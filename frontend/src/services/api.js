@@ -6,51 +6,82 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  // Don't include credentials in CORS requests (tokens go in headers)
+  withCredentials: false
 })
 
-// Request interceptor to add token
+// Request interceptor to add Bearer token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
+}, (error) => {
+  return Promise.reject(error)
 })
 
-// Response interceptor for error handling
+// Response interceptor for error handling and token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
     
+    // Handle 401 Unauthorized - attempt token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
       
       try {
         const refreshToken = localStorage.getItem('refresh_token')
+        if (!refreshToken) {
+          // No refresh token available, redirect to login
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
+          window.location.href = '/login'
+          return Promise.reject(error)
+        }
+
+        // Attempt to refresh the token
         const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
           refresh_token: refreshToken
         })
         
+        // Store new tokens
         localStorage.setItem('access_token', response.data.access_token)
         localStorage.setItem('refresh_token', response.data.refresh_token)
+        localStorage.setItem('token_expires_at', 
+          new Date(Date.now() + (response.data.expires_in * 1000)).toISOString()
+        )
         
+        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`
         return api(originalRequest)
-      } catch (err) {
+      } catch (refreshError) {
+        // Refresh failed, clear tokens and redirect to login
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
+        localStorage.removeItem('token_expires_at')
         window.location.href = '/login'
-        return Promise.reject(err)
+        return Promise.reject(refreshError)
       }
+    }
+    
+    // Handle 403 Forbidden - likely insufficient permissions
+    if (error.response?.status === 403) {
+      console.error('Insufficient permissions:', error.response.data?.detail)
+    }
+    
+    // Handle 423 Locked - account is locked
+    if (error.response?.status === 423) {
+      console.error('Account is locked:', error.response.data?.detail)
     }
     
     return Promise.reject(error)
   }
 )
 
-// Service methods
+// Service methods for API operations
 export const suppliers = {
   list: (params) => api.get('/suppliers', { params }),
   create: (data) => api.post('/suppliers', data),
@@ -98,6 +129,7 @@ export const transfers = {
 
 export const inventory = {
   list: (params) => api.get('/inventory', { params }),
+
   get: (id) => api.get(`/inventory/${id}`),
 }
 

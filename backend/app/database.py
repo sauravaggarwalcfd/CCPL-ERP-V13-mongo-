@@ -7,6 +7,7 @@ from .models import (
     StockTransfer, StockAdjustment, Category, Brand, Season,
     Color, Size, AuditLog
 )
+from .models.item import ItemCategory, ItemSubCategory, ItemMaster
 
 
 class Database:
@@ -40,6 +41,9 @@ async def connect_to_mongo():
             Color,
             Size,
             AuditLog,
+            ItemCategory,
+            ItemSubCategory,
+            ItemMaster,
         ],
     )
 

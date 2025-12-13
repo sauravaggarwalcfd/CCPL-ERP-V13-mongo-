@@ -1,6 +1,7 @@
 from . import auth
 from . import users
 from . import roles
+from . import items
 from . import products
 from . import inventory
 from . import suppliers
@@ -17,6 +18,7 @@ __all__ = [
     "auth",
     "users",
     "roles",
+    "items",
     "products",
     "inventory",
     "suppliers",

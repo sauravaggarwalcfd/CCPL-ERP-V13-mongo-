@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
 from .database import connect_to_mongo, close_mongo_connection
 from .routes import (
     auth,
@@ -17,16 +18,27 @@ from .routes import (
     adjustments,
     master_data,
     reports,
+    items,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await connect_to_mongo()
+    try:
+        await connect_to_mongo()
+        logger.info("MongoDB connection successful")
+    except Exception as e:
+        logger.warning(f"MongoDB connection failed: {str(e)}")
+        logger.warning("App starting with database unavailable - use for testing only")
     yield
     # Shutdown
-    await close_mongo_connection()
+    try:
+        await close_mongo_connection()
+    except Exception as e:
+        logger.warning(f"Error closing MongoDB connection: {str(e)}")
 
 
 app = FastAPI(
@@ -39,7 +51,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +61,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(roles.router, prefix="/api/roles", tags=["Roles"])
+app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(products.router, prefix="/api/products", tags=["Products"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(suppliers.router, prefix="/api/suppliers", tags=["Suppliers"])

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import MainLayout from './components/layout/MainLayout'
@@ -7,6 +8,8 @@ import Dashboard from './pages/Dashboard'
 import ProductsList from './pages/products/ProductsList'
 import InventoryList from './pages/inventory/InventoryList'
 import SuppliersList from './pages/suppliers/SuppliersList'
+import ItemMaster from './pages/ItemMaster'
+import ItemCategory from './pages/ItemCategory'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -50,9 +53,20 @@ function App() {
                 <SuppliersList />
               </ProtectedRoute>
             } />
+            <Route path="/item-master" element={
+              <ProtectedRoute>
+                <ItemMaster />
+              </ProtectedRoute>
+            } />
+            <Route path="/item-category" element={
+              <ProtectedRoute>
+                <ItemCategory />
+              </ProtectedRoute>
+            } />
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster position="top-right" />
     </AuthProvider>
   )
 }
