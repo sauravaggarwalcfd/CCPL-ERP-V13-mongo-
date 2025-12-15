@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List, Optional
 import logging
+import re
+from datetime import datetime
 from ..models.item import (
     ItemCategory, ItemSubCategory, ItemMaster,
     ItemCategoryCreate, ItemCategoryResponse,
     ItemSubCategoryCreate, ItemSubCategoryResponse,
     ItemMasterCreate, ItemMasterResponse,
-    InventoryType
+    InventoryType, InventoryClassType, UnitOfMeasure
 )
 from ..core.dependencies import get_current_user
 
@@ -21,26 +23,61 @@ async def create_item_category(
     data: ItemCategoryCreate,
     current_user = Depends(get_current_user)
 ):
-    """Create a new Item Category (Level 1)"""
+    """Create a new Item Category - Requires inventory_class and selected_uoms"""
+    
+    # Generate category_id if not provided
+    category_id = data.category_id
+    if not category_id:
+        if data.category_code:
+            category_id = data.category_code.upper()
+        elif data.category_name:
+            category_id = data.category_name[:4].upper().replace(' ', '')
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either category_id, category_code, or category_name must be provided"
+            )
     
     # Check if category already exists
-    existing = await ItemCategory.find_one(ItemCategory.category_id == data.category_id)
+    existing = await ItemCategory.find_one(ItemCategory.category_id == category_id)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Item Category with ID '{data.category_id}' already exists"
+            detail=f"Item Category with ID '{category_id}' already exists"
         )
     
-    category = ItemCategory(
-        category_id=data.category_id,
-        category_name=data.category_name,
-        category_code=data.category_code,
-        description=data.description,
-        parent_category_id=data.parent_category_id,
-    )
+    # Validate category code format (max 4 alphabets only)
+    if data.category_code:
+        if not re.match(r'^[A-Za-z]{1,4}$', data.category_code):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category code must be 1-4 alphabetic characters only"
+            )
+        
+        # Check if category code exists
+        existing_code = await ItemCategory.find_one(ItemCategory.category_code == data.category_code.upper())
+        if existing_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Category code '{data.category_code}' already exists"
+            )
+    
+    # Validate selected_uoms
+    if not data.selected_uoms or len(data.selected_uoms) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one Unit of Measure must be selected"
+        )
+    
+    category_data = data.dict()
+    category_data['category_id'] = category_id
+    category_data['category_code'] = (data.category_code or category_id).upper()
+    category_data['category_name'] = (data.category_name or category_id).upper()
+    
+    category = ItemCategory(**category_data)
     
     await category.save()
-    logger.info(f"Created Item Category: {data.category_id} - {data.category_name}")
+    logger.info(f"Created Item Category: {category_id} - {category.category_name}")
     
     return ItemCategoryResponse(
         id=str(category.id),
@@ -49,8 +86,25 @@ async def create_item_category(
         category_code=category.category_code,
         description=category.description,
         parent_category_id=category.parent_category_id,
+        parent_category_name=category.parent_category_name,
+        level=category.level,
+        inventory_class=category.inventory_class,
+        selected_uoms=category.selected_uoms or [],
+        waste_percentage=category.waste_percentage,
+        reorder_point=category.reorder_point,
+        lead_time_days=category.lead_time_days,
+        preferred_supplier_id=category.preferred_supplier_id,
+        preferred_supplier_name=category.preferred_supplier_name,
+        standard_cost=category.standard_cost,
+        requires_batch_tracking=category.requires_batch_tracking,
+        requires_expiry_tracking=category.requires_expiry_tracking,
+        quality_check_required=category.quality_check_required,
+        storage_requirements=category.storage_requirements,
+        handling_instructions=category.handling_instructions,
+        sort_order=category.sort_order,
         is_active=category.is_active,
-        created_at=category.created_at
+        created_at=category.created_at,
+        updated_at=category.updated_at,
     )
 
 
@@ -61,11 +115,16 @@ async def list_item_categories(
     active_only: bool = True,
     current_user = Depends(get_current_user)
 ):
-    """List all Item Categories"""
+    """List all Item Categories - only returns categories with inventory_class"""
     
-    query = ItemCategory.find()
+    # Filter for categories that have inventory_class (skip old records without it)
     if active_only:
-        query = query.where(ItemCategory.is_active == True)
+        query = ItemCategory.find(
+            ItemCategory.is_active == True,
+            ItemCategory.inventory_class != None
+        )
+    else:
+        query = ItemCategory.find(ItemCategory.inventory_class != None)
     
     categories = await query.skip(skip).limit(limit).to_list()
     
@@ -77,8 +136,25 @@ async def list_item_categories(
             category_code=cat.category_code,
             description=cat.description,
             parent_category_id=cat.parent_category_id,
+            parent_category_name=cat.parent_category_name,
+            level=cat.level,
+            inventory_class=cat.inventory_class,
+            selected_uoms=cat.selected_uoms or [],
+            waste_percentage=cat.waste_percentage,
+            reorder_point=cat.reorder_point,
+            lead_time_days=cat.lead_time_days,
+            preferred_supplier_id=cat.preferred_supplier_id,
+            preferred_supplier_name=cat.preferred_supplier_name,
+            standard_cost=cat.standard_cost,
+            requires_batch_tracking=cat.requires_batch_tracking,
+            requires_expiry_tracking=cat.requires_expiry_tracking,
+            quality_check_required=cat.quality_check_required,
+            storage_requirements=cat.storage_requirements,
+            handling_instructions=cat.handling_instructions,
+            sort_order=cat.sort_order,
             is_active=cat.is_active,
-            created_at=cat.created_at
+            created_at=cat.created_at,
+            updated_at=cat.updated_at,
         )
         for cat in categories
     ]
@@ -100,14 +176,150 @@ async def get_item_category(
     
     return ItemCategoryResponse(
         id=str(category.id),
-        category_id=category.category_id,
-        category_name=category.category_name,
-        category_code=category.category_code,
-        description=category.description,
-        parent_category_id=category.parent_category_id,
-        is_active=category.is_active,
-        created_at=category.created_at
+        **category.dict(exclude={"id"}),
     )
+
+
+@router.put("/categories/{category_id}", response_model=ItemCategoryResponse)
+async def update_item_category(
+    category_id: str,
+    data: ItemCategoryCreate,
+    current_user = Depends(get_current_user)
+):
+    """Update an Item Category - Requires inventory_class and selected_uoms"""
+    
+    category = await ItemCategory.find_one(ItemCategory.category_id == category_id)
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item Category '{category_id}' not found"
+        )
+    
+    # Check if new category_id already exists (if different from current)
+    if data.category_id and data.category_id != category_id:
+        existing = await ItemCategory.find_one(ItemCategory.category_id == data.category_id)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Item Category with ID '{data.category_id}' already exists"
+            )
+    
+    # Validate category code format (max 4 alphabets only)
+    if data.category_code:
+        if not re.match(r'^[A-Za-z]{1,4}$', data.category_code):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category code must be 1-4 alphabetic characters only"
+            )
+        
+        # Check if category code exists (if changing it)
+        if data.category_code != category.category_code:
+            existing_code = await ItemCategory.find_one(ItemCategory.category_code == data.category_code.upper())
+            if existing_code:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Category code '{data.category_code}' already exists"
+                )
+    
+    # Validate selected_uoms
+    if not data.selected_uoms or len(data.selected_uoms) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one Unit of Measure must be selected"
+        )
+    
+    # Check if inventory_class is changing and if category has children
+    if data.inventory_class and data.inventory_class != category.inventory_class:
+        children = await ItemCategory.find(ItemCategory.parent_category_id == category_id).to_list()
+        if children:
+            # Update all children with new inventory_class
+            for child in children:
+                child.inventory_class = data.inventory_class
+                child.updated_at = datetime.utcnow()
+                await child.save()
+            logger.info(f"Updated inventory_class for {len(children)} child categories of {category_id}")
+    
+    # Update all fields from data - enforce uppercase
+    for field, value in data.dict(exclude_unset=True).items():
+        if field == 'category_name' and value:
+            setattr(category, field, value.upper())
+        elif field == 'category_code' and value:
+            setattr(category, field, value.upper())
+        else:
+            setattr(category, field, value)
+    
+    category.updated_at = datetime.utcnow()
+    
+    await category.save()
+    logger.info(f"Updated Item Category: {category_id}")
+    
+    return ItemCategoryResponse(
+        id=str(category.id),
+        **category.dict(exclude={"id"}),
+    )
+
+
+@router.delete("/categories/{category_id}")
+async def delete_item_category(
+    category_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Delete an Item Category"""
+    
+    category = await ItemCategory.find_one(ItemCategory.category_id == category_id)
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item Category '{category_id}' not found"
+        )
+    
+    await category.delete()
+    logger.info(f"Deleted Item Category: {category_id}")
+    
+    return {"message": f"Category '{category_id}' deleted successfully"}
+
+
+@router.get("/categories/hierarchy")
+async def get_category_hierarchy(
+    current_user = Depends(get_current_user)
+):
+    """Get full category hierarchy tree"""
+    
+    # Get all categories
+    all_categories = await ItemCategory.find().to_list()
+    
+    # Build hierarchy
+    def build_tree(parent_id=None):
+        children = []
+        for cat in all_categories:
+            if cat.parent_category_id == parent_id:
+                node = {
+                    "id": str(cat.id),
+                    "category_id": cat.category_id,
+                    "category_name": cat.category_name,
+                    "category_code": cat.category_code,
+                    "level": cat.level,
+                    "inventory_class": cat.inventory_class,
+                    "children": build_tree(cat.category_id)
+                }
+                children.append(node)
+        return children
+    
+    return build_tree(None)
+
+
+@router.get("/enums/inventory-classes")
+async def get_inventory_classes():
+    """Get all inventory class types"""
+    return [{"value": item.value, "label": item.value.replace("_", " ").title()} 
+            for item in InventoryClassType]
+
+
+@router.get("/enums/units-of-measure")
+async def get_units_of_measure():
+    """Get all units of measure"""
+    return [{"value": item.value, "label": item.value.upper()} 
+            for item in UnitOfMeasure]
 
 
 # ==================== ITEM SUB-CATEGORY ROUTES ====================
@@ -172,13 +384,16 @@ async def list_item_sub_categories(
 ):
     """List Item Sub-Categories - optionally filter by parent category"""
     
-    query = ItemSubCategory.find()
-    
+    filters = []
     if category_id:
-        query = query.where(ItemSubCategory.category_id == category_id)
-    
+        filters.append(ItemSubCategory.category_id == category_id)
     if active_only:
-        query = query.where(ItemSubCategory.is_active == True)
+        filters.append(ItemSubCategory.is_active == True)
+    
+    if filters:
+        query = ItemSubCategory.find(*filters)
+    else:
+        query = ItemSubCategory.find()
     
     sub_categories = await query.skip(skip).limit(limit).to_list()
     
@@ -357,16 +572,18 @@ async def list_items(
 ):
     """List Item Master records - optionally filter by category"""
     
-    query = ItemMaster.find()
-    
+    filters = []
     if category_id:
-        query = query.where(ItemMaster.category_id == category_id)
-    
+        filters.append(ItemMaster.category_id == category_id)
     if sub_category_id:
-        query = query.where(ItemMaster.sub_category_id == sub_category_id)
-    
+        filters.append(ItemMaster.sub_category_id == sub_category_id)
     if active_only:
-        query = query.where(ItemMaster.is_active == True)
+        filters.append(ItemMaster.is_active == True)
+    
+    if filters:
+        query = ItemMaster.find(*filters)
+    else:
+        query = ItemMaster.find()
     
     items = await query.skip(skip).limit(limit).to_list()
     

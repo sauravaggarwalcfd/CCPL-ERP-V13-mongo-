@@ -11,24 +11,89 @@ class InventoryType(str, Enum):
     CONSUMABLE = "consumable"
 
 
-# ==================== ITEM CATEGORY ====================
+class InventoryClassType(str, Enum):
+    RAW_MATERIALS = "raw_materials"
+    SEMI_FINISHED = "semi_finished"
+    FINISHED_GOODS = "finished_goods"
+    ACCESSORIES = "accessories"
+    PACKAGING = "packaging"
+
+
+class UnitOfMeasure(str, Enum):
+    METER = "meter"
+    KG = "kg"
+    PIECE = "piece"
+    YARD = "yard"
+    LITER = "liter"
+    GRAM = "gram"
+    DOZEN = "dozen"
+    SET = "set"
+
+
+# ==================== ITEM CATEGORY (ENHANCED) ====================
 class ItemCategory(Document):
     """
-    Level 1: Item Category
-    Example: CLOTH (Clothing), FOOT (Footwear), ACCS (Accessories)
+    Item Category with UNLIMITED HIERARCHICAL DEPTH
+    
+    Supports infinite nesting through parent_category_id relationship.
+    No restrictions on tree depth - can have as many levels as needed.
+    
+    Example Structure:
+    Level 1: RAW MATERIALS (root)
+      Level 2: FABRICS (child)
+        Level 3: COTTON FABRICS (grandchild)
+          Level 4: ORGANIC COTTON (great-grandchild)
+            Level 5: CERTIFIED ORGANIC COTTON (great-great-grandchild)
+              ... unlimited depth
+    
+    Features:
+    - Parent-child relationships via parent_category_id
+    - Level field tracks depth (auto-calculated)
+    - Inherits inventory_class from ancestors
+    - Supports full tree operations (CRUD, move, reorder)
     """
-    category_id: Indexed(str, unique=True)  # CLOTH, FOOT, ACCS
-    category_name: str  # Clothing, Footwear, Accessories
-    category_code: str  # Short code for reference
+    category_id: Indexed(str, unique=True)  # Unique identifier
+    category_name: str  # Display name (uppercase enforced)
+    category_code: str  # Short code (max 4 letters, uppercase)
     description: Optional[str] = None
-    parent_category_id: Optional[str] = None  # For hierarchical structure
+    
+    # Hierarchy fields - enables infinite nesting
+    parent_category_id: Optional[str] = None  # Parent reference (null = root level)
+    parent_category_name: Optional[str] = None  # Denormalized for display
+    level: int = 1  # Depth in tree (1=root, 2=child, 3=grandchild, ... no limit)
+    
+    # Inventory classification
+    inventory_class: Optional[InventoryClassType] = None  # For level 1
+    
+    # Material attributes
+    selected_uoms: Optional[List[str]] = []  # Multiple units of measure allowed
+    waste_percentage: Optional[float] = 0.0  # Expected wastage (%)
+    reorder_point: Optional[int] = None  # Min stock level
+    lead_time_days: Optional[int] = None  # Procurement lead time
+    
+    # Supplier & Cost (can link to supplier master later)
+    preferred_supplier_id: Optional[str] = None
+    preferred_supplier_name: Optional[str] = None
+    standard_cost: Optional[float] = None  # Standard cost per UOM
+    
+    # Quality & Tracking
+    requires_batch_tracking: bool = False
+    requires_expiry_tracking: bool = False
+    quality_check_required: bool = False
+    
+    # Storage requirements
+    storage_requirements: Optional[str] = None  # Temperature, humidity, etc.
+    handling_instructions: Optional[str] = None
+    
+    # System fields
     is_active: bool = True
+    sort_order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "item_categories"
-        indexes = ["category_id", "category_code"]
+        indexes = ["category_id", "category_code", "parent_category_id", "level", "inventory_class"]
 
 
 # ==================== ITEM SUB-CATEGORY ====================
@@ -139,17 +204,69 @@ class ItemMaster(Document):
 
 # ==================== REQUEST/RESPONSE SCHEMAS ====================
 class ItemCategoryCreate(BaseModel):
+    category_id: Optional[str] = None
+    category_name: Optional[str] = None
+    category_code: Optional[str] = None
+    description: Optional[str] = None
+    
+    # Hierarchy
+    parent_category_id: Optional[str] = None
+    parent_category_name: Optional[str] = None
+    level: int = 1
+    
+    # Inventory classification (REQUIRED)
+    inventory_class: InventoryClassType
+    
+    # Material attributes (REQUIRED)
+    selected_uoms: List[str]
+    waste_percentage: Optional[float] = 0.0
+    reorder_point: Optional[int] = None
+    lead_time_days: Optional[int] = None
+    
+    # Supplier & Cost
+    preferred_supplier_id: Optional[str] = None
+    preferred_supplier_name: Optional[str] = None
+    standard_cost: Optional[float] = None
+    
+    # Quality & Tracking
+    requires_batch_tracking: bool = False
+    requires_expiry_tracking: bool = False
+    quality_check_required: bool = False
+    
+    # Storage
+    storage_requirements: Optional[str] = None
+    handling_instructions: Optional[str] = None
+    
+    # System
+    sort_order: int = 0
+
+
+class ItemCategoryResponse(BaseModel):
+    id: str
     category_id: str
-    category_name: str
-    category_code: str
+    category_name: Optional[str] = None
+    category_code: Optional[str] = None
     description: Optional[str] = None
     parent_category_id: Optional[str] = None
-
-
-class ItemCategoryResponse(ItemCategoryCreate):
-    id: str
+    parent_category_name: Optional[str] = None
+    level: int
+    inventory_class: InventoryClassType
+    selected_uoms: List[str]
+    waste_percentage: Optional[float] = 0.0
+    reorder_point: Optional[int] = None
+    lead_time_days: Optional[int] = None
+    preferred_supplier_id: Optional[str] = None
+    preferred_supplier_name: Optional[str] = None
+    standard_cost: Optional[float] = None
+    requires_batch_tracking: bool = False
+    requires_expiry_tracking: bool = False
+    quality_check_required: bool = False
+    storage_requirements: Optional[str] = None
+    handling_instructions: Optional[str] = None
+    sort_order: int = 0
     is_active: bool
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 class ItemSubCategoryCreate(BaseModel):

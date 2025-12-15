@@ -173,8 +173,8 @@ export default function Login() {
         {!isSignup && (
           <div className="text-center text-sm text-gray-600 bg-gray-100 rounded p-3">
             <p className="font-semibold mb-1">Demo Account:</p>
-            <p>Email: admin@confidence.com</p>
-            <p>Password: Admin@123</p>
+            <p>Email: demo@example.com</p>
+            <p>Password: Demo123!</p>
           </div>
         )}
       </div>

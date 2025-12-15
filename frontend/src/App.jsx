@@ -10,6 +10,7 @@ import InventoryList from './pages/inventory/InventoryList'
 import SuppliersList from './pages/suppliers/SuppliersList'
 import ItemMaster from './pages/ItemMaster'
 import ItemCategory from './pages/ItemCategory'
+import ItemCategoryHierarchy from './pages/ItemCategoryHierarchy'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -61,6 +62,11 @@ function App() {
             <Route path="/item-category" element={
               <ProtectedRoute>
                 <ItemCategory />
+              </ProtectedRoute>
+            } />
+            <Route path="/item-category-hierarchy" element={
+              <ProtectedRoute>
+                <ItemCategoryHierarchy />
               </ProtectedRoute>
             } />
           </Route>

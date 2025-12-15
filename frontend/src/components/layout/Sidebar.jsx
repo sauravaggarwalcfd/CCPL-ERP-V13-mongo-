@@ -22,7 +22,8 @@ export default function Sidebar() {
       icon: Archive,
       label: 'Masters',
       subItems: [
-        { to: '/item-category', label: 'Item Category' },
+        { to: '/item-category', label: 'Item Category (Basic)' },
+        { to: '/item-category-hierarchy', label: 'Item Category (Tree View)' },
         { to: '/fabric-category', label: 'Fabric Category' },
         { to: '/item-master', label: 'Item Master' },
         { to: '/color-master', label: 'Color Master' },
