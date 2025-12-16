@@ -215,6 +215,10 @@ class ItemSubClass(Document):
     # Item Type
     item_type: str = "FG"
     
+    # SKU Configuration
+    sku_prefix: str = ""    # Same as sub_class_code, used in SKU generation
+    last_sequence: str = "A0000"    # Last used sequence
+    
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
