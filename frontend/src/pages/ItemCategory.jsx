@@ -29,11 +29,14 @@ export default function ItemCategory() {
       const response = await fetch('http://127.0.0.1:8000/api/items/categories', {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
       setCategories(Array.isArray(data) ? data : [])
     } catch (error) {
-      toast.error('Failed to fetch categories')
-      console.error(error)
+      console.error('Error fetching categories:', error)
+      setCategories([]) // Set empty array on error instead of showing error toast
     } finally {
       setLoading(false)
     }

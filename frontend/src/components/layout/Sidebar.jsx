@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { BarChart3, Package, TrendingUp, ShoppingCart, Users, Truck, GitBranch, Settings, LogOut, ChevronDown, Home, Archive, Boxes, FileText, Lock, Mail } from 'lucide-react'
+import { BarChart3, Package, TrendingUp, ShoppingCart, Users, Truck, GitBranch, Settings, LogOut, ChevronDown, Home, Archive, Boxes, FileText, Lock, Mail, FolderTree } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useState } from 'react'
 
@@ -22,8 +22,7 @@ export default function Sidebar() {
       icon: Archive,
       label: 'Masters',
       subItems: [
-        { to: '/item-category', label: 'Item Category (Basic)' },
-        { to: '/item-category-hierarchy', label: 'Item Category (Tree View)' },
+        { to: '/item-categories', label: 'Item Categories', icon: FolderTree },
         { to: '/fabric-category', label: 'Fabric Category' },
         { to: '/item-master', label: 'Item Master' },
         { to: '/color-master', label: 'Color Master' },

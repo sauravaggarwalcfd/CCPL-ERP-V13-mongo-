@@ -13,6 +13,8 @@ from . import transfers
 from . import adjustments
 from . import master_data
 from . import reports
+from . import item_types
+from . import category_hierarchy
 
 __all__ = [
     "auth",
@@ -30,4 +32,6 @@ __all__ = [
     "adjustments",
     "master_data",
     "reports",
+    "item_types",
+    "category_hierarchy",
 ]

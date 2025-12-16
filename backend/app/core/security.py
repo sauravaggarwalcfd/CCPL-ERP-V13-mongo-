@@ -6,11 +6,10 @@ import re
 import secrets
 from ..config import settings
 
-# CryptContext with bcrypt configuration
+# CryptContext with argon2 configuration (better than bcrypt)
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=settings.PASSWORD_HASH_ROUNDS
+    schemes=["argon2"],
+    deprecated="auto"
 )
 
 # In-memory token blacklist (use Redis in production)

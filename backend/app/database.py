@@ -7,7 +7,15 @@ from .models import (
     StockTransfer, StockAdjustment, Category, Brand, Season,
     Color, Size, AuditLog
 )
-from .models.item import ItemCategory, ItemSubCategory, ItemMaster
+from .models.item import ItemMaster
+from .models.item_type import ItemType
+from .models.category_hierarchy import (
+    ItemCategory,
+    ItemSubCategory,
+    ItemDivision,
+    ItemClass,
+    ItemSubClass
+)
 
 
 class Database:
@@ -41,9 +49,13 @@ async def connect_to_mongo():
             Color,
             Size,
             AuditLog,
-            ItemCategory,
-            ItemSubCategory,
             ItemMaster,
+            ItemType,
+            ItemCategory,           # 5-level hierarchy
+            ItemSubCategory,
+            ItemDivision,
+            ItemClass,
+            ItemSubClass,
         ],
     )
 

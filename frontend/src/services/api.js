@@ -155,4 +155,55 @@ export const warehouses = {
   get: (id) => api.get(`/warehouses/${id}`),
 }
 
+// Item Types API
+export const itemTypes = {
+  getAll: (params = {}) => api.get('/item-types', { params }),
+  getDropdown: () => api.get('/item-types/dropdown'),
+  getOne: (code) => api.get(`/item-types/${code}`),
+  create: (data) => api.post('/item-types', data),
+  update: (code, data) => api.put(`/item-types/${code}`, data),
+  delete: (code) => api.delete(`/item-types/${code}`),
+  seed: () => api.post('/item-types/seed'),
+}
+
+// Category Hierarchy API (5 Levels)
+export const categoryHierarchy = {
+  // Tree
+  getTree: (isActive = true) => api.get('/hierarchy/tree', { params: { is_active: isActive } }),
+  
+  // Dropdown helper
+  getDropdown: (level, categoryCode, subCategoryCode, divisionCode, classCode) => {
+    const params = {}
+    if (categoryCode) params.category_code = categoryCode
+    if (subCategoryCode) params.sub_category_code = subCategoryCode
+    if (divisionCode) params.division_code = divisionCode
+    if (classCode) params.class_code = classCode
+    return api.get(`/hierarchy/dropdown/${level}`, { params })
+  },
+  
+  // Level 1: Categories
+  getCategories: (params = {}) => api.get('/hierarchy/categories', { params }),
+  getCategory: (code) => api.get(`/hierarchy/categories/${code}`),
+  
+  // Level 2: Sub-Categories
+  getSubCategories: (params = {}) => api.get('/hierarchy/sub-categories', { params }),
+  
+  // Level 3: Divisions
+  getDivisions: (params = {}) => api.get('/hierarchy/divisions', { params }),
+  
+  // Level 4: Classes
+  getClasses: (params = {}) => api.get('/hierarchy/classes', { params }),
+  
+  // Level 5: Sub-Classes
+  getSubClasses: (params = {}) => api.get('/hierarchy/sub-classes', { params }),
+  
+  // Generic CRUD by level key
+  create: (levelKey, data) => api.post(`/hierarchy/${levelKey}`, data),
+  update: (levelKey, code, data) => api.put(`/hierarchy/${levelKey}/${code}`, data),
+  delete: (levelKey, code) => api.delete(`/hierarchy/${levelKey}/${code}`),
+  
+  // Seed data
+  seed: () => api.post('/hierarchy/seed'),
+}
+
 export default api
