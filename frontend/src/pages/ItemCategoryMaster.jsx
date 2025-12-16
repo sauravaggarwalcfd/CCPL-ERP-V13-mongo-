@@ -1178,6 +1178,25 @@ export default function ItemCategoryMaster() {
                   />
                 </div>
                 
+                {/* Path & SKU Preview - Show for all levels when code is entered */}
+                {formData.code && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label className="block text-sm font-semibold text-blue-800 mb-2">
+                      Code Path Preview
+                    </label>
+                    <div className="font-mono text-lg font-bold text-blue-700">
+                      {formData.level === 1 && formData.code}
+                      {formData.level === 2 && `${formData.category_code || '????'}/${formData.code}`}
+                      {formData.level === 3 && `${formData.category_code || '????'}/${formData.sub_category_code || '????'}/${formData.code}`}
+                      {formData.level === 4 && `${formData.category_code || '????'}/${formData.sub_category_code || '????'}/${formData.division_code || '????'}/${formData.code}`}
+                      {formData.level === 5 && `${formData.category_code || '????'}/${formData.sub_category_code || '????'}/${formData.division_code || '????'}/${formData.class_code || '????'}/${formData.code}`}
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Hierarchy path: {LEVELS.slice(0, formData.level).map(l => l.name).join(' → ')}
+                    </p>
+                  </div>
+                )}
+                
                 {/* SKU Prefix Preview - Only for Level 5 (Sub-Class) */}
                 {formData.level === 5 && formData.code && (
                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
