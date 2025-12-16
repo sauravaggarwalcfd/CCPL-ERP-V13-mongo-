@@ -25,7 +25,7 @@ const DEFAULT_FORM = {
   sub_category_code: '',
   division_code: '',
   class_code: '',
-  applicable_item_types: ['FG'],
+  item_type: 'FG',
   has_color: true,
   has_size: true,
   has_fabric: false,
@@ -241,7 +241,7 @@ export default function ItemCategoryMaster() {
       sub_category_code: item.sub_category_code || '',
       division_code: item.division_code || '',
       class_code: item.class_code || '',
-      applicable_item_types: item.applicable_item_types || ['FGDS'],
+      item_type: item.item_type || 'FG',
       has_color: item.has_color ?? true,
       has_size: item.has_size ?? true,
       has_fabric: item.has_fabric ?? false,
@@ -338,7 +338,7 @@ export default function ItemCategoryMaster() {
         [levelConfig.codeField]: formData.code.toUpperCase(),
         [levelConfig.nameField]: formData.name,
         description: formData.description || null,
-        applicable_item_types: formData.applicable_item_types,
+        item_type: formData.item_type,
         icon: formData.icon,
         color_code: formData.color_code,
         sort_order: formData.sort_order,
@@ -784,10 +784,47 @@ export default function ItemCategoryMaster() {
 
             {/* Modal Body */}
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-              {/* Step 1: Select Level */}
+              {/* Step 1: Select Item Type */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Step 1: Select Item Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {itemTypesList.map((type) => (
+                    <label
+                      key={type.value}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition ${
+                        formData.item_type === type.value
+                          ? 'border-blue-500 bg-blue-100'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="item_type"
+                        value={type.value}
+                        checked={formData.item_type === type.value}
+                        onChange={(e) => setFormData(prev => ({ ...prev, item_type: e.target.value }))}
+                        className="sr-only"
+                      />
+                      <span 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: type.color }}
+                      />
+                      <span className="text-sm font-bold">{type.value}</span>
+                      <span className="text-xs text-gray-600">{type.name}</span>
+                      {formData.item_type === type.value && (
+                        <Check size={16} className="text-blue-600 ml-1" />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 2: Select Level */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Step 1: Select Level
+                  Step 2: Select Level
                 </label>
                 <div className="grid grid-cols-1 gap-2">
                   {LEVELS.map((level) => {
@@ -829,11 +866,11 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
 
-              {/* Step 2: Select Parent Hierarchy */}
+              {/* Step 3: Select Parent Hierarchy */}
               {formData.level > 1 && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Step 2: Select Parent Hierarchy
+                    Step 3: Select Parent Hierarchy
                   </label>
                   
                   <div className="space-y-3">
@@ -931,10 +968,10 @@ export default function ItemCategoryMaster() {
                 </div>
               )}
 
-              {/* Step 3: Basic Information */}
+              {/* Step 4: Basic Information */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Step {formData.level > 1 ? '3' : '2'}: Basic Information
+                  Step {formData.level > 1 ? '4' : '3'}: Basic Information
                 </label>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -987,53 +1024,6 @@ export default function ItemCategoryMaster() {
                     placeholder="Optional description..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
-                </div>
-              </div>
-
-              {/* Applicable Item Types - For ALL levels */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Step {formData.level > 1 ? '4' : '3'}: Select Item Types
-                </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  Select which item types can be created under this {LEVELS[formData.level - 1]?.name.toLowerCase()}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {itemTypesList.map((type) => (
-                    <label
-                      key={type.value}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${
-                        formData.applicable_item_types.includes(type.value)
-                          ? 'border-blue-500 bg-blue-100'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.applicable_item_types.includes(type.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              applicable_item_types: [...prev.applicable_item_types, type.value]
-                            }))
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              applicable_item_types: prev.applicable_item_types.filter(t => t !== type.value)
-                            }))
-                          }
-                        }}
-                        className="sr-only"
-                      />
-                      <span 
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: type.color }}
-                      />
-                      <span className="text-sm font-medium">{type.value}</span>
-                      <span className="text-xs text-gray-500">{type.name}</span>
-                    </label>
-                  ))}
                 </div>
               </div>
 

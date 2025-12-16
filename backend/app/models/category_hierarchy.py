@@ -30,7 +30,7 @@ class ItemCategory(Document):
     category_name: str
     description: Optional[str] = None
     
-    applicable_item_types: List[str] = ["FG"]
+    item_type: str = "FG"
     
     has_color: bool = True
     has_size: bool = True
@@ -77,8 +77,8 @@ class ItemSubCategory(Document):
     path: str = ""    # APRL/MENS
     path_name: str = ""  # Apparel > Men
     
-    # Applicable Item Types
-    applicable_item_types: List[str] = ["FG"]
+    # Item Type
+    item_type: str = "FG"
     
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
@@ -119,8 +119,8 @@ class ItemDivision(Document):
     path: str = ""    # APRL/MENS/TOPW
     path_name: str = ""  # Apparel > Men > Topwear
     
-    # Applicable Item Types
-    applicable_item_types: List[str] = ["FG"]
+    # Item Type
+    item_type: str = "FG"
     
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
@@ -163,8 +163,8 @@ class ItemClass(Document):
     path: str = ""    # APRL/MENS/TOPW/TSHT
     path_name: str = ""  # Apparel > Men > Topwear > T-Shirts
     
-    # Applicable Item Types
-    applicable_item_types: List[str] = ["FG"]
+    # Item Type
+    item_type: str = "FG"
     
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
@@ -212,8 +212,8 @@ class ItemSubClass(Document):
     path: str = ""    # APRL/MENS/TOPW/TSHT/RNCK
     path_name: str = ""  # Apparel > Men > Topwear > T-Shirts > Round Neck
     
-    # Applicable Item Types
-    applicable_item_types: List[str] = ["FG"]
+    # Item Type
+    item_type: str = "FG"
     
     # SKU Configuration
     sku_prefix: str = ""    # Same as sub_class_code, used in SKU generation
@@ -257,7 +257,7 @@ class ItemCategoryCreate(BaseModel):
     category_code: str = Field(..., min_length=4, max_length=4)
     category_name: str
     description: Optional[str] = None
-    applicable_item_types: List[str] = ["FG"]
+    item_type: str = "FG"
     has_color: bool = True
     has_size: bool = True
     has_fabric: bool = False
@@ -282,7 +282,7 @@ class ItemSubCategoryCreate(BaseModel):
     sub_category_name: str
     description: Optional[str] = None
     category_code: str    # Parent
-    applicable_item_types: List[str] = ["FG"]
+    item_type: str = "FG"
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -302,7 +302,7 @@ class ItemDivisionCreate(BaseModel):
     description: Optional[str] = None
     category_code: str
     sub_category_code: str
-    applicable_item_types: List[str] = ["FG"]
+    item_type: str = "FG"
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -323,7 +323,7 @@ class ItemClassCreate(BaseModel):
     category_code: str
     sub_category_code: str
     division_code: str
-    applicable_item_types: List[str] = ["FG"]
+    item_type: str = "FG"
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -347,7 +347,7 @@ class ItemSubClassCreate(BaseModel):
     sub_category_code: str
     division_code: str
     class_code: str
-    applicable_item_types: List[str] = ["FG"]
+    item_type: str = "FG"
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -368,7 +368,7 @@ class ItemSubClassCreate(BaseModel):
 class ItemCategoryUpdate(BaseModel):
     category_name: Optional[str] = None
     description: Optional[str] = None
-    applicable_item_types: Optional[List[str]] = None
+    item_type: Optional[str] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -387,7 +387,7 @@ class ItemCategoryUpdate(BaseModel):
 class ItemSubCategoryUpdate(BaseModel):
     sub_category_name: Optional[str] = None
     description: Optional[str] = None
-    applicable_item_types: Optional[List[str]] = None
+    item_type: Optional[str] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -400,7 +400,7 @@ class ItemSubCategoryUpdate(BaseModel):
 class ItemDivisionUpdate(BaseModel):
     division_name: Optional[str] = None
     description: Optional[str] = None
-    applicable_item_types: Optional[List[str]] = None
+    item_type: Optional[str] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -413,7 +413,7 @@ class ItemDivisionUpdate(BaseModel):
 class ItemClassUpdate(BaseModel):
     class_name: Optional[str] = None
     description: Optional[str] = None
-    applicable_item_types: Optional[List[str]] = None
+    item_type: Optional[str] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -428,7 +428,7 @@ class ItemClassUpdate(BaseModel):
 class ItemSubClassUpdate(BaseModel):
     sub_class_name: Optional[str] = None
     description: Optional[str] = None
-    applicable_item_types: Optional[List[str]] = None
+    item_type: Optional[str] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -479,13 +479,13 @@ HierarchyTreeNode.model_rebuild()
 # ==================== SEED DATA ====================
 
 SEED_CATEGORIES = [
-    {"category_code": "APRL", "category_name": "Apparel", "description": "All clothing and garments", "applicable_item_types": ["FGDS", "SEMI", "CUTP"], "has_color": True, "has_size": True, "has_fabric": True, "default_hsn_code": "6109", "default_gst_rate": 5.0, "icon": "Shirt", "color_code": "#10b981", "sort_order": 1},
-    {"category_code": "FABR", "category_name": "Fabrics", "description": "Grey and dyed fabrics", "applicable_item_types": ["GFAB", "DFAB"], "has_color": True, "has_size": False, "has_fabric": True, "default_hsn_code": "5407", "default_gst_rate": 5.0, "icon": "Layers", "color_code": "#3b82f6", "sort_order": 2},
-    {"category_code": "TRIM", "category_name": "Trims & Notions", "description": "Buttons, zippers, labels", "applicable_item_types": ["TRIM"], "has_color": True, "has_size": True, "default_hsn_code": "9606", "default_gst_rate": 12.0, "icon": "Sparkles", "color_code": "#f59e0b", "sort_order": 3},
-    {"category_code": "YARN", "category_name": "Yarns & Fibers", "description": "Cotton, polyester yarns", "applicable_item_types": ["YARN"], "has_color": True, "default_hsn_code": "5205", "default_gst_rate": 5.0, "icon": "Circle", "color_code": "#ec4899", "sort_order": 4},
-    {"category_code": "CHEM", "category_name": "Dyes & Chemicals", "description": "Dyes, softeners", "applicable_item_types": ["DYCM"], "has_color": False, "has_size": False, "default_hsn_code": "3204", "default_gst_rate": 18.0, "icon": "FlaskConical", "color_code": "#ef4444", "sort_order": 5},
-    {"category_code": "PACK", "category_name": "Packaging", "description": "Polybags, cartons, tags", "applicable_item_types": ["PACK"], "has_color": False, "default_hsn_code": "3923", "default_gst_rate": 18.0, "icon": "Box", "color_code": "#06b6d4", "sort_order": 6},
-    {"category_code": "CONS", "category_name": "Consumables", "description": "Needles, oil, tools", "applicable_item_types": ["CONS"], "has_color": False, "has_size": False, "default_hsn_code": "8452", "default_gst_rate": 18.0, "icon": "Wrench", "color_code": "#64748b", "sort_order": 7},
+    {"category_code": "APRL", "category_name": "Apparel", "description": "All clothing and garments", "item_type": "FG", "has_color": True, "has_size": True, "has_fabric": True, "default_hsn_code": "6109", "default_gst_rate": 5.0, "icon": "Shirt", "color_code": "#10b981", "sort_order": 1},
+    {"category_code": "FABR", "category_name": "Fabrics", "description": "Grey and dyed fabrics", "item_type": "RM", "has_color": True, "has_size": False, "has_fabric": True, "default_hsn_code": "5407", "default_gst_rate": 5.0, "icon": "Layers", "color_code": "#3b82f6", "sort_order": 2},
+    {"category_code": "TRIM", "category_name": "Trims & Notions", "description": "Buttons, zippers, labels", "item_type": "AC", "has_color": True, "has_size": True, "default_hsn_code": "9606", "default_gst_rate": 12.0, "icon": "Sparkles", "color_code": "#f59e0b", "sort_order": 3},
+    {"category_code": "YARN", "category_name": "Yarns & Fibers", "description": "Cotton, polyester yarns", "item_type": "RM", "has_color": True, "default_hsn_code": "5205", "default_gst_rate": 5.0, "icon": "Circle", "color_code": "#ec4899", "sort_order": 4},
+    {"category_code": "CHEM", "category_name": "Dyes & Chemicals", "description": "Dyes, softeners", "item_type": "CM", "has_color": False, "has_size": False, "default_hsn_code": "3204", "default_gst_rate": 18.0, "icon": "FlaskConical", "color_code": "#ef4444", "sort_order": 5},
+    {"category_code": "PACK", "category_name": "Packaging", "description": "Polybags, cartons, tags", "item_type": "CM", "has_color": False, "default_hsn_code": "3923", "default_gst_rate": 18.0, "icon": "Box", "color_code": "#06b6d4", "sort_order": 6},
+    {"category_code": "CONS", "category_name": "Consumables", "description": "Needles, oil, tools", "item_type": "CM", "has_color": False, "has_size": False, "default_hsn_code": "8452", "default_gst_rate": 18.0, "icon": "Wrench", "color_code": "#64748b", "sort_order": 7},
 ]
 
 SEED_SUB_CATEGORIES = [
