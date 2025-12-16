@@ -58,7 +58,8 @@ async def list_categories(
             "description": c.description,
             "path": c.category_code,
             "path_name": c.category_name,
-            "applicable_item_types": c.applicable_item_types,
+            "item_type": c.item_type,
+            "applicable_item_types": getattr(c, 'applicable_item_types', [c.item_type]),
             "has_color": c.has_color,
             "has_size": c.has_size,
             "has_fabric": c.has_fabric,
@@ -69,6 +70,8 @@ async def list_categories(
             "sort_order": c.sort_order,
             "is_active": c.is_active,
             "child_count": c.child_count,
+            "sku_code": getattr(c, 'sku_code', None),
+            "sequence": getattr(c, 'sequence', 'A0001'),
             "created_at": c.created_at,
             "updated_at": c.updated_at,
         }
@@ -108,6 +111,8 @@ async def get_category(code: str):
         "sort_order": category.sort_order,
         "is_active": category.is_active,
         "child_count": category.child_count,
+        "sku_code": category.sku_code,
+        "sequence": category.sequence,
     }
 
 
@@ -124,7 +129,9 @@ async def create_category(data: ItemCategoryCreate):
         category_code=data.category_code.upper(),
         category_name=data.category_name,
         description=data.description,
-        applicable_item_types=[t.upper() for t in data.applicable_item_types],
+        sku_code=data.sku_code,
+        sequence=data.sequence,
+        applicable_item_types=[t.upper() for t in data.applicable_item_types] if hasattr(data, 'applicable_item_types') and data.applicable_item_types else [data.item_type],
         has_color=data.has_color,
         has_size=data.has_size,
         has_fabric=data.has_fabric,
@@ -139,9 +146,9 @@ async def create_category(data: ItemCategoryCreate):
         sort_order=data.sort_order,
     ).insert()
     
-    logger.info(f"Created category: {category.category_code}")
+    logger.info(f"Created category: {category.category_code} with SKU: {category.sku_code}")
     
-    return {"message": "Category created", "code": category.category_code}
+    return {"message": "Category created", "code": category.category_code, "sku_code": category.sku_code}
 
 
 @router.put("/categories/{code}")

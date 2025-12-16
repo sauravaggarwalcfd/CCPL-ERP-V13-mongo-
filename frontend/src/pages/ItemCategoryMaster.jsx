@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { 
-  Plus, Search, ChevronRight, ChevronDown, Edit2, Trash2, Eye,
+  Plus, Search, ChevronRight, ChevronDown, Edit2, Edit3, Trash2, Eye,
   Package, Users, Layers, Tag, Hash, Shirt, RefreshCw, List,
   FolderTree, Settings, X, Check, AlertCircle, Filter
 } from 'lucide-react'
@@ -35,6 +35,43 @@ const DEFAULT_FORM = {
   icon: 'Package',
   color_code: '#10b981',
   sort_order: 0,
+  sequence: 'A0001',
+}
+
+// Function to generate next sequence (A0001 -> A0002 -> ... -> A9999 -> B0001)
+const generateNextSequence = (currentSeq = 'A0000') => {
+  const letter = currentSeq.charAt(0)
+  const num = parseInt(currentSeq.slice(1), 10)
+  
+  if (num >= 9999) {
+    // Move to next letter
+    const nextLetter = String.fromCharCode(letter.charCodeAt(0) + 1)
+    if (nextLetter > 'Z') return 'Z9999' // Max reached
+    return `${nextLetter}0001`
+  }
+  return `${letter}${String(num + 1).padStart(4, '0')}`
+}
+
+// Build SKU Code: ItemType-LevelCode-Sequence (3 sections for Item Category)
+const buildSkuCode = (itemType, levelCode, sequence) => {
+  const parts = []
+  if (itemType) parts.push(itemType.slice(0, 2).toUpperCase())
+  if (levelCode) parts.push(levelCode.toUpperCase().padEnd(4, 'X').slice(0, 4))
+  if (sequence) parts.push(sequence.toUpperCase())
+  return parts.join('-')
+}
+
+// Default Item Type Form
+const DEFAULT_ITEM_TYPE_FORM = {
+  code: '',
+  name: '',
+  description: '',
+  color: '#10b981',
+  icon: 'Package',
+  allow_purchase: true,
+  allow_sale: true,
+  allow_manufacture: false,
+  allow_stock: true,
 }
 
 export default function ItemCategoryMaster() {
@@ -50,18 +87,30 @@ export default function ItemCategoryMaster() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterLevel, setFilterLevel] = useState('')
   
-  // Modal state
-  const [showModal, setShowModal] = useState(false)
-  const [modalMode, setModalMode] = useState('create')
+  // Panel state (replaces modal)
+  const [showPanel, setShowPanel] = useState(false)
+  const [panelMode, setPanelMode] = useState('create') // 'create', 'edit'
   const [formData, setFormData] = useState(DEFAULT_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  
+  // Item Type Panel state
+  const [showItemTypePanel, setShowItemTypePanel] = useState(false)
+  const [itemTypeFormData, setItemTypeFormData] = useState(DEFAULT_ITEM_TYPE_FORM)
+  const [itemTypeMode, setItemTypeMode] = useState('create')
+  
+  // Legacy modal support (keeping for compatibility)
+  const [showModal, setShowModal] = useState(false)
+  const [modalMode, setModalMode] = useState('create')
   
   // Dropdown options
   const [categoryOptions, setCategoryOptions] = useState([])
   const [subCategoryOptions, setSubCategoryOptions] = useState([])
   const [divisionOptions, setDivisionOptions] = useState([])
   const [classOptions, setClassOptions] = useState([])
+  
+  // Sequence tracking for auto-generated SKU Code
+  const [lastSequences, setLastSequences] = useState({})
 
   // Fetch data
   const fetchTree = useCallback(async () => {
@@ -202,6 +251,12 @@ export default function ItemCategoryMaster() {
     setExpandedNodes(new Set())
   }
 
+  // Get next sequence for a given item type
+  const getNextSequence = (itemType) => {
+    const currentSeq = lastSequences[itemType] || 'A0000'
+    return generateNextSequence(currentSeq)
+  }
+
   // Modal handlers
   const openCreateModal = (parentNode = null) => {
     const newForm = { ...DEFAULT_FORM }
@@ -222,25 +277,52 @@ export default function ItemCategoryMaster() {
       if (pathParts[3]) newForm.class_code = pathParts[3]
     }
     
+    // Auto-generate sequence
+    newForm.sequence = getNextSequence(newForm.item_type)
+    
     setFormData(newForm)
     setFormErrors({})
-    setModalMode('create')
-    setShowModal(true)
+    setPanelMode('create')
+    setShowPanel(true)
+    setShowItemTypePanel(false)
     
     // Fetch dropdown options
     fetchDropdownOptions(newForm.level, newForm)
   }
 
   const openEditModal = async (item) => {
-    setFormData({
+    // Extract parent codes from path if not directly available
+    const pathParts = item.path?.split('/') || []
+    
+    // For items at different levels, extract parent codes from path
+    let categoryCode = item.category_code || ''
+    let subCategoryCode = item.sub_category_code || ''
+    let divisionCode = item.division_code || ''
+    let classCode = item.class_code || ''
+    
+    // If parent codes not directly available, extract from path
+    if (item.level >= 2 && !categoryCode && pathParts[0]) {
+      categoryCode = pathParts[0]
+    }
+    if (item.level >= 3 && !subCategoryCode && pathParts[1]) {
+      subCategoryCode = pathParts[1]
+    }
+    if (item.level >= 4 && !divisionCode && pathParts[2]) {
+      divisionCode = pathParts[2]
+    }
+    if (item.level >= 5 && !classCode && pathParts[3]) {
+      classCode = pathParts[3]
+    }
+    
+    const editFormData = {
       level: item.level,
       code: item.code,
       name: item.name,
       description: item.description || '',
-      category_code: item.category_code || '',
-      sub_category_code: item.sub_category_code || '',
-      division_code: item.division_code || '',
-      class_code: item.class_code || '',
+      category_code: categoryCode,
+      sub_category_code: subCategoryCode,
+      division_code: divisionCode,
+      class_code: classCode,
       item_type: item.item_type || 'FG',
       has_color: item.has_color ?? true,
       has_size: item.has_size ?? true,
@@ -251,24 +333,92 @@ export default function ItemCategoryMaster() {
       icon: item.icon || 'Package',
       color_code: item.color_code || '#10b981',
       sort_order: item.sort_order || 0,
-    })
-    setFormErrors({})
-    setModalMode('edit')
-    setShowModal(true)
+      sequence: item.sequence || 'A0001',
+    }
     
-    await fetchDropdownOptions(item.level, item)
+    setFormData(editFormData)
+    setFormErrors({})
+    setPanelMode('edit')
+    setShowPanel(true)
+    setShowItemTypePanel(false)
+    
+    // Fetch dropdown options with the extracted parent codes
+    await fetchDropdownOptions(item.level, editFormData)
+  }
+
+  // Item Type handlers
+  const openItemTypeCreate = () => {
+    setItemTypeFormData(DEFAULT_ITEM_TYPE_FORM)
+    setItemTypeMode('create')
+    setShowItemTypePanel(true)
+    setShowPanel(false)
+  }
+
+  const openItemTypeEdit = (type) => {
+    setItemTypeFormData({
+      code: type.value,
+      name: type.name,
+      description: type.description || '',
+      color: type.color || '#10b981',
+      icon: type.icon || 'Package',
+      allow_purchase: type.allow_purchase ?? true,
+      allow_sale: type.allow_sale ?? true,
+      allow_manufacture: type.allow_manufacture ?? false,
+      allow_stock: type.allow_stock ?? true,
+    })
+    setItemTypeMode('edit')
+    setShowItemTypePanel(true)
+    setShowPanel(false)
+  }
+
+  const handleItemTypeSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const payload = {
+        code: itemTypeFormData.code.toUpperCase(),
+        name: itemTypeFormData.name,
+        description: itemTypeFormData.description,
+        color: itemTypeFormData.color,
+        icon: itemTypeFormData.icon,
+        allow_purchase: itemTypeFormData.allow_purchase,
+        allow_sale: itemTypeFormData.allow_sale,
+        allow_manufacture: itemTypeFormData.allow_manufacture,
+        allow_stock: itemTypeFormData.allow_stock,
+      }
+      
+      if (itemTypeMode === 'create') {
+        await itemTypes.create(payload)
+        toast.success('Item Type created successfully!')
+      } else {
+        await itemTypes.update(itemTypeFormData.code, payload)
+        toast.success('Item Type updated successfully!')
+      }
+      
+      setShowItemTypePanel(false)
+      fetchItemTypes()
+    } catch (error) {
+      const message = error.response?.data?.detail || 'Operation failed'
+      toast.error(message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // Form handlers
   const handleLevelChange = async (level) => {
-    setFormData(prev => ({
-      ...prev,
-      level,
-      category_code: '',
-      sub_category_code: '',
-      division_code: '',
-      class_code: '',
-    }))
+    setFormData(prev => {
+      const newSequence = getNextSequence(prev.item_type)
+      return {
+        ...prev,
+        level,
+        category_code: '',
+        sub_category_code: '',
+        division_code: '',
+        class_code: '',
+        sequence: newSequence,
+      }
+    })
     
     await fetchDropdownOptions(level, {})
   }
@@ -334,6 +484,10 @@ export default function ItemCategoryMaster() {
     
     try {
       const levelConfig = LEVELS[formData.level - 1]
+      
+      // Build SKU Code
+      const skuCode = buildSkuCode(formData.item_type, formData.code, formData.sequence)
+      
       const payload = {
         [levelConfig.codeField]: formData.code.toUpperCase(),
         [levelConfig.nameField]: formData.name,
@@ -342,6 +496,8 @@ export default function ItemCategoryMaster() {
         icon: formData.icon,
         color_code: formData.color_code,
         sort_order: formData.sort_order,
+        sku_code: skuCode,
+        sequence: formData.sequence,
       }
       
       // Add level-specific fields for Level 1
@@ -360,15 +516,21 @@ export default function ItemCategoryMaster() {
       if (formData.level >= 4) payload.division_code = formData.division_code
       if (formData.level >= 5) payload.class_code = formData.class_code
       
-      if (modalMode === 'create') {
+      if (panelMode === 'create') {
         await categoryHierarchy.create(levelConfig.key, payload)
         toast.success(`${levelConfig.name} created successfully!`)
+        
+        // Update sequence tracking
+        setLastSequences(prev => ({
+          ...prev,
+          [formData.item_type]: formData.sequence
+        }))
       } else {
         await categoryHierarchy.update(levelConfig.key, formData.code, payload)
         toast.success(`${levelConfig.name} updated successfully!`)
       }
       
-      setShowModal(false)
+      setShowPanel(false)
       fetchTree()
       fetchList()
     } catch (error) {
@@ -538,7 +700,10 @@ export default function ItemCategoryMaster() {
         </div>
       </div>
 
-      <div className="p-6">
+      {/* Main Content - Side by Side Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel - Views */}
+        <div className={`${(showPanel || showItemTypePanel) ? 'w-1/2' : 'flex-1'} p-6 overflow-auto transition-all duration-300`}>
         {/* Tree View */}
         {viewMode === 'tree' && (
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -699,16 +864,24 @@ export default function ItemCategoryMaster() {
         {/* Item Types View */}
         {viewMode === 'types' && (
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="border-b p-4 bg-gray-50">
-              <h2 className="text-lg font-semibold">Item Types</h2>
-              <p className="text-sm text-gray-500">10 types for complete apparel manufacturing workflow</p>
+            <div className="border-b p-4 bg-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Item Types</h2>
+                <p className="text-sm text-gray-500">10 types for complete apparel manufacturing workflow</p>
+              </div>
+              <button
+                onClick={openItemTypeCreate}
+                className="bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition"
+              >
+                <Plus size={18} /> Add New Item Type
+              </button>
             </div>
             
             <div className="grid grid-cols-2 gap-4 p-4">
               {itemTypesList.map((type) => (
                 <div 
                   key={type.value}
-                  className="border rounded-lg p-4 hover:shadow-md transition"
+                  className="border rounded-lg p-4 hover:shadow-md transition group"
                 >
                   <div className="flex items-center gap-3">
                     <div 
@@ -717,7 +890,7 @@ export default function ItemCategoryMaster() {
                     >
                       <Package size={24} className="text-white" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold">{type.value}</span>
                         <span className="text-gray-600">{type.name}</span>
@@ -731,6 +904,14 @@ export default function ItemCategoryMaster() {
                         )}
                       </div>
                     </div>
+                    {/* Edit Button */}
+                    <button
+                      onClick={() => openItemTypeEdit(type)}
+                      className="opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-100 rounded transition"
+                      title="Edit Item Type"
+                    >
+                      <Edit3 size={16} className="text-gray-500" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -761,20 +942,20 @@ export default function ItemCategoryMaster() {
             })}
           </div>
         </div>
-      </div>
+        </div>
+        {/* End Left Panel */}
 
-      {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5">
+        {/* Right Panel - Form (Side Panel) */}
+        {showPanel && (
+          <div className="w-1/2 border-l bg-white overflow-auto">
+            {/* Panel Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">
-                  {modalMode === 'create' ? 'Create New Category' : 'Edit Category'}
+                  {panelMode === 'create' ? 'Create New Category' : 'Edit Category'}
                 </h2>
                 <button
-                  onClick={() => setShowModal(false)}
+                  onClick={() => setShowPanel(false)}
                   className="p-1 hover:bg-white/20 rounded transition"
                 >
                   <X size={24} />
@@ -782,8 +963,8 @@ export default function ItemCategoryMaster() {
               </div>
             </div>
 
-            {/* Modal Body */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+            {/* Panel Body */}
+            <form onSubmit={handleSubmit} className="p-6">
               {/* Step 1: Select Item Type */}
               <div className="mb-6 p-4 bg-blue-50 rounded-lg">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -804,7 +985,11 @@ export default function ItemCategoryMaster() {
                         name="item_type"
                         value={type.value}
                         checked={formData.item_type === type.value}
-                        onChange={(e) => setFormData(prev => ({ ...prev, item_type: e.target.value }))}
+                        onChange={(e) => {
+                          const newType = e.target.value
+                          const newSequence = getNextSequence(newType)
+                          setFormData(prev => ({ ...prev, item_type: newType, sequence: newSequence }))
+                        }}
                         className="sr-only"
                       />
                       <span 
@@ -836,7 +1021,7 @@ export default function ItemCategoryMaster() {
                           formData.level === level.level
                             ? 'border-emerald-500 bg-emerald-50'
                             : 'border-gray-200 hover:border-gray-300'
-                        } ${modalMode === 'edit' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${panelMode === 'edit' ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <input
                           type="radio"
@@ -844,7 +1029,7 @@ export default function ItemCategoryMaster() {
                           value={level.level}
                           checked={formData.level === level.level}
                           onChange={() => handleLevelChange(level.level)}
-                          disabled={modalMode === 'edit'}
+                          disabled={panelMode === 'edit'}
                           className="sr-only"
                         />
                         <div 
@@ -883,7 +1068,6 @@ export default function ItemCategoryMaster() {
                         <select
                           value={formData.category_code}
                           onChange={(e) => handleParentChange('category_code', e.target.value)}
-                          disabled={modalMode === 'edit'}
                           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.category_code ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -908,7 +1092,7 @@ export default function ItemCategoryMaster() {
                         <select
                           value={formData.sub_category_code}
                           onChange={(e) => handleParentChange('sub_category_code', e.target.value)}
-                          disabled={modalMode === 'edit' || !formData.category_code}
+                          disabled={!formData.category_code}
                           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.sub_category_code ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -930,7 +1114,7 @@ export default function ItemCategoryMaster() {
                         <select
                           value={formData.division_code}
                           onChange={(e) => handleParentChange('division_code', e.target.value)}
-                          disabled={modalMode === 'edit' || !formData.sub_category_code}
+                          disabled={!formData.sub_category_code}
                           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.division_code ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -952,7 +1136,7 @@ export default function ItemCategoryMaster() {
                         <select
                           value={formData.class_code}
                           onChange={(e) => handleParentChange('class_code', e.target.value)}
-                          disabled={modalMode === 'edit' || !formData.division_code}
+                          disabled={!formData.division_code}
                           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.class_code ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -974,6 +1158,21 @@ export default function ItemCategoryMaster() {
                   Step {formData.level > 1 ? '4' : '3'}: Basic Information
                 </label>
                 
+                {/* SKU Code Preview - Auto Generated */}
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <label className="block text-sm font-semibold text-emerald-700 mb-1">
+                    SKU Code <span className="text-xs font-normal">(Auto-Generated)</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-white border-2 border-emerald-300 rounded-lg font-mono text-lg font-bold text-emerald-800 tracking-wider">
+                      {buildSkuCode(formData.item_type, formData.code, formData.sequence) || 'XX-XXXX-X0000'}
+                    </div>
+                  </div>
+                  <p className="text-xs text-emerald-600 mt-1">
+                    Format: <span className="font-mono">ItemType(2)-Code(4)-Sequence(5)</span>
+                  </p>
+                </div>
+                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
@@ -984,18 +1183,32 @@ export default function ItemCategoryMaster() {
                       type="text"
                       value={formData.code}
                       onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase().slice(0, 4) }))}
-                      disabled={modalMode === 'edit'}
+                      disabled={panelMode === 'edit'}
                       placeholder="e.g., APRL"
                       maxLength={4}
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase ${
                         formErrors.code ? 'border-red-500' : 'border-gray-300'
-                      } ${modalMode === 'edit' ? 'bg-gray-100' : ''}`}
+                      } ${panelMode === 'edit' ? 'bg-gray-100' : ''}`}
                     />
                     {formErrors.code && (
                       <p className="text-red-500 text-xs mt-1">{formErrors.code}</p>
                     )}
                   </div>
                   
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      Sequence <span className="text-xs text-gray-400 ml-1">(Auto)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.sequence}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-mono text-gray-600"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 mt-4">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
                       Name <span className="text-red-500">*</span>
@@ -1073,43 +1286,200 @@ export default function ItemCategoryMaster() {
                   )}
                 </div>
               </div>
-            </form>
 
-            {/* Modal Footer */}
-            <div className="border-t p-4 bg-gray-50 flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                <span className="text-red-500">*</span> Required fields
+              {/* Panel Footer */}
+              <div className="border-t pt-4 mt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  <span className="text-red-500">*</span> Required fields
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPanel(false)}
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={18} />
+                        {panelMode === 'create' ? 'Create' : 'Update'}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-3">
+            </form>
+          </div>
+        )}
+
+        {/* Right Panel - Item Type Form (Side Panel) */}
+        {showItemTypePanel && (
+          <div className="w-1/2 border-l bg-white overflow-auto">
+            {/* Panel Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">
+                  {itemTypeMode === 'create' ? 'Create New Item Type' : 'Edit Item Type'}
+                </h2>
                 <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                  onClick={() => setShowItemTypePanel(false)}
+                  className="p-1 hover:bg-white/20 rounded transition"
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={saving}
-                  className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Check size={18} />
-                      {modalMode === 'create' ? 'Create' : 'Update'}
-                    </>
-                  )}
+                  <X size={24} />
                 </button>
               </div>
             </div>
+
+            {/* Panel Body */}
+            <form onSubmit={handleItemTypeSubmit} className="p-6">
+              {/* Basic Information */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Basic Information
+                </label>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      Code <span className="text-red-500">*</span>
+                      <span className="text-xs text-gray-400 ml-1">(2 characters)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={itemTypeFormData.code}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, code: e.target.value.toUpperCase().slice(0, 2) }))}
+                      disabled={itemTypeMode === 'edit'}
+                      placeholder="e.g., FG"
+                      maxLength={2}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono uppercase ${
+                        itemTypeMode === 'edit' ? 'bg-gray-100' : 'border-gray-300'
+                      }`}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={itemTypeFormData.name}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g., Finished Goods"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 mb-1">Description</label>
+                  <textarea
+                    value={itemTypeFormData.description}
+                    onChange={(e) => setItemTypeFormData(prev => ({ ...prev, description: e.target.value }))}
+                    rows={2}
+                    placeholder="Optional description..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Settings */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Settings
+                </label>
+                
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={itemTypeFormData.allow_purchase}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, allow_purchase: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Allow Purchase</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={itemTypeFormData.allow_sale}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, allow_sale: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Allow Sale</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={itemTypeFormData.is_active}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Active</span>
+                  </label>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 mb-1">Color</label>
+                  <input
+                    type="color"
+                    value={itemTypeFormData.color}
+                    onChange={(e) => setItemTypeFormData(prev => ({ ...prev, color: e.target.value }))}
+                    className="w-full h-10 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Panel Footer */}
+              <div className="border-t pt-4 mt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  <span className="text-red-500">*</span> Required fields
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowItemTypePanel(false)}
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={18} />
+                        {itemTypeMode === 'create' ? 'Create' : 'Update'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+      {/* End Main Content Flex Container */}
     </div>
   )
 }
