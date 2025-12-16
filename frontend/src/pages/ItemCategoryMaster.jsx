@@ -551,6 +551,12 @@ export default function ItemCategoryMaster() {
               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-600">
                 {node.code}
               </span>
+              {/* SKU Prefix badge for Level 5 (Sub-Class) */}
+              {node.level === 5 && node.sku_prefix && (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-mono">
+                  SKU: {node.sku_prefix}-XXXX-XXXX-XXXX
+                </span>
+              )}
             </div>
             <div className="text-xs text-gray-500">
               Level {node.level}: {levelConfig?.name}
@@ -743,6 +749,7 @@ export default function ItemCategoryMaster() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Level</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Code</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">SKU Prefix</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Path</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
@@ -772,6 +779,15 @@ export default function ItemCategoryMaster() {
                           </span>
                         </td>
                         <td className="px-4 py-3 font-medium">{item.name}</td>
+                        <td className="px-4 py-3">
+                          {item.level === 5 && item.sku_prefix ? (
+                            <span className="font-mono text-sm bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                              {item.sku_prefix}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-500">{item.path_name}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-xs px-2 py-1 rounded-full ${
@@ -1161,6 +1177,25 @@ export default function ItemCategoryMaster() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
+                
+                {/* SKU Prefix Preview - Only for Level 5 (Sub-Class) */}
+                {formData.level === 5 && formData.code && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <label className="block text-sm font-semibold text-amber-800 mb-2">
+                      SKU Prefix Preview
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-lg font-bold text-amber-700">
+                        {formData.item_type}-{formData.code}
+                      </span>
+                      <span className="text-gray-400">-</span>
+                      <span className="font-mono text-gray-400">XXXX-XXXX-XXXX</span>
+                    </div>
+                    <p className="text-xs text-amber-600 mt-1">
+                      First 2 parts defined here. Remaining 3 parts (Sequence-Color-Size) will be assigned in Item Master.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Settings */}
