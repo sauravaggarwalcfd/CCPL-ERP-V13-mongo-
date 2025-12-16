@@ -1133,10 +1133,10 @@ export default function ItemCategoryMaster() {
                       SKU Code <span className="text-emerald-400">(Auto-Generated)</span>
                     </label>
                     <div className="font-mono text-xl font-bold text-emerald-700">
-                      {formData.item_type}-{formData.code}-A0001
+                      {formData.item_type}-{formData.code}
                     </div>
                     <p className="text-xs text-emerald-600 mt-1">
-                      Format: ItemType(2)-Code(4)-Sequence(5)
+                      Format: ItemType(2)-Code(4)
                     </p>
                   </div>
                 )}

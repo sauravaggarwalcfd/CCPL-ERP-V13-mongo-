@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Search, Plus, Filter, Download, Edit2, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ItemCreateForm from '../components/items/ItemCreateForm'
 
 export default function ItemMaster() {
   const [items, setItems] = useState([])
@@ -14,33 +15,6 @@ export default function ItemMaster() {
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
-
-  // Form state
-  const [formData, setFormData] = useState({
-    item_code: '',
-    item_name: '',
-    item_description: '',
-    category_id: '',
-    sub_category_id: '',
-    color_id: '',
-    size_id: '',
-    brand_id: '',
-    uom: 'PCS',
-    inventory_type: 'stocked',
-    cost_price: 0,
-    selling_price: 0,
-    mrp: 0,
-    hsn_code: '',
-    gst_rate: 5,
-    min_stock_level: 10,
-    max_stock_level: 100,
-    reorder_point: 20,
-    reorder_quantity: 50,
-    material: '',
-    weight: '',
-    care_instructions: '',
-    barcode: '',
-  })
 
   // Fetch categories on mount
   useEffect(() => {
@@ -116,60 +90,6 @@ export default function ItemMaster() {
   const handleCategoryChange = (e) => {
     setSelectedCategory(e.target.value)
     setSelectedSubCategory('')
-  }
-
-  const handleAddItem = async (e) => {
-    e.preventDefault()
-    
-    if (!formData.item_code || !formData.item_name || !formData.category_id || !formData.sub_category_id) {
-      toast.error('Please fill in all required fields')
-      return
-    }
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/items/items', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          cost_price: parseFloat(formData.cost_price),
-          selling_price: parseFloat(formData.selling_price),
-          mrp: parseFloat(formData.mrp),
-          gst_rate: parseFloat(formData.gst_rate),
-          min_stock_level: parseInt(formData.min_stock_level),
-          max_stock_level: parseInt(formData.max_stock_level),
-          reorder_point: parseInt(formData.reorder_point),
-          reorder_quantity: parseInt(formData.reorder_quantity),
-          weight: formData.weight ? parseFloat(formData.weight) : null,
-        })
-      })
-
-      if (response.ok) {
-        toast.success('Item created successfully!')
-        setShowAddModal(false)
-        setFormData({
-          item_code: '', item_name: '', item_description: '',
-          category_id: '', sub_category_id: '',
-          color_id: '', size_id: '', brand_id: '',
-          uom: 'PCS', inventory_type: 'stocked',
-          cost_price: 0, selling_price: 0, mrp: 0,
-          hsn_code: '', gst_rate: 5,
-          min_stock_level: 10, max_stock_level: 100,
-          reorder_point: 20, reorder_quantity: 50,
-          material: '', weight: '', care_instructions: '', barcode: '',
-        })
-        fetchItems()
-      } else {
-        const error = await response.json()
-        toast.error(error.detail || 'Failed to create item')
-      }
-    } catch (error) {
-      toast.error('Error creating item')
-      console.error(error)
-    }
   }
 
   const filteredItems = items.filter(item =>
@@ -342,212 +262,12 @@ export default function ItemMaster() {
         </div>
       </div>
 
-      {/* Add Item Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
-              <h2 className="text-2xl font-bold">Add New Item</h2>
-            </div>
-
-            <form onSubmit={handleAddItem} className="p-6 space-y-4">
-              {/* Item Code & Name */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Item Code *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.item_code}
-                    onChange={(e) => setFormData({...formData, item_code: e.target.value})}
-                    placeholder="TSHRT-M-BLUE-001"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.item_name}
-                    onChange={(e) => setFormData({...formData, item_name: e.target.value})}
-                    placeholder="Men's T-Shirt - Blue (M)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Category & Sub-Category */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                  <select
-                    required
-                    value={formData.category_id}
-                    onChange={(e) => {
-                      setFormData({...formData, category_id: e.target.value, sub_category_id: ''})
-                      if (e.target.value) fetchSubCategories(e.target.value)
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.category_id}>{cat.category_name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Category *</label>
-                  <select
-                    required
-                    value={formData.sub_category_id}
-                    onChange={(e) => setFormData({...formData, sub_category_id: e.target.value})}
-                    disabled={!formData.category_id}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">Select Sub-Category</option>
-                    {subCategories.map(subcat => (
-                      <option key={subcat.id} value={subcat.sub_category_id}>{subcat.sub_category_name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Attributes */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Size ID</label>
-                  <input
-                    type="text"
-                    value={formData.size_id}
-                    onChange={(e) => setFormData({...formData, size_id: e.target.value})}
-                    placeholder="M"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Color ID</label>
-                  <input
-                    type="text"
-                    value={formData.color_id}
-                    onChange={(e) => setFormData({...formData, color_id: e.target.value})}
-                    placeholder="BLUE"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Brand ID</label>
-                  <input
-                    type="text"
-                    value={formData.brand_id}
-                    onChange={(e) => setFormData({...formData, brand_id: e.target.value})}
-                    placeholder="BRAND"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({...formData, selling_price: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">MRP</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.mrp}
-                    onChange={(e) => setFormData({...formData, mrp: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Description & Material */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Material</label>
-                  <input
-                    type="text"
-                    value={formData.material}
-                    onChange={(e) => setFormData({...formData, material: e.target.value})}
-                    placeholder="100% Cotton"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Weight (g)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formData.weight}
-                    onChange={(e) => setFormData({...formData, weight: e.target.value})}
-                    placeholder="150"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Stock Levels */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock Level</label>
-                  <input
-                    type="number"
-                    value={formData.min_stock_level}
-                    onChange={(e) => setFormData({...formData, min_stock_level: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Stock Level</label>
-                  <input
-                    type="number"
-                    value={formData.max_stock_level}
-                    onChange={(e) => setFormData({...formData, max_stock_level: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Form Actions */}
-              <div className="flex gap-3 pt-6 border-t">
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
-                >
-                  Create Item
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg font-medium transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Add Item Modal - New Enhanced Form */}
+      <ItemCreateForm
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchItems}
+      />
     </div>
   )
 }
