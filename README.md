@@ -187,3 +187,4 @@ All models are defined with Pydantic and Beanie for MongoDB:
 ## License
 
 Proprietary - Confidence Clothing Inventory System
+# Auto-push enabled
