@@ -59,7 +59,6 @@ async def list_categories(
             "path": c.category_code,
             "path_name": c.category_name,
             "item_type": c.item_type,
-            "applicable_item_types": getattr(c, 'applicable_item_types', [c.item_type]),
             "has_color": c.has_color,
             "has_size": c.has_size,
             "has_fabric": c.has_fabric,
@@ -70,8 +69,6 @@ async def list_categories(
             "sort_order": c.sort_order,
             "is_active": c.is_active,
             "child_count": c.child_count,
-            "sku_code": getattr(c, 'sku_code', None),
-            "sequence": getattr(c, 'sequence', 'A0001'),
             "created_at": c.created_at,
             "updated_at": c.updated_at,
         }
@@ -96,7 +93,7 @@ async def get_category(code: str):
         "description": category.description,
         "path": category.category_code,
         "path_name": category.category_name,
-        "applicable_item_types": category.applicable_item_types,
+        "item_type": getattr(category, 'item_type', 'FG'),
         "has_color": category.has_color,
         "has_size": category.has_size,
         "has_fabric": category.has_fabric,
@@ -111,8 +108,6 @@ async def get_category(code: str):
         "sort_order": category.sort_order,
         "is_active": category.is_active,
         "child_count": category.child_count,
-        "sku_code": category.sku_code,
-        "sequence": category.sequence,
     }
 
 
@@ -129,9 +124,7 @@ async def create_category(data: ItemCategoryCreate):
         category_code=data.category_code.upper(),
         category_name=data.category_name,
         description=data.description,
-        sku_code=data.sku_code,
-        sequence=data.sequence,
-        applicable_item_types=[t.upper() for t in data.applicable_item_types] if hasattr(data, 'applicable_item_types') and data.applicable_item_types else [data.item_type],
+        item_type=data.item_type,
         has_color=data.has_color,
         has_size=data.has_size,
         has_fabric=data.has_fabric,
@@ -146,9 +139,9 @@ async def create_category(data: ItemCategoryCreate):
         sort_order=data.sort_order,
     ).insert()
     
-    logger.info(f"Created category: {category.category_code} with SKU: {category.sku_code}")
+    logger.info(f"Created category: {category.category_code}")
     
-    return {"message": "Category created", "code": category.category_code, "sku_code": category.sku_code}
+    return {"message": "Category created", "code": category.category_code}
 
 
 @router.put("/categories/{code}")
@@ -619,8 +612,6 @@ async def list_sub_classes(
             "class_name": i.class_name,
             "path": i.path,
             "path_name": i.path_name,
-            "sku_prefix": i.sku_prefix or i.sub_class_code,
-            "last_sequence": i.last_sequence,
             "hsn_code": i.hsn_code,
             "gst_rate": i.gst_rate,
             "icon": i.icon,
@@ -672,8 +663,6 @@ async def create_sub_class(data: ItemSubClassCreate):
         class_name=cls.class_name,
         path=build_path([cat.category_code, subcat.sub_category_code, div.division_code, cls.class_code, data.sub_class_code.upper()]),
         path_name=build_path_name([cat.category_name, subcat.sub_category_name, div.division_name, cls.class_name, data.sub_class_name]),
-        sku_prefix=data.sub_class_code.upper(),
-        last_sequence="A0000",
         has_color=data.has_color,
         has_size=data.has_size,
         has_fabric=data.has_fabric,
@@ -1022,7 +1011,6 @@ async def seed_hierarchy():
                     class_name=cls.class_name,
                     path=build_path([cat.category_code, subcat.sub_category_code, div.division_code, cls.class_code, data["sub_class_code"]]),
                     path_name=build_path_name([cat.category_name, subcat.sub_category_name, div.division_name, cls.class_name, data["sub_class_name"]]),
-                    sku_prefix=data["sub_class_code"],
                     icon=data.get("icon", "Hash"),
                     color_code=data.get("color_code", "#f59e0b"),
                     sort_order=data.get("sort_order", 0),

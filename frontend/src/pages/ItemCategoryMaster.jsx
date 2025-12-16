@@ -35,30 +35,6 @@ const DEFAULT_FORM = {
   icon: 'Package',
   color_code: '#10b981',
   sort_order: 0,
-  sequence: 'A0001',
-}
-
-// Function to generate next sequence (A0001 -> A0002 -> ... -> A9999 -> B0001)
-const generateNextSequence = (currentSeq = 'A0000') => {
-  const letter = currentSeq.charAt(0)
-  const num = parseInt(currentSeq.slice(1), 10)
-  
-  if (num >= 9999) {
-    // Move to next letter
-    const nextLetter = String.fromCharCode(letter.charCodeAt(0) + 1)
-    if (nextLetter > 'Z') return 'Z9999' // Max reached
-    return `${nextLetter}0001`
-  }
-  return `${letter}${String(num + 1).padStart(4, '0')}`
-}
-
-// Build SKU Code: ItemType-LevelCode-Sequence (3 sections for Item Category)
-const buildSkuCode = (itemType, levelCode, sequence) => {
-  const parts = []
-  if (itemType) parts.push(itemType.slice(0, 2).toUpperCase())
-  if (levelCode) parts.push(levelCode.toUpperCase().padEnd(4, 'X').slice(0, 4))
-  if (sequence) parts.push(sequence.toUpperCase())
-  return parts.join('-')
 }
 
 // Default Item Type Form
@@ -108,9 +84,6 @@ export default function ItemCategoryMaster() {
   const [subCategoryOptions, setSubCategoryOptions] = useState([])
   const [divisionOptions, setDivisionOptions] = useState([])
   const [classOptions, setClassOptions] = useState([])
-  
-  // Sequence tracking for auto-generated SKU Code
-  const [lastSequences, setLastSequences] = useState({})
 
   // Fetch data
   const fetchTree = useCallback(async () => {
@@ -251,12 +224,6 @@ export default function ItemCategoryMaster() {
     setExpandedNodes(new Set())
   }
 
-  // Get next sequence for a given item type
-  const getNextSequence = (itemType) => {
-    const currentSeq = lastSequences[itemType] || 'A0000'
-    return generateNextSequence(currentSeq)
-  }
-
   // Modal handlers
   const openCreateModal = (parentNode = null) => {
     const newForm = { ...DEFAULT_FORM }
@@ -276,9 +243,6 @@ export default function ItemCategoryMaster() {
       if (pathParts[2]) newForm.division_code = pathParts[2]
       if (pathParts[3]) newForm.class_code = pathParts[3]
     }
-    
-    // Auto-generate sequence
-    newForm.sequence = getNextSequence(newForm.item_type)
     
     setFormData(newForm)
     setFormErrors({})
@@ -333,7 +297,6 @@ export default function ItemCategoryMaster() {
       icon: item.icon || 'Package',
       color_code: item.color_code || '#10b981',
       sort_order: item.sort_order || 0,
-      sequence: item.sequence || 'A0001',
     }
     
     setFormData(editFormData)
@@ -485,9 +448,6 @@ export default function ItemCategoryMaster() {
     try {
       const levelConfig = LEVELS[formData.level - 1]
       
-      // Build SKU Code
-      const skuCode = buildSkuCode(formData.item_type, formData.code, formData.sequence)
-      
       const payload = {
         [levelConfig.codeField]: formData.code.toUpperCase(),
         [levelConfig.nameField]: formData.name,
@@ -496,8 +456,6 @@ export default function ItemCategoryMaster() {
         icon: formData.icon,
         color_code: formData.color_code,
         sort_order: formData.sort_order,
-        sku_code: skuCode,
-        sequence: formData.sequence,
       }
       
       // Add level-specific fields for Level 1
@@ -519,12 +477,6 @@ export default function ItemCategoryMaster() {
       if (panelMode === 'create') {
         await categoryHierarchy.create(levelConfig.key, payload)
         toast.success(`${levelConfig.name} created successfully!`)
-        
-        // Update sequence tracking
-        setLastSequences(prev => ({
-          ...prev,
-          [formData.item_type]: formData.sequence
-        }))
       } else {
         await categoryHierarchy.update(levelConfig.key, formData.code, payload)
         toast.success(`${levelConfig.name} updated successfully!`)
@@ -1158,21 +1110,6 @@ export default function ItemCategoryMaster() {
                   Step {formData.level > 1 ? '4' : '3'}: Basic Information
                 </label>
                 
-                {/* SKU Code Preview - Auto Generated */}
-                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <label className="block text-sm font-semibold text-emerald-700 mb-1">
-                    SKU Code <span className="text-xs font-normal">(Auto-Generated)</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2 bg-white border-2 border-emerald-300 rounded-lg font-mono text-lg font-bold text-emerald-800 tracking-wider">
-                      {buildSkuCode(formData.item_type, formData.code, formData.sequence) || 'XX-XXXX-X0000'}
-                    </div>
-                  </div>
-                  <p className="text-xs text-emerald-600 mt-1">
-                    Format: <span className="font-mono">ItemType(2)-Code(4)-Sequence(5)</span>
-                  </p>
-                </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
@@ -1195,20 +1132,6 @@ export default function ItemCategoryMaster() {
                     )}
                   </div>
                   
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">
-                      Sequence <span className="text-xs text-gray-400 ml-1">(Auto)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.sequence}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-mono text-gray-600"
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4 mt-4">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
                       Name <span className="text-red-500">*</span>

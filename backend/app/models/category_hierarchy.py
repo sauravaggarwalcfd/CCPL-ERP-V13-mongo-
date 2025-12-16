@@ -30,12 +30,7 @@ class ItemCategory(Document):
     category_name: str
     description: Optional[str] = None
     
-    # SKU Code fields (auto-generated)
-    sku_code: Optional[str] = None    # Format: FG-APRL-A0001
-    sequence: str = "A0001"           # Sequence part: A0001
-    
     item_type: str = "FG"
-    applicable_item_types: List[str] = ["FG"]  # List of applicable item types
     
     has_color: bool = True
     has_size: bool = True
@@ -74,10 +69,6 @@ class ItemSubCategory(Document):
     sub_category_code: Indexed(str, unique=True)    # 4 chars: MENS
     sub_category_name: str
     description: Optional[str] = None
-    
-    # SKU Code fields (auto-generated)
-    sku_code: Optional[str] = None    # Format: FG-MENS-A0001
-    sequence: str = "A0001"           # Sequence part: A0001
     
     # Parent Reference
     category_code: Indexed(str)
@@ -118,10 +109,6 @@ class ItemDivision(Document):
     division_code: Indexed(str, unique=True)    # 4 chars: TOPW
     division_name: str
     description: Optional[str] = None
-    
-    # SKU Code fields (auto-generated)
-    sku_code: Optional[str] = None    # Format: FG-TOPW-A0001
-    sequence: str = "A0001"           # Sequence part: A0001
     
     # Parent References
     category_code: Indexed(str)
@@ -164,10 +151,6 @@ class ItemClass(Document):
     class_code: Indexed(str, unique=True)    # 4 chars: TSHT
     class_name: str
     description: Optional[str] = None
-    
-    # SKU Code fields (auto-generated)
-    sku_code: Optional[str] = None    # Format: FG-TSHT-A0001
-    sequence: str = "A0001"           # Sequence part: A0001
     
     # Parent References
     category_code: Indexed(str)
@@ -216,10 +199,6 @@ class ItemSubClass(Document):
     sub_class_name: str
     description: Optional[str] = None
     
-    # SKU Code fields (auto-generated)
-    sku_code: Optional[str] = None    # Format: FG-RNCK-A0001
-    sequence: str = "A0001"           # Sequence part: A0001
-    
     # Parent References (Full hierarchy)
     category_code: Indexed(str)
     category_name: str
@@ -235,10 +214,6 @@ class ItemSubClass(Document):
     
     # Item Type
     item_type: str = "FG"
-    
-    # SKU Configuration
-    sku_prefix: str = ""    # Same as sub_class_code, used in SKU generation
-    last_sequence: str = "A0000"    # Last used sequence
     
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
@@ -278,10 +253,7 @@ class ItemCategoryCreate(BaseModel):
     category_code: str = Field(..., min_length=4, max_length=4)
     category_name: str
     description: Optional[str] = None
-    sku_code: Optional[str] = None
-    sequence: str = "A0001"
     item_type: str = "FG"
-    applicable_item_types: List[str] = ["FG"]
     has_color: bool = True
     has_size: bool = True
     has_fabric: bool = False
@@ -305,8 +277,6 @@ class ItemSubCategoryCreate(BaseModel):
     sub_category_code: str = Field(..., min_length=4, max_length=4)
     sub_category_name: str
     description: Optional[str] = None
-    sku_code: Optional[str] = None
-    sequence: str = "A0001"
     category_code: str    # Parent
     item_type: str = "FG"
     has_color: Optional[bool] = None
@@ -326,8 +296,6 @@ class ItemDivisionCreate(BaseModel):
     division_code: str = Field(..., min_length=4, max_length=4)
     division_name: str
     description: Optional[str] = None
-    sku_code: Optional[str] = None
-    sequence: str = "A0001"
     category_code: str
     sub_category_code: str
     item_type: str = "FG"
@@ -348,8 +316,6 @@ class ItemClassCreate(BaseModel):
     class_code: str = Field(..., min_length=4, max_length=4)
     class_name: str
     description: Optional[str] = None
-    sku_code: Optional[str] = None
-    sequence: str = "A0001"
     category_code: str
     sub_category_code: str
     division_code: str
@@ -373,8 +339,6 @@ class ItemSubClassCreate(BaseModel):
     sub_class_code: str = Field(..., min_length=4, max_length=4)
     sub_class_name: str
     description: Optional[str] = None
-    sku_code: Optional[str] = None
-    sequence: str = "A0001"
     category_code: str
     sub_category_code: str
     division_code: str
