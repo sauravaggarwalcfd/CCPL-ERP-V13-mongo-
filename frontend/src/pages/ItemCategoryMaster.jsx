@@ -25,7 +25,7 @@ const DEFAULT_FORM = {
   sub_category_code: '',
   division_code: '',
   class_code: '',
-  applicable_item_types: ['FGDS'],
+  applicable_item_types: ['FG'],
   has_color: true,
   has_size: true,
   has_fabric: false,
@@ -338,14 +338,14 @@ export default function ItemCategoryMaster() {
         [levelConfig.codeField]: formData.code.toUpperCase(),
         [levelConfig.nameField]: formData.name,
         description: formData.description || null,
+        applicable_item_types: formData.applicable_item_types,
         icon: formData.icon,
         color_code: formData.color_code,
         sort_order: formData.sort_order,
       }
       
-      // Add level-specific fields
+      // Add level-specific fields for Level 1
       if (formData.level === 1) {
-        payload.applicable_item_types = formData.applicable_item_types
         payload.has_color = formData.has_color
         payload.has_size = formData.has_size
         payload.has_fabric = formData.has_fabric
@@ -990,51 +990,52 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
 
-              {/* Level 1 specific: Item Types */}
-              {formData.level === 1 && (
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Applicable Item Types
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {itemTypesList.map((type) => (
-                      <label
-                        key={type.value}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${
-                          formData.applicable_item_types.includes(type.value)
-                            ? 'border-blue-500 bg-blue-100'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={formData.applicable_item_types.includes(type.value)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData(prev => ({
-                                ...prev,
-                                applicable_item_types: [...prev.applicable_item_types, type.value]
-                              }))
-                            } else {
-                              setFormData(prev => ({
-                                ...prev,
-                                applicable_item_types: prev.applicable_item_types.filter(t => t !== type.value)
-                              }))
-                            }
-                          }}
-                          className="sr-only"
-                        />
-                        <span 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: type.color }}
-                        />
-                        <span className="text-sm font-medium">{type.value}</span>
-                        <span className="text-xs text-gray-500">{type.name}</span>
-                      </label>
-                    ))}
-                  </div>
+              {/* Applicable Item Types - For ALL levels */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Step {formData.level > 1 ? '4' : '3'}: Select Item Types
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Select which item types can be created under this {LEVELS[formData.level - 1]?.name.toLowerCase()}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {itemTypesList.map((type) => (
+                    <label
+                      key={type.value}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${
+                        formData.applicable_item_types.includes(type.value)
+                          ? 'border-blue-500 bg-blue-100'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.applicable_item_types.includes(type.value)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData(prev => ({
+                              ...prev,
+                              applicable_item_types: [...prev.applicable_item_types, type.value]
+                            }))
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              applicable_item_types: prev.applicable_item_types.filter(t => t !== type.value)
+                            }))
+                          }
+                        }}
+                        className="sr-only"
+                      />
+                      <span 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: type.color }}
+                      />
+                      <span className="text-sm font-medium">{type.value}</span>
+                      <span className="text-xs text-gray-500">{type.name}</span>
+                    </label>
+                  ))}
                 </div>
-              )}
+              </div>
 
               {/* Settings */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">

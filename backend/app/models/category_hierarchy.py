@@ -30,7 +30,7 @@ class ItemCategory(Document):
     category_name: str
     description: Optional[str] = None
     
-    applicable_item_types: List[str] = ["FGDS"]
+    applicable_item_types: List[str] = ["FG"]
     
     has_color: bool = True
     has_size: bool = True
@@ -77,6 +77,9 @@ class ItemSubCategory(Document):
     path: str = ""    # APRL/MENS
     path_name: str = ""  # Apparel > Men
     
+    # Applicable Item Types
+    applicable_item_types: List[str] = ["FG"]
+    
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -115,6 +118,9 @@ class ItemDivision(Document):
     
     path: str = ""    # APRL/MENS/TOPW
     path_name: str = ""  # Apparel > Men > Topwear
+    
+    # Applicable Item Types
+    applicable_item_types: List[str] = ["FG"]
     
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
@@ -156,6 +162,9 @@ class ItemClass(Document):
     
     path: str = ""    # APRL/MENS/TOPW/TSHT
     path_name: str = ""  # Apparel > Men > Topwear > T-Shirts
+    
+    # Applicable Item Types
+    applicable_item_types: List[str] = ["FG"]
     
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
@@ -203,6 +212,9 @@ class ItemSubClass(Document):
     path: str = ""    # APRL/MENS/TOPW/TSHT/RNCK
     path_name: str = ""  # Apparel > Men > Topwear > T-Shirts > Round Neck
     
+    # Applicable Item Types
+    applicable_item_types: List[str] = ["FG"]
+    
     # SKU Configuration
     sku_prefix: str = ""    # Same as sub_class_code, used in SKU generation
     last_sequence: str = "A0000"    # Last used sequence
@@ -245,7 +257,7 @@ class ItemCategoryCreate(BaseModel):
     category_code: str = Field(..., min_length=4, max_length=4)
     category_name: str
     description: Optional[str] = None
-    applicable_item_types: List[str] = ["FGDS"]
+    applicable_item_types: List[str] = ["FG"]
     has_color: bool = True
     has_size: bool = True
     has_fabric: bool = False
@@ -270,6 +282,7 @@ class ItemSubCategoryCreate(BaseModel):
     sub_category_name: str
     description: Optional[str] = None
     category_code: str    # Parent
+    applicable_item_types: List[str] = ["FG"]
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -289,6 +302,7 @@ class ItemDivisionCreate(BaseModel):
     description: Optional[str] = None
     category_code: str
     sub_category_code: str
+    applicable_item_types: List[str] = ["FG"]
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -309,6 +323,7 @@ class ItemClassCreate(BaseModel):
     category_code: str
     sub_category_code: str
     division_code: str
+    applicable_item_types: List[str] = ["FG"]
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -332,6 +347,7 @@ class ItemSubClassCreate(BaseModel):
     sub_category_code: str
     division_code: str
     class_code: str
+    applicable_item_types: List[str] = ["FG"]
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -371,6 +387,7 @@ class ItemCategoryUpdate(BaseModel):
 class ItemSubCategoryUpdate(BaseModel):
     sub_category_name: Optional[str] = None
     description: Optional[str] = None
+    applicable_item_types: Optional[List[str]] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -383,6 +400,7 @@ class ItemSubCategoryUpdate(BaseModel):
 class ItemDivisionUpdate(BaseModel):
     division_name: Optional[str] = None
     description: Optional[str] = None
+    applicable_item_types: Optional[List[str]] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -395,6 +413,7 @@ class ItemDivisionUpdate(BaseModel):
 class ItemClassUpdate(BaseModel):
     class_name: Optional[str] = None
     description: Optional[str] = None
+    applicable_item_types: Optional[List[str]] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
@@ -409,6 +428,7 @@ class ItemClassUpdate(BaseModel):
 class ItemSubClassUpdate(BaseModel):
     sub_class_name: Optional[str] = None
     description: Optional[str] = None
+    applicable_item_types: Optional[List[str]] = None
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
