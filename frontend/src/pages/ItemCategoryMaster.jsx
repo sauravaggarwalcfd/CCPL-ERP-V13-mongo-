@@ -1126,6 +1126,21 @@ export default function ItemCategoryMaster() {
                   Step {formData.level > 1 ? '4' : '3'}: Basic Information
                 </label>
                 
+                {/* SKU Code Preview - Shows for all levels */}
+                {formData.code && (
+                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+                    <label className="block text-sm text-emerald-600 mb-1">
+                      SKU Code <span className="text-emerald-400">(Auto-Generated)</span>
+                    </label>
+                    <div className="font-mono text-xl font-bold text-emerald-700">
+                      {formData.item_type}-{formData.code}-A0001
+                    </div>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      Format: ItemType(2)-Code(4)-Sequence(5)
+                    </p>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
@@ -1177,44 +1192,6 @@ export default function ItemCategoryMaster() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
-                
-                {/* Path & SKU Preview - Show for all levels when code is entered */}
-                {formData.code && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <label className="block text-sm font-semibold text-blue-800 mb-2">
-                      Code Path Preview
-                    </label>
-                    <div className="font-mono text-lg font-bold text-blue-700">
-                      {formData.level === 1 && formData.code}
-                      {formData.level === 2 && `${formData.category_code || '????'}/${formData.code}`}
-                      {formData.level === 3 && `${formData.category_code || '????'}/${formData.sub_category_code || '????'}/${formData.code}`}
-                      {formData.level === 4 && `${formData.category_code || '????'}/${formData.sub_category_code || '????'}/${formData.division_code || '????'}/${formData.code}`}
-                      {formData.level === 5 && `${formData.category_code || '????'}/${formData.sub_category_code || '????'}/${formData.division_code || '????'}/${formData.class_code || '????'}/${formData.code}`}
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Hierarchy path: {LEVELS.slice(0, formData.level).map(l => l.name).join(' → ')}
-                    </p>
-                  </div>
-                )}
-                
-                {/* SKU Prefix Preview - Only for Level 5 (Sub-Class) */}
-                {formData.level === 5 && formData.code && (
-                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <label className="block text-sm font-semibold text-amber-800 mb-2">
-                      SKU Prefix Preview
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-lg font-bold text-amber-700">
-                        {formData.item_type}-{formData.code}
-                      </span>
-                      <span className="text-gray-400">-</span>
-                      <span className="font-mono text-gray-400">XXXX-XXXX-XXXX</span>
-                    </div>
-                    <p className="text-xs text-amber-600 mt-1">
-                      First 2 parts defined here. Remaining 3 parts (Sequence-Color-Size) will be assigned in Item Master.
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Settings */}
