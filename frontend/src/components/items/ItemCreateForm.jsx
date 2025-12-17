@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { X, Search, ChevronRight, Lock, Package, Save, FileText } from 'lucide-react'
+import { X, Search, ChevronRight, Lock, Package, Save, FileText, AlertCircle, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api, { categoryHierarchy, itemTypes } from '../../services/api'
+import api, { itemTypes } from '../../services/api'
+import { useHierarchySearch } from './useHierarchySearch'
 
 // UOM Options
 const UOM_OPTIONS = [
@@ -26,7 +27,24 @@ const generateSKU = (itemType = 'FG', sequence = 1) => {
 }
 
 export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
-  // Loading states
+  // Use the custom hierarchy hook
+  const {
+    categories,
+    subCategories,
+    divisions,
+    classes,
+    subClasses,
+    searchLoading,
+    fetchAllCategories,
+    fetchSubCategories,
+    fetchDivisions,
+    fetchClasses,
+    fetchSubClasses,
+    searchAllLevels,
+    reverseFillHierarchy,
+  } = useHierarchySearch()
+
+  // Loading & UI states
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   
@@ -34,15 +52,6 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
-  const [searchLoading, setSearchLoading] = useState(false)
-  
-  // Hierarchy data
-  const [categories, setCategories] = useState([])
-  const [subCategories, setSubCategories] = useState([])
-  const [divisions, setDivisions] = useState([])
-  const [classes, setClasses] = useState([])
-  const [subClasses, setSubClasses] = useState([])
-  const [itemTypesList, setItemTypesList] = useState([])
   
   // Selected hierarchy
   const [selectedCategory, setSelectedCategory] = useState(null)
@@ -69,144 +78,105 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
     conversionFactor: 1,
   })
   
-  // SKU sequence (would come from backend in production)
+  // Item types list
+  const [itemTypesList, setItemTypesList] = useState([])
+  
+  // SKU sequence
   const [skuSequence, setSkuSequence] = useState(1)
 
-  // Fetch initial data
+  // Initialize on open
   useEffect(() => {
     if (isOpen) {
-      fetchCategories()
-      fetchItemTypes()
+      initializeForm()
+    }
+  }, [isOpen])
+
+  const initializeForm = async () => {
+    try {
+      setLoading(true)
+      // Fetch item types
+      const typesRes = await itemTypes.getDropdown()
+      setItemTypesList(typesRes.data || [])
+      
+      // Fetch categories
+      await fetchAllCategories(true) // Force refresh
+      
       // Generate initial SKU
       setFormData(prev => ({
         ...prev,
         sku: generateSKU('FG', skuSequence)
       }))
-    }
-  }, [isOpen])
-
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      setLoading(true)
-      const response = await categoryHierarchy.getCategories({ is_active: true })
-      setCategories(response.data || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      console.error('Error initializing form:', error)
       toast.error('Failed to load categories')
     } finally {
       setLoading(false)
     }
   }
 
-  // Fetch item types
-  const fetchItemTypes = async () => {
-    try {
-      const response = await itemTypes.getDropdown()
-      setItemTypesList(response.data || [])
-    } catch (error) {
-      console.error('Error fetching item types:', error)
+  // Handle category change
+  const handleCategoryChange = async (categoryCode) => {
+    const category = categories.find(c => c.code === categoryCode)
+    setSelectedCategory(category || null)
+    setSelectedSubCategory(null)
+    setSelectedDivision(null)
+    setSelectedClass(null)
+    setSelectedSubClass(null)
+    
+    if (category) {
+      updateAutoFilledData(category)
+      await fetchSubCategories(categoryCode)
     }
   }
 
-  // Fetch sub-categories when category changes
-  useEffect(() => {
-    if (selectedCategory) {
-      fetchSubCategories(selectedCategory.code)
-      updateAutoFilledData(selectedCategory)
-    } else {
-      setSubCategories([])
-      setSelectedSubCategory(null)
+  // Handle sub-category change (WITH REVERSE FILL)
+  const handleSubCategoryChange = async (subCategoryCode) => {
+    const subCat = subCategories.find(s => s.code === subCategoryCode)
+    setSelectedSubCategory(subCat || null)
+    setSelectedDivision(null)
+    setSelectedClass(null)
+    setSelectedSubClass(null)
+    
+    if (subCat && selectedCategory) {
+      await fetchDivisions(selectedCategory.code, subCategoryCode)
     }
-  }, [selectedCategory])
+  }
 
-  // Fetch divisions when sub-category changes
-  useEffect(() => {
-    if (selectedSubCategory) {
-      fetchDivisions(selectedCategory?.code, selectedSubCategory.code)
-    } else {
-      setDivisions([])
-      setSelectedDivision(null)
+  // Handle division change
+  const handleDivisionChange = async (divisionCode) => {
+    const div = divisions.find(d => d.code === divisionCode)
+    setSelectedDivision(div || null)
+    setSelectedClass(null)
+    setSelectedSubClass(null)
+    
+    if (div && selectedCategory && selectedSubCategory) {
+      await fetchClasses(selectedCategory.code, selectedSubCategory.code, divisionCode)
     }
-  }, [selectedSubCategory])
+  }
 
-  // Fetch classes when division changes
-  useEffect(() => {
-    if (selectedDivision) {
-      fetchClasses(selectedCategory?.code, selectedSubCategory?.code, selectedDivision.code)
-    } else {
-      setClasses([])
-      setSelectedClass(null)
-    }
-  }, [selectedDivision])
-
-  // Fetch sub-classes when class changes
-  useEffect(() => {
-    if (selectedClass) {
-      fetchSubClasses(
-        selectedCategory?.code,
-        selectedSubCategory?.code,
-        selectedDivision?.code,
-        selectedClass.code
+  // Handle class change
+  const handleClassChange = async (classCode) => {
+    const cls = classes.find(c => c.code === classCode)
+    setSelectedClass(cls || null)
+    setSelectedSubClass(null)
+    
+    if (cls && selectedCategory && selectedSubCategory && selectedDivision) {
+      await fetchSubClasses(
+        selectedCategory.code,
+        selectedSubCategory.code,
+        selectedDivision.code,
+        classCode
       )
-    } else {
-      setSubClasses([])
-      setSelectedSubClass(null)
-    }
-  }, [selectedClass])
-
-  const fetchSubCategories = async (categoryCode) => {
-    try {
-      const response = await categoryHierarchy.getSubCategories({ category_code: categoryCode, is_active: true })
-      setSubCategories(response.data || [])
-    } catch (error) {
-      console.error('Error fetching sub-categories:', error)
     }
   }
 
-  const fetchDivisions = async (categoryCode, subCategoryCode) => {
-    try {
-      const response = await categoryHierarchy.getDivisions({ 
-        category_code: categoryCode,
-        sub_category_code: subCategoryCode,
-        is_active: true 
-      })
-      setDivisions(response.data || [])
-    } catch (error) {
-      console.error('Error fetching divisions:', error)
-    }
+  // Handle sub-class change
+  const handleSubClassChange = (subClassCode) => {
+    const subCls = subClasses.find(s => s.code === subClassCode)
+    setSelectedSubClass(subCls || null)
   }
 
-  const fetchClasses = async (categoryCode, subCategoryCode, divisionCode) => {
-    try {
-      const response = await categoryHierarchy.getClasses({ 
-        category_code: categoryCode,
-        sub_category_code: subCategoryCode,
-        division_code: divisionCode,
-        is_active: true 
-      })
-      setClasses(response.data || [])
-    } catch (error) {
-      console.error('Error fetching classes:', error)
-    }
-  }
-
-  const fetchSubClasses = async (categoryCode, subCategoryCode, divisionCode, classCode) => {
-    try {
-      const response = await categoryHierarchy.getSubClasses({ 
-        category_code: categoryCode,
-        sub_category_code: subCategoryCode,
-        division_code: divisionCode,
-        class_code: classCode,
-        is_active: true 
-      })
-      setSubClasses(response.data || [])
-    } catch (error) {
-      console.error('Error fetching sub-classes:', error)
-    }
-  }
-
-  // Update auto-filled data based on category selection
+  // Update auto-filled data based on category
   const updateAutoFilledData = (category) => {
     const itemType = itemTypesList.find(t => t.value === category.item_type)
     
@@ -237,14 +207,58 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
     return parts.join(' > ')
   }, [selectedCategory, selectedSubCategory, selectedDivision, selectedClass, selectedSubClass])
 
+  // Handle search with debounce
+  const handleSearch = async (term) => {
+    setSearchTerm(term)
+    
+    if (term.length < 1) {
+      setSearchResults([])
+      setShowSearchDropdown(false)
+      return
+    }
+
+    const results = await searchAllLevels(term)
+    setSearchResults(results)
+    setShowSearchDropdown(true)
+  }
+
+  // Handle search result selection with REVERSE FILL
+  const handleSelectSearchResult = async (result) => {
+    try {
+      const hierarchy = await reverseFillHierarchy(result)
+      
+      // Set all hierarchy levels
+      if (hierarchy.category) setSelectedCategory(hierarchy.category)
+      if (hierarchy.subCategory) setSelectedSubCategory(hierarchy.subCategory)
+      if (hierarchy.division) setSelectedDivision(hierarchy.division)
+      if (hierarchy.class) setSelectedClass(hierarchy.class)
+      if (hierarchy.subClass) setSelectedSubClass(hierarchy.subClass)
+      
+      // Update auto-filled data
+      if (hierarchy.category) {
+        updateAutoFilledData(hierarchy.category)
+      }
+      
+      // Clear search
+      setSearchTerm('')
+      setShowSearchDropdown(false)
+      setSearchResults([])
+      
+      toast.success(`✅ Selected: ${result.fullPath}`)
+    } catch (error) {
+      console.error('Selection error:', error)
+      toast.error('Failed to select category')
+    }
+  }
+
   // Handle form submission
   const handleSubmit = async (isDraft = false) => {
     if (!selectedCategory) {
-      toast.error('Please select at least a Category')
+      toast.error('❌ Please select at least a Category')
       return
     }
     if (!formData.itemName.trim()) {
-      toast.error('Please enter an Item Name')
+      toast.error('❌ Please enter an Item Name')
       return
     }
 
@@ -274,15 +288,15 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
         mrp: 0,
       }
 
-      const response = await api.post('/items/', payload)
+      await api.post('/items/', payload)
 
-      toast.success(isDraft ? 'Item saved as draft!' : 'Item created successfully!')
+      toast.success(isDraft ? '💾 Item saved as draft!' : '✅ Item created successfully!')
       setSkuSequence(prev => prev + 1)
       resetForm()
       onSuccess?.()
       onClose()
     } catch (error) {
-      toast.error(error.response?.data?.detail || error.message || 'Failed to create item')
+      toast.error(error.response?.data?.detail || error.message || '❌ Failed to create item')
       console.error('Error creating item:', error)
     } finally {
       setSaving(false)
@@ -296,10 +310,6 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
     setSelectedDivision(null)
     setSelectedClass(null)
     setSelectedSubClass(null)
-    setSubCategories([])
-    setDivisions([])
-    setClasses([])
-    setSubClasses([])
     setAutoFilledData({
       itemType: '',
       itemTypeName: '',
@@ -315,204 +325,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
       conversionFactor: 1,
     })
     setSearchTerm('')
-  }
-
-  // Get UOM name
-  const getUomName = (code) => {
-    const uom = UOM_OPTIONS.find(u => u.code === code)
-    return uom ? `${uom.code} - ${uom.name}` : code
-  }
-
-  // Search across all category levels
-  const handleSearch = async (term) => {
-    setSearchTerm(term)
-    
-    if (term.length < 1) {
-      setSearchResults([])
-      setShowSearchDropdown(false)
-      return
-    }
-
-    setSearchLoading(true)
-    try {
-      // Search in all levels
-      const searchLower = term.toLowerCase()
-      
-      const [catsRes, subCatsRes, divsRes, clsRes, subClsRes] = await Promise.all([
-        categoryHierarchy.getCategories({ is_active: true }),
-        categoryHierarchy.getSubCategories({ is_active: true }),
-        categoryHierarchy.getDivisions({ is_active: true }),
-        categoryHierarchy.getClasses({ is_active: true }),
-        categoryHierarchy.getSubClasses({ is_active: true }),
-      ])
-
-      const results = []
-
-      // Filter and format categories
-      const cats = (catsRes.data || []).filter(c => 
-        c.name.toLowerCase().includes(searchLower) || c.code.toLowerCase().includes(searchLower)
-      ).map(c => ({
-        ...c,
-        level: 1,
-        levelName: 'Category',
-        fullPath: c.name,
-        searchPath: [c.name],
-      }))
-
-      // Filter and format sub-categories
-      const subCats = (subCatsRes.data || []).filter(c => 
-        c.name.toLowerCase().includes(searchLower) || c.code.toLowerCase().includes(searchLower)
-      ).map(c => ({
-        ...c,
-        level: 2,
-        levelName: 'Sub-Category',
-        fullPath: `${c.category_name} > ${c.name}`,
-        searchPath: [c.category_code, c.code],
-      }))
-
-      // Filter and format divisions
-      const divs = (divsRes.data || []).filter(c => 
-        c.name.toLowerCase().includes(searchLower) || c.code.toLowerCase().includes(searchLower)
-      ).map(c => ({
-        ...c,
-        level: 3,
-        levelName: 'Division',
-        fullPath: `${c.category_name} > ${c.sub_category_name} > ${c.name}`,
-        searchPath: [c.category_code, c.sub_category_code, c.code],
-      }))
-
-      // Filter and format classes
-      const cls = (clsRes.data || []).filter(c => 
-        c.name.toLowerCase().includes(searchLower) || c.code.toLowerCase().includes(searchLower)
-      ).map(c => ({
-        ...c,
-        level: 4,
-        levelName: 'Class',
-        fullPath: `${c.category_name} > ${c.sub_category_name} > ${c.division_name} > ${c.name}`,
-        searchPath: [c.category_code, c.sub_category_code, c.division_code, c.code],
-      }))
-
-      // Filter and format sub-classes
-      const subCls = (subClsRes.data || []).filter(c => 
-        c.name.toLowerCase().includes(searchLower) || c.code.toLowerCase().includes(searchLower)
-      ).map(c => ({
-        ...c,
-        level: 5,
-        levelName: 'Sub-Class',
-        fullPath: `${c.category_name} > ${c.sub_category_name} > ${c.division_name} > ${c.class_name} > ${c.name}`,
-        searchPath: [c.category_code, c.sub_category_code, c.division_code, c.class_code, c.code],
-      }))
-
-      results.push(...cats, ...subCats, ...divs, ...cls, ...subCls)
-
-      // Sort by level (show categories first) then by name
-      results.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
-
-      setSearchResults(results.slice(0, 15)) // Limit to 15 results
-      setShowSearchDropdown(true)
-    } catch (error) {
-      console.error('Search error:', error)
-      toast.error('Search failed')
-    } finally {
-      setSearchLoading(false)
-    }
-  }
-
-  // Handle search result selection
-  const handleSelectSearchResult = async (result) => {
-    try {
-      // Set the deepest level that was found
-      if (result.level >= 1) {
-        setSelectedCategory(
-          categories.find(c => c.code === result.category_code) || 
-          { code: result.category_code, name: result.category_name, item_type: result.item_type, default_hsn_code: result.default_hsn_code, default_gst_rate: result.default_gst_rate }
-        )
-      }
-
-      if (result.level >= 2 && result.sub_category_code) {
-        // Fetch sub-categories
-        const subCatsRes = await categoryHierarchy.getSubCategories({ 
-          category_code: result.category_code, 
-          is_active: true 
-        })
-        const subCat = subCatsRes.data?.find(c => c.code === result.sub_category_code)
-        if (subCat) {
-          setSubCategories(subCatsRes.data || [])
-          setSelectedSubCategory(subCat)
-        }
-      }
-
-      if (result.level >= 3 && result.division_code) {
-        // Fetch divisions
-        const divsRes = await categoryHierarchy.getDivisions({ 
-          category_code: result.category_code,
-          sub_category_code: result.sub_category_code,
-          is_active: true 
-        })
-        const div = divsRes.data?.find(d => d.code === result.division_code)
-        if (div) {
-          setDivisions(divsRes.data || [])
-          setSelectedDivision(div)
-        }
-      }
-
-      if (result.level >= 4 && result.class_code) {
-        // Fetch classes
-        const clsRes = await categoryHierarchy.getClasses({ 
-          category_code: result.category_code,
-          sub_category_code: result.sub_category_code,
-          division_code: result.division_code,
-          is_active: true 
-        })
-        const cls = clsRes.data?.find(c => c.code === result.class_code)
-        if (cls) {
-          setClasses(clsRes.data || [])
-          setSelectedClass(cls)
-        }
-      }
-
-      if (result.level >= 5 && result.sub_class_code) {
-        // Fetch sub-classes
-        const subClsRes = await categoryHierarchy.getSubClasses({ 
-          category_code: result.category_code,
-          sub_category_code: result.sub_category_code,
-          division_code: result.division_code,
-          class_code: result.class_code,
-          is_active: true 
-        })
-        const subCls = subClsRes.data?.find(sc => sc.code === result.sub_class_code)
-        if (subCls) {
-          setSubClasses(subClsRes.data || [])
-          setSelectedSubClass(subCls)
-        }
-      }
-
-      // Update auto-filled data from the result
-      const itemType = itemTypesList.find(t => t.value === result.item_type)
-      setAutoFilledData({
-        itemType: result.item_type || 'FG',
-        itemTypeName: itemType?.name || result.item_type || 'Finished Goods',
-        hsnCode: result.default_hsn_code || '',
-        gstRate: result.default_gst_rate || 5,
-        defaultUom: result.default_uom || 'PCS',
-      })
-
-      // Update SKU
-      setFormData(prev => ({
-        ...prev,
-        sku: generateSKU(result.item_type || 'FG', skuSequence),
-        stockUom: result.default_uom || 'PCS',
-      }))
-
-      // Clear search
-      setSearchTerm('')
-      setShowSearchDropdown(false)
-      setSearchResults([])
-      toast.success(`Selected: ${result.fullPath}`)
-    } catch (error) {
-      console.error('Selection error:', error)
-      toast.error('Failed to select category')
-    }
+    setSearchResults([])
+    setShowSearchDropdown(false)
   }
 
   if (!isOpen) return null
@@ -536,38 +350,47 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
         {/* Form Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Quick Search */}
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+          {/* Quick Search - FIXED VERSION */}
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-300">
+            <label className="flex items-center gap-2 text-sm font-bold text-blue-900 mb-3">
               <Search className="w-4 h-4" />
-              QUICK SEARCH (Search & Auto-Fill)
+              🔍 QUICK SEARCH (Search & Auto-Fill All Levels)
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-3 top-3 text-blue-400 w-5 h-5" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => searchTerm.length > 0 && setShowSearchDropdown(true)}
-                placeholder="🔍 Search by Category, SKU, Code, Name..."
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="🔍 Type to search (Category, Sub-Category, Division, Class, etc.)"
+                className="w-full pl-10 pr-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               />
               
-              {/* Search Dropdown Results */}
+              {/* Loading indicator */}
+              {searchLoading && (
+                <div className="absolute right-3 top-3">
+                  <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+                </div>
+              )}
+              
+              {/* Search Results Dropdown - FIXED */}
               {showSearchDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-blue-300 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
                   {searchLoading ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
-                      Searching...
+                    <div className="p-6 text-center">
+                      <div className="animate-spin w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Searching all levels...</p>
                     </div>
                   ) : searchResults.length === 0 && searchTerm.length > 0 ? (
-                    <div className="p-4 text-center text-gray-500">
-                      No matching categories found
+                    <div className="p-6 text-center">
+                      <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+                      <p className="text-gray-600 font-medium">No matching categories found for "{searchTerm}"</p>
+                      <p className="text-xs text-gray-500 mt-1">Try searching by code or different name</p>
                     </div>
                   ) : searchResults.length === 0 ? (
-                    <div className="p-4 text-center text-gray-400 text-sm">
-                      Start typing to search...
+                    <div className="p-6 text-center text-gray-400 text-sm">
+                      Start typing to search across all 5 levels...
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -578,8 +401,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                           className="w-full text-left px-4 py-3 hover:bg-blue-50 transition flex items-start gap-3 group"
                         >
                           {/* Level Badge */}
-                          <div className="flex-shrink-0 mt-0.5">
-                            <span className="inline-block w-6 h-6 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                          <div className="flex-shrink-0">
+                            <span className="inline-block w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs rounded-full flex items-center justify-center font-bold shadow-sm">
                               L{result.level}
                             </span>
                           </div>
@@ -587,18 +410,21 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-gray-900 truncate">{result.name}</span>
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-600 flex-shrink-0">
+                              <span className="font-semibold text-gray-900">{result.name}</span>
+                              <span className="text-xs bg-gray-200 px-2.5 py-0.5 rounded-full font-mono text-gray-700 flex-shrink-0 font-bold">
                                 {result.code}
+                              </span>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full flex-shrink-0 font-medium">
+                                {result.levelName}
                               </span>
                             </div>
                             <div className="text-xs text-gray-600 truncate">
-                              {result.levelName} • {result.fullPath}
+                              📍 {result.fullPath}
                             </div>
                           </div>
                           
                           {/* Arrow */}
-                          <ChevronRight className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 w-4 h-4 mt-1" />
+                          <ChevronRight className="text-blue-400 group-hover:text-blue-600 flex-shrink-0 w-5 h-5 mt-1" />
                         </button>
                       ))}
                     </div>
@@ -606,148 +432,178 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                 </div>
               )}
             </div>
-            {showSearchDropdown && searchResults.length > 0 && (
-              <p className="text-xs text-gray-500 mt-2">
-                Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-              </p>
+            <p className="text-xs text-blue-700 mt-2">💡 Tip: Search auto-fills all levels. e.g., search "Cotton" and select result to fill entire path.</p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t-2 border-gray-300" />
+
+          {/* Step 1: Category Hierarchy - FIXED CASCADING */}
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">1</span>
+              SELECT CATEGORY HIERARCHY <span className="text-red-500">*</span>
+            </h3>
+            
+            {/* All dropdowns in one section */}
+            <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              {/* Category Dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  📦 Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedCategory?.code || ''}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                >
+                  <option value="">-- Select Category --</option>
+                  {categories.map(cat => (
+                    <option key={cat.code} value={cat.code}>
+                      {cat.code} • {cat.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedCategory && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <Check size={14} /> Selected: {selectedCategory.name}
+                  </p>
+                )}
+              </div>
+
+              {/* Sub-Category Dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  📂 Sub-Category
+                </label>
+                <select
+                  value={selectedSubCategory?.code || ''}
+                  onChange={(e) => handleSubCategoryChange(e.target.value)}
+                  disabled={!selectedCategory}
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">-- Select Sub-Category --</option>
+                  {subCategories.map(subCat => (
+                    <option key={subCat.code} value={subCat.code}>
+                      {subCat.code} • {subCat.name}
+                    </option>
+                  ))}
+                </select>
+                {!selectedCategory && (
+                  <p className="text-xs text-gray-500 mt-1">Select Category first</p>
+                )}
+                {selectedSubCategory && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <Check size={14} /> Selected: {selectedSubCategory.name}
+                  </p>
+                )}
+              </div>
+
+              {/* Division Dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  🎯 Division
+                </label>
+                <select
+                  value={selectedDivision?.code || ''}
+                  onChange={(e) => handleDivisionChange(e.target.value)}
+                  disabled={!selectedSubCategory}
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">-- Select Division --</option>
+                  {divisions.map(div => (
+                    <option key={div.code} value={div.code}>
+                      {div.code} • {div.name}
+                    </option>
+                  ))}
+                </select>
+                {!selectedSubCategory && (
+                  <p className="text-xs text-gray-500 mt-1">Select Sub-Category first</p>
+                )}
+                {selectedDivision && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <Check size={14} /> Selected: {selectedDivision.name}
+                  </p>
+                )}
+              </div>
+
+              {/* Class Dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  🏷️ Class
+                </label>
+                <select
+                  value={selectedClass?.code || ''}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  disabled={!selectedDivision}
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">-- Select Class --</option>
+                  {classes.map(cls => (
+                    <option key={cls.code} value={cls.code}>
+                      {cls.code} • {cls.name}
+                    </option>
+                  ))}
+                </select>
+                {!selectedDivision && (
+                  <p className="text-xs text-gray-500 mt-1">Select Division first</p>
+                )}
+                {selectedClass && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <Check size={14} /> Selected: {selectedClass.name}
+                  </p>
+                )}
+              </div>
+
+              {/* Sub-Class Dropdown */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  ✨ Sub-Class
+                </label>
+                <select
+                  value={selectedSubClass?.code || ''}
+                  onChange={(e) => handleSubClassChange(e.target.value)}
+                  disabled={!selectedClass}
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">-- Select Sub-Class --</option>
+                  {subClasses.map(subCls => (
+                    <option key={subCls.code} value={subCls.code}>
+                      {subCls.code} • {subCls.name}
+                    </option>
+                  ))}
+                </select>
+                {!selectedClass && (
+                  <p className="text-xs text-gray-500 mt-1">Select Class first</p>
+                )}
+                {selectedSubClass && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <Check size={14} /> Selected: {selectedSubClass.name}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Path Display */}
+            {hierarchyPath && (
+              <div className="bg-blue-100 rounded-lg px-4 py-3 flex items-start gap-2 mt-4 border border-blue-300">
+                <span className="text-blue-600 font-bold text-lg">📍</span>
+                <div>
+                  <p className="text-xs text-blue-600 font-semibold">Current Path:</p>
+                  <p className="text-blue-900 font-medium">{hierarchyPath}</p>
+                </div>
+              </div>
             )}
           </div>
 
           {/* Divider */}
           <div className="border-t-2 border-gray-300" />
 
-          {/* Step 1: Category Hierarchy */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">1</span>
-              SELECT CATEGORY HIERARCHY <span className="text-red-500">*</span>
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Category</label>
-                <select
-                  value={selectedCategory?.code || ''}
-                  onChange={(e) => {
-                    const cat = categories.find(c => c.code === e.target.value)
-                    setSelectedCategory(cat || null)
-                  }}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map(cat => (
-                    <option key={cat.code} value={cat.code}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sub-Category */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Sub-Category</label>
-                <select
-                  value={selectedSubCategory?.code || ''}
-                  onChange={(e) => {
-                    const subCat = subCategories.find(c => c.code === e.target.value)
-                    setSelectedSubCategory(subCat || null)
-                  }}
-                  disabled={!selectedCategory}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Sub-Category</option>
-                  {subCategories.map(subCat => (
-                    <option key={subCat.code} value={subCat.code}>
-                      {subCat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Division */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Division</label>
-                <select
-                  value={selectedDivision?.code || ''}
-                  onChange={(e) => {
-                    const div = divisions.find(d => d.code === e.target.value)
-                    setSelectedDivision(div || null)
-                  }}
-                  disabled={!selectedSubCategory}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Division</option>
-                  {divisions.map(div => (
-                    <option key={div.code} value={div.code}>
-                      {div.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Class */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Class</label>
-                <select
-                  value={selectedClass?.code || ''}
-                  onChange={(e) => {
-                    const cls = classes.find(c => c.code === e.target.value)
-                    setSelectedClass(cls || null)
-                  }}
-                  disabled={!selectedDivision}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Class</option>
-                  {classes.map(cls => (
-                    <option key={cls.code} value={cls.code}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sub-Class */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Sub-Class</label>
-                <select
-                  value={selectedSubClass?.code || ''}
-                  onChange={(e) => {
-                    const subCls = subClasses.find(c => c.code === e.target.value)
-                    setSelectedSubClass(subCls || null)
-                  }}
-                  disabled={!selectedClass}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Sub-Class</option>
-                  {subClasses.map(subCls => (
-                    <option key={subCls.code} value={subCls.code}>
-                      {subCls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Path Display */}
-            {hierarchyPath && (
-              <div className="bg-blue-50 rounded-lg px-4 py-2 flex items-center gap-2">
-                <span className="text-blue-600 font-medium">📍 Path:</span>
-                <span className="text-blue-800">{hierarchyPath}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-gray-200" />
-
           {/* Auto-filled from Category */}
           {selectedCategory && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-600 uppercase mb-3">
-                Auto-filled from Category:
+              <h4 className="text-sm font-bold text-gray-700 uppercase mb-3">
+                ✅ Auto-filled from Category:
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -757,7 +613,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                       type="text"
                       value={autoFilledData.itemType ? `${autoFilledData.itemType} - ${autoFilledData.itemTypeName}` : ''}
                       readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
+                      className="w-full px-3 py-2.5 pr-10 border border-green-300 rounded-lg bg-green-50 text-green-900 font-semibold cursor-not-allowed"
                     />
                     <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
                   </div>
@@ -769,7 +625,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                       type="text"
                       value={autoFilledData.hsnCode || 'Not Set'}
                       readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
+                      className="w-full px-3 py-2.5 pr-10 border border-green-300 rounded-lg bg-green-50 text-green-900 font-semibold cursor-not-allowed"
                     />
                     <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
                   </div>
@@ -781,7 +637,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                       type="text"
                       value={`${autoFilledData.gstRate}%`}
                       readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
+                      className="w-full px-3 py-2.5 pr-10 border border-green-300 rounded-lg bg-green-50 text-green-900 font-semibold cursor-not-allowed"
                     />
                     <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
                   </div>
@@ -795,21 +651,21 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
           {/* Step 2: Item Details */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">2</span>
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">2</span>
               ITEM DETAILS
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* SKU (Auto) */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">SKU (Auto)</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">SKU (Auto)</label>
                 <div className="relative">
                   <input
                     type="text"
                     value={formData.sku}
                     readOnly
-                    className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-mono cursor-not-allowed"
+                    className="w-full px-3 py-2.5 pr-10 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-mono font-bold cursor-not-allowed"
                   />
                   <Lock className="absolute right-3 top-3 w-4 h-4 text-gray-500" />
                 </div>
@@ -817,15 +673,15 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
               {/* Item Name */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-600 mb-1">
+                <label className="block text-sm font-bold text-gray-700 mb-2">
                   Item Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.itemName}
                   onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                  placeholder="Men's Round Neck Cotton T-Shirt"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Men's Round Neck Cotton T-Shirt"
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
             </div>
@@ -836,21 +692,19 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
           {/* Step 3: Units of Measure */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">3</span>
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">3</span>
               UNITS OF MEASURE <span className="text-red-500">*</span>
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Stock UOM */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Stock UOM <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Stock UOM <span className="text-red-500">*</span></label>
                 <select
                   value={formData.stockUom}
                   onChange={(e) => setFormData({ ...formData, stockUom: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
                 >
                   {UOM_OPTIONS.map(uom => (
                     <option key={uom.code} value={uom.code}>
@@ -862,17 +716,13 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
               {/* Purchase UOM */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Purchase UOM <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Purchase UOM <span className="text-red-500">*</span></label>
                 <select
                   value={formData.purchaseUom}
                   onChange={(e) => {
                     const newPurchaseUom = e.target.value
-                    const stockUomData = UOM_OPTIONS.find(u => u.code === formData.stockUom)
                     const purchaseUomData = UOM_OPTIONS.find(u => u.code === newPurchaseUom)
                     
-                    // Auto-calculate conversion factor for common conversions
                     let conversionFactor = 1
                     if (newPurchaseUom === 'DOZ' && formData.stockUom === 'PCS') {
                       conversionFactor = 12
@@ -892,7 +742,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                       conversionFactor 
                     })
                   }}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
                 >
                   {UOM_OPTIONS.map(uom => (
                     <option key={uom.code} value={uom.code}>
@@ -904,7 +754,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
               {/* Conversion Factor */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Conversion Factor</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Conversion Factor</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -912,9 +762,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                     step="0.001"
                     value={formData.conversionFactor}
                     onChange={(e) => setFormData({ ...formData, conversionFactor: parseFloat(e.target.value) || 1 })}
-                    className="w-24 px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-24 px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
                   />
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-600 font-medium">
                     1 {formData.purchaseUom} = {formData.conversionFactor} {formData.stockUom}
                   </span>
                 </div>
@@ -928,7 +778,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium transition"
+            className="px-5 py-2.5 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-bold transition"
           >
             Cancel
           </button>
@@ -936,7 +786,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
             type="button"
             onClick={() => handleSubmit(true)}
             disabled={saving}
-            className="px-5 py-2.5 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2.5 border-2 border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50 font-bold transition flex items-center gap-2 disabled:opacity-50"
           >
             <FileText className="w-4 h-4" />
             Save as Draft
@@ -945,10 +795,10 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
             type="button"
             onClick={() => handleSubmit(false)}
             disabled={saving || !selectedCategory || !formData.itemName.trim()}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-bold transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             <Save className="w-4 h-4" />
-            {saving ? 'Creating...' : 'Create'}
+            {saving ? 'Creating...' : 'Create Item'}
           </button>
         </div>
       </div>
