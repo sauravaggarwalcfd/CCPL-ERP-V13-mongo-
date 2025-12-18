@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, Filter, Download, Edit2, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ItemCreateForm from '../components/items/ItemCreateForm'
-import api, { categoryHierarchy } from '../services/api'
 
 export default function ItemMaster() {
   const [items, setItems] = useState([])
@@ -32,25 +31,34 @@ export default function ItemMaster() {
     }
   }, [selectedCategory])
 
+  const getToken = () => localStorage.getItem('access_token')
+
   const fetchCategories = async () => {
     try {
-      const response = await categoryHierarchy.getCategories({ is_active: true })
-      setCategories(Array.isArray(response.data) ? response.data : [])
+      const response = await fetch('http://127.0.0.1:8000/api/items/categories', {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      setCategories(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching categories:', error)
-      setCategories([])
+      setCategories([]) // Set empty array on error instead of showing error toast
     }
   }
 
-  const fetchSubCategories = async (categoryCode) => {
+  const fetchSubCategories = async (categoryId) => {
     try {
-      const response = await categoryHierarchy.getSubCategories({ 
-        category_code: categoryCode,
-        is_active: true 
-      })
-      setSubCategories(Array.isArray(response.data) ? response.data : [])
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/items/sub-categories?category_id=${categoryId}`,
+        { headers: { 'Authorization': `Bearer ${getToken()}` } }
+      )
+      const data = await response.json()
+      setSubCategories(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Error fetching sub-categories:', error)
+      console.error(error)
       setSubCategories([])
     }
   }
@@ -58,31 +66,30 @@ export default function ItemMaster() {
   const fetchItems = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/items/', {
-        params: {
-          category_code: selectedCategory || undefined,
-          sub_category_code: selectedSubCategory || undefined,
-          is_active: true
-        }
+      let url = 'http://127.0.0.1:8000/api/items/items'
+      const params = []
+      
+      if (selectedCategory) params.push(`category_id=${selectedCategory}`)
+      if (selectedSubCategory) params.push(`sub_category_id=${selectedSubCategory}`)
+      
+      if (params.length > 0) url += '?' + params.join('&')
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
       })
-      setItems(Array.isArray(response.data) ? response.data : [])
+      const data = await response.json()
+      setItems(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Error fetching items:', error)
-      setItems([])
+      toast.error('Failed to fetch items')
+      console.error(error)
     } finally {
       setLoading(false)
     }
   }
 
   const handleCategoryChange = (e) => {
-    const selectedCode = e.target.value
-    setSelectedCategory(selectedCode)
+    setSelectedCategory(e.target.value)
     setSelectedSubCategory('')
-    if (selectedCode) {
-      fetchSubCategories(selectedCode)
-    } else {
-      setSubCategories([])
-    }
   }
 
   const filteredItems = items.filter(item =>
@@ -125,8 +132,8 @@ export default function ItemMaster() {
                 >
                   <option value="">All Categories</option>
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.code}>
-                      {cat.name}
+                    <option key={cat.id} value={cat.category_id}>
+                      {cat.category_name}
                     </option>
                   ))}
                 </select>
@@ -142,8 +149,8 @@ export default function ItemMaster() {
                 >
                   <option value="">All Sub-Categories</option>
                   {subCategories.map(subcat => (
-                    <option key={subcat.id} value={subcat.code}>
-                      {subcat.name}
+                    <option key={subcat.id} value={subcat.sub_category_id}>
+                      {subcat.sub_category_name}
                     </option>
                   ))}
                 </select>

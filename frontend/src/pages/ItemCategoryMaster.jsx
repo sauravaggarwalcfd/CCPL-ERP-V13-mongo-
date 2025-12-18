@@ -224,13 +224,6 @@ export default function ItemCategoryMaster() {
     setExpandedNodes(new Set())
   }
 
-  // Get next sequence number based on item type
-  const getNextSequence = (itemType) => {
-    // This will be calculated from the data - for now return a default
-    // In production, this would query the backend for the next sequence
-    return 1
-  }
-
   // Modal handlers
   const openCreateModal = (parentNode = null) => {
     const newForm = { ...DEFAULT_FORM }
