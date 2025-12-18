@@ -3,7 +3,7 @@ Item Type Master Model
 Defines types of items: Raw Material, Finished Goods, etc.
 
 Table: item_types
-Code Format: 4 characters (e.g., FGDS, YARN, TRIM)
+Code Format: 2 characters (e.g., FG, RM, AC, CM, SG)
 """
 
 from beanie import Document, Indexed
@@ -105,9 +105,14 @@ class ItemTypeResponse(BaseModel):
 
 
 SEED_ITEM_TYPES = [
-    {"type_code": "RM", "type_name": "Raw Material", "description": "Fabrics, threads, raw inputs", "allow_purchase": True, "allow_sale": False, "default_uom": "KG", "color_code": "#8b5cf6", "icon": "Layers", "sort_order": 1},
-    {"type_code": "FG", "type_name": "Finished Goods", "description": "Ready to sell products", "allow_purchase": False, "allow_sale": True, "require_quality_check": True, "default_uom": "PCS", "color_code": "#10b981", "icon": "Package", "sort_order": 2},
-    {"type_code": "SG", "type_name": "Sub Finished Goods", "description": "Semi-finished/Work in progress", "allow_purchase": False, "allow_sale": False, "default_uom": "PCS", "color_code": "#f97316", "icon": "Loader", "sort_order": 3},
-    {"type_code": "AC", "type_name": "Accessories", "description": "Buttons, zippers, labels", "allow_purchase": True, "allow_sale": False, "default_uom": "PCS", "color_code": "#f59e0b", "icon": "Sparkles", "sort_order": 4},
-    {"type_code": "CM", "type_name": "Consumable", "description": "Packaging, office supplies", "allow_purchase": True, "allow_sale": False, "default_uom": "PCS", "color_code": "#64748b", "icon": "Wrench", "sort_order": 5},
+    {"type_code": "YN", "type_name": "Yarn & Fiber", "description": "Yarns and fibers for manufacturing", "allow_purchase": True, "allow_sale": False, "default_uom": "KG", "color_code": "#8b5cf6", "icon": "Circle", "sort_order": 1},
+    {"type_code": "GF", "type_name": "Grey Fabric", "description": "Unprocessed grey fabric", "allow_purchase": True, "allow_sale": False, "default_uom": "MTR", "color_code": "#6b7280", "icon": "Layers", "sort_order": 2},
+    {"type_code": "DF", "type_name": "Dyed Fabric", "description": "Processed and dyed fabric", "allow_purchase": True, "allow_sale": False, "default_uom": "MTR", "color_code": "#3b82f6", "icon": "Layers", "sort_order": 3},
+    {"type_code": "TR", "type_name": "Trims & Accessories", "description": "Buttons, zippers, labels, accessories", "allow_purchase": True, "allow_sale": False, "default_uom": "PCS", "color_code": "#f59e0b", "icon": "Sparkles", "sort_order": 4},
+    {"type_code": "DY", "type_name": "Dyes & Chemicals", "description": "Dyes, chemicals for processing", "allow_purchase": True, "allow_sale": False, "default_uom": "LTR", "color_code": "#ef4444", "icon": "FlaskConical", "sort_order": 5},
+    {"type_code": "CP", "type_name": "Cut Components", "description": "Cut fabric components", "allow_purchase": False, "allow_sale": False, "default_uom": "PCS", "color_code": "#ec4899", "icon": "Scissors", "sort_order": 6},
+    {"type_code": "SF", "type_name": "Semi-Finished Goods", "description": "Semi-finished products/WIP", "allow_purchase": False, "allow_sale": False, "default_uom": "PCS", "color_code": "#f97316", "icon": "Loader", "sort_order": 7},
+    {"type_code": "FG", "type_name": "Finished Goods", "description": "Ready to sell products", "allow_purchase": False, "allow_sale": True, "require_quality_check": True, "default_uom": "PCS", "color_code": "#10b981", "icon": "Package", "sort_order": 8},
+    {"type_code": "PK", "type_name": "Packaging Materials", "description": "Polybags, cartons, tags", "allow_purchase": True, "allow_sale": False, "default_uom": "PCS", "color_code": "#06b6d4", "icon": "Box", "sort_order": 9},
+    {"type_code": "CS", "type_name": "Consumables & Spares", "description": "Needles, oil, tools, spares", "allow_purchase": True, "allow_sale": False, "default_uom": "PCS", "color_code": "#64748b", "icon": "Wrench", "sort_order": 10},
 ]

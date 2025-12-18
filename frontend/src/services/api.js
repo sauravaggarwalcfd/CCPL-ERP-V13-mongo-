@@ -166,6 +166,21 @@ export const itemTypes = {
   seed: () => api.post('/item-types/seed'),
 }
 
+// Items API
+export const items = {
+  list: (params = {}) => api.get('/items', { params }),
+  search: (searchTerm, limit = 10) => api.get('/items', {
+    params: { search: searchTerm, limit }
+  }),
+  get: (id) => api.get(`/items/${id}`),
+  create: (data) => api.post('/items', data),
+  update: (id, data) => api.put(`/items/${id}`, data),
+  delete: (id) => api.delete(`/items/${id}`),
+  checkExists: (itemCode) => api.get(`/items`, {
+    params: { search: itemCode, limit: 1 }
+  }),
+}
+
 // Category Hierarchy API (5 Levels)
 export const categoryHierarchy = {
   // Tree

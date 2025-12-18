@@ -16,6 +16,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
     environment:
       MONGODB_URL: mongodb://mongodb:27017
       DATABASE_NAME: inventory_erp

@@ -1,19 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
-import { 
+import {
   Plus, Search, ChevronRight, ChevronDown, Edit2, Edit3, Trash2, Eye,
   Package, Users, Layers, Tag, Hash, Shirt, RefreshCw, List,
-  FolderTree, Settings, X, Check, AlertCircle, Filter
+  FolderTree, Settings, X, Check, AlertCircle, Filter, GripVertical
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { categoryHierarchy, itemTypes } from '../services/api'
 
 // Level Configuration
 const LEVELS = [
-  { level: 1, name: 'Category', key: 'categories', codeField: 'category_code', nameField: 'category_name', icon: Package, color: '#10b981', example: 'Apparel, Fabrics, Accessories' },
-  { level: 2, name: 'Sub-Category', key: 'sub-categories', codeField: 'sub_category_code', nameField: 'sub_category_name', icon: Users, color: '#3b82f6', example: 'Men, Women, Kids' },
-  { level: 3, name: 'Division', key: 'divisions', codeField: 'division_code', nameField: 'division_name', icon: Layers, color: '#8b5cf6', example: 'Topwear, Bottomwear' },
-  { level: 4, name: 'Class', key: 'classes', codeField: 'class_code', nameField: 'class_name', icon: Tag, color: '#ec4899', example: 'T-Shirts, Jeans, Shirts' },
-  { level: 5, name: 'Sub-Class', key: 'sub-classes', codeField: 'sub_class_code', nameField: 'sub_class_name', icon: Hash, color: '#f59e0b', example: 'Round Neck, V-Neck, Polo' },
+  { level: 1, name: 'Level 1', key: 'categories', codeField: 'category_code', nameField: 'category_name', icon: Package, color: '#10b981', example: 'Apparel, Fabrics, Accessories' },
+  { level: 2, name: 'Level 2', key: 'sub-categories', codeField: 'sub_category_code', nameField: 'sub_category_name', icon: Users, color: '#3b82f6', example: 'Men, Women, Kids' },
+  { level: 3, name: 'Level 3', key: 'divisions', codeField: 'division_code', nameField: 'division_name', icon: Layers, color: '#8b5cf6', example: 'Topwear, Bottomwear' },
+  { level: 4, name: 'Level 4', key: 'classes', codeField: 'class_code', nameField: 'class_name', icon: Tag, color: '#ec4899', example: 'T-Shirts, Jeans, Shirts' },
+  { level: 5, name: 'Level 5', key: 'sub-classes', codeField: 'sub_class_code', nameField: 'sub_class_name', icon: Hash, color: '#f59e0b', example: 'Round Neck, V-Neck, Polo' },
 ]
 
 const DEFAULT_FORM = {
@@ -84,6 +84,17 @@ export default function ItemCategoryMaster() {
   const [subCategoryOptions, setSubCategoryOptions] = useState([])
   const [divisionOptions, setDivisionOptions] = useState([])
   const [classOptions, setClassOptions] = useState([])
+
+  // Panel resize state
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50) // percentage
+  const [isResizing, setIsResizing] = useState(false)
+
+  // Drag and drop state
+  const [draggedItem, setDraggedItem] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [showMoveConfirm, setShowMoveConfirm] = useState(false)
+  const [pendingMoveData, setPendingMoveData] = useState(null)
 
   // Fetch data
   const fetchTree = useCallback(async () => {
@@ -370,19 +381,15 @@ export default function ItemCategoryMaster() {
 
   // Form handlers
   const handleLevelChange = async (level) => {
-    setFormData(prev => {
-      const newSequence = getNextSequence(prev.item_type)
-      return {
-        ...prev,
-        level,
-        category_code: '',
-        sub_category_code: '',
-        division_code: '',
-        class_code: '',
-        sequence: newSequence,
-      }
-    })
-    
+    setFormData(prev => ({
+      ...prev,
+      level,
+      category_code: '',
+      sub_category_code: '',
+      division_code: '',
+      class_code: '',
+    }))
+
     await fetchDropdownOptions(level, {})
   }
 
@@ -407,9 +414,9 @@ export default function ItemCategoryMaster() {
 
   const validateForm = () => {
     const errors = {}
-    
-    if (!formData.code || formData.code.length !== 4) {
-      errors.code = 'Code must be exactly 4 characters'
+
+    if (!formData.code || formData.code.length < 2 || formData.code.length > 4) {
+      errors.code = 'Code must be 2-4 characters'
     } else if (!/^[A-Za-z0-9]+$/.test(formData.code)) {
       errors.code = 'Code must be alphanumeric only'
     }
@@ -511,23 +518,248 @@ export default function ItemCategoryMaster() {
     }
   }
 
+  // Panel resize handlers
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing) return
+
+      const mainContainer = document.querySelector('.flex.flex-1.overflow-hidden.relative')
+      if (!mainContainer) return
+
+      const containerRect = mainContainer.getBoundingClientRect()
+      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+
+      // Constrain between 30% and 70%
+      if (newWidth >= 30 && newWidth <= 70) {
+        setLeftPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      // Prevent text selection while dragging
+      document.body.style.userSelect = 'none'
+      document.body.style.cursor = 'col-resize'
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      }
+    }
+  }, [isResizing])
+
+  // Drag and Drop handlers
+  const canDrop = useCallback((draggedNode, targetNode) => {
+    if (!draggedNode || !targetNode) return false
+
+    // Can't drop on itself
+    if (draggedNode.code === targetNode.code) return false
+
+    // Can't drop Level 1 items (categories can't be moved)
+    if (draggedNode.level === 1) return false
+
+    // Can't drop on a descendant of itself
+    const isDescendant = (node, potentialAncestor) => {
+      if (node.code === potentialAncestor.code) return true
+      if (!potentialAncestor.children) return false
+      return potentialAncestor.children.some(child => isDescendant(node, child))
+    }
+    if (isDescendant(targetNode, draggedNode)) return false
+
+    // Target must be one level above the dragged item
+    // Level 2 can only be dropped on Level 1
+    // Level 3 can only be dropped on Level 2, etc.
+    if (targetNode.level !== draggedNode.level - 1) return false
+
+    return true
+  }, [])
+
+  const handleDragStart = useCallback((e, node) => {
+    if (node.level === 1) {
+      e.preventDefault()
+      return
+    }
+
+    setDraggedItem(node)
+    setIsDragging(true)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', node.code)
+  }, [])
+
+  const handleDragOver = useCallback((e, node) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedItem) {
+      return
+    }
+
+    setDropTarget(node)
+
+    if (!canDrop(draggedItem, node)) {
+      e.dataTransfer.dropEffect = 'none'
+      return
+    }
+
+    e.dataTransfer.dropEffect = 'move'
+  }, [draggedItem, canDrop])
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    setDropTarget(null)
+  }, [])
+
+  const handleDrop = useCallback((e, targetNode) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedItem || !canDrop(draggedItem, targetNode)) {
+      toast.error('Invalid drop: Cannot move here!')
+      setDraggedItem(null)
+      setDropTarget(null)
+      setIsDragging(false)
+      return
+    }
+
+    // Show confirmation modal
+    setPendingMoveData({ draggedItem, targetNode })
+    setShowMoveConfirm(true)
+    setDraggedItem(null)
+    setDropTarget(null)
+    setIsDragging(false)
+  }, [draggedItem, canDrop])
+
+  const executeMoveItem = useCallback(async () => {
+    if (!pendingMoveData) return
+
+    const { draggedItem, targetNode } = pendingMoveData
+
+    try {
+      // Prepare the update payload based on the level
+      const levelConfig = LEVELS[draggedItem.level - 1]
+      const payload = {
+        [levelConfig.codeField]: draggedItem.code,
+        [levelConfig.nameField]: draggedItem.name,
+        description: draggedItem.description || null,
+        item_type: draggedItem.item_type,
+        icon: draggedItem.icon,
+        color_code: draggedItem.color_code,
+        sort_order: draggedItem.sort_order,
+      }
+
+      // Update parent references based on target node's level and path
+      if (draggedItem.level >= 2) {
+        // For Level 2: parent is the target (Level 1)
+        if (draggedItem.level === 2) {
+          payload.category_code = targetNode.code
+        }
+        // For Level 3: parent is target (Level 2), also need the category
+        else if (draggedItem.level === 3) {
+          const pathParts = targetNode.path?.split('/') || []
+          payload.category_code = pathParts[0] || targetNode.category_code
+          payload.sub_category_code = targetNode.code
+        }
+        // For Level 4: parent is target (Level 3)
+        else if (draggedItem.level === 4) {
+          const pathParts = targetNode.path?.split('/') || []
+          payload.category_code = pathParts[0] || targetNode.category_code
+          payload.sub_category_code = pathParts[1] || targetNode.sub_category_code
+          payload.division_code = targetNode.code
+        }
+        // For Level 5: parent is target (Level 4)
+        else if (draggedItem.level === 5) {
+          const pathParts = targetNode.path?.split('/') || []
+          payload.category_code = pathParts[0] || targetNode.category_code
+          payload.sub_category_code = pathParts[1] || targetNode.sub_category_code
+          payload.division_code = pathParts[2] || targetNode.division_code
+          payload.class_code = targetNode.code
+        }
+      }
+
+      // Call the API to update
+      await categoryHierarchy.update(levelConfig.key, draggedItem.code, payload)
+
+      toast.success(`${draggedItem.name} moved successfully!`)
+
+      // Refresh the tree
+      fetchTree()
+      fetchList()
+    } catch (error) {
+      const message = error.response?.data?.detail || 'Failed to move item'
+      toast.error(message)
+    } finally {
+      setShowMoveConfirm(false)
+      setPendingMoveData(null)
+    }
+  }, [pendingMoveData, fetchTree, fetchList])
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedItem(null)
+    setDropTarget(null)
+    setIsDragging(false)
+  }, [])
+
   // Render tree node
   const renderTreeNode = (node, depth = 0) => {
     const hasChildren = node.children?.length > 0
     const isExpanded = expandedNodes.has(node.code)
     const levelConfig = LEVELS[node.level - 1]
     const IconComponent = levelConfig?.icon || Package
-    
+
+    const isBeingDragged = draggedItem?.code === node.code
+    const isValidDropTarget = draggedItem && canDrop(draggedItem, node)
+    const isCurrentDropTarget = dropTarget?.code === node.code
+
     return (
       <div key={node.code}>
-        <div 
-          className="flex items-center py-2 px-3 hover:bg-gray-50 border-b cursor-pointer group"
+        <div
+          draggable={node.level > 1}
+          onDragStart={(e) => handleDragStart(e, node)}
+          onDragOver={(e) => handleDragOver(e, node)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, node)}
+          onDragEnd={handleDragEnd}
+          className={`flex items-center py-2 px-3 border-b group transition-all ${
+            isBeingDragged
+              ? 'opacity-50 bg-gray-100'
+              : isCurrentDropTarget && isValidDropTarget
+              ? 'bg-emerald-100 border-emerald-500 border-2 scale-105'
+              : isCurrentDropTarget && !isValidDropTarget
+              ? 'bg-red-100 border-red-500 border-2'
+              : isValidDropTarget && isDragging
+              ? 'bg-emerald-50 hover:bg-emerald-100'
+              : isDragging && !isValidDropTarget
+              ? 'bg-red-50 opacity-50'
+              : 'hover:bg-gray-50'
+          } ${node.level > 1 ? 'cursor-move' : 'cursor-pointer'}`}
           style={{ paddingLeft: `${depth * 24 + 12}px` }}
         >
+          {/* Drag Handle - Only for Level 2-5 */}
+          {node.level > 1 && (
+            <div className="mr-1 text-gray-400 group-hover:text-gray-600 cursor-move">
+              <GripVertical size={16} />
+            </div>
+          )}
+
           {/* Expand/Collapse */}
           {hasChildren ? (
             <button
-              onClick={() => toggleNode(node.code)}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleNode(node.code)
+              }}
               className="p-1 hover:bg-gray-200 rounded mr-2 transition"
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -535,7 +767,7 @@ export default function ItemCategoryMaster() {
           ) : (
             <span className="w-7" />
           )}
-          
+
           {/* Icon */}
           <div 
             className="w-8 h-8 rounded flex items-center justify-center mr-3"
@@ -559,7 +791,7 @@ export default function ItemCategoryMaster() {
               )}
             </div>
             <div className="text-xs text-gray-500">
-              Level {node.level}: {levelConfig?.name}
+              {levelConfig?.name}
               {node.child_count > 0 && ` • ${node.child_count} children`}
               {node.item_count > 0 && ` • ${node.item_count} items`}
             </div>
@@ -659,9 +891,14 @@ export default function ItemCategoryMaster() {
       </div>
 
       {/* Main Content - Side by Side Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Left Panel - Views */}
-        <div className={`${(showPanel || showItemTypePanel) ? 'w-1/2' : 'flex-1'} p-6 overflow-auto transition-all duration-300`}>
+        <div
+          className="p-6 overflow-auto transition-all duration-300"
+          style={{
+            width: (showPanel || showItemTypePanel) ? `${leftPanelWidth}%` : '100%'
+          }}
+        >
         {/* Tree View */}
         {viewMode === 'tree' && (
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -736,7 +973,7 @@ export default function ItemCategoryMaster() {
               >
                 <option value="">All Levels</option>
                 {LEVELS.map(l => (
-                  <option key={l.level} value={l.level}>Level {l.level}: {l.name}</option>
+                  <option key={l.level} value={l.level}>{l.name}</option>
                 ))}
               </select>
             </div>
@@ -902,7 +1139,7 @@ export default function ItemCategoryMaster() {
                     <IconComponent size={14} className="text-white" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">L{level.level}: {level.name}</div>
+                    <div className="text-sm font-medium">{level.name}</div>
                     <div className="text-xs text-gray-500">{level.example}</div>
                   </div>
                 </div>
@@ -913,9 +1150,27 @@ export default function ItemCategoryMaster() {
         </div>
         {/* End Left Panel */}
 
+        {/* Resize Handle */}
+        {(showPanel || showItemTypePanel) && (
+          <div
+            className={`w-1 bg-gray-300 hover:bg-emerald-500 cursor-col-resize flex-shrink-0 transition-colors ${
+              isResizing ? 'bg-emerald-500' : ''
+            }`}
+            onMouseDown={handleMouseDown}
+            style={{ cursor: 'col-resize' }}
+          >
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="w-0.5 h-8 bg-white rounded-full opacity-70"></div>
+            </div>
+          </div>
+        )}
+
         {/* Right Panel - Form (Side Panel) */}
         {showPanel && (
-          <div className="w-1/2 border-l bg-white overflow-auto">
+          <div
+            className="border-l bg-white overflow-auto"
+            style={{ width: `${100 - leftPanelWidth}%` }}
+          >
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">
               <div className="flex items-center justify-between">
@@ -954,9 +1209,7 @@ export default function ItemCategoryMaster() {
                         value={type.value}
                         checked={formData.item_type === type.value}
                         onChange={(e) => {
-                          const newType = e.target.value
-                          const newSequence = getNextSequence(newType)
-                          setFormData(prev => ({ ...prev, item_type: newType, sequence: newSequence }))
+                          setFormData(prev => ({ ...prev, item_type: e.target.value }))
                         }}
                         className="sr-only"
                       />
@@ -1007,8 +1260,7 @@ export default function ItemCategoryMaster() {
                           <IconComponent size={20} className="text-white" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">Level {level.level}: {level.name}</div>
-                          <div className="text-xs text-gray-500">{level.example}</div>
+                          <div className="font-medium">Level {level.level}</div>
                         </div>
                         {formData.level === level.level && (
                           <Check size={20} className="text-emerald-600" />
@@ -1125,44 +1377,8 @@ export default function ItemCategoryMaster() {
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Step {formData.level > 1 ? '4' : '3'}: Basic Information
                 </label>
-                
-                {/* SKU Code Preview - Shows for all levels */}
-                {formData.code && (
-                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
-                    <label className="block text-sm text-emerald-600 mb-1">
-                      SKU Code <span className="text-emerald-400">(Auto-Generated)</span>
-                    </label>
-                    <div className="font-mono text-xl font-bold text-emerald-700">
-                      {formData.item_type}-{formData.code}
-                    </div>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      Format: ItemType(2)-Code(4)
-                    </p>
-                  </div>
-                )}
-                
+
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">
-                      Code <span className="text-red-500">*</span>
-                      <span className="text-xs text-gray-400 ml-1">(4 characters)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.code}
-                      onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase().slice(0, 4) }))}
-                      disabled={panelMode === 'edit'}
-                      placeholder="e.g., APRL"
-                      maxLength={4}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase ${
-                        formErrors.code ? 'border-red-500' : 'border-gray-300'
-                      } ${panelMode === 'edit' ? 'bg-gray-100' : ''}`}
-                    />
-                    {formErrors.code && (
-                      <p className="text-red-500 text-xs mt-1">{formErrors.code}</p>
-                    )}
-                  </div>
-                  
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
                       Name <span className="text-red-500">*</span>
@@ -1180,8 +1396,42 @@ export default function ItemCategoryMaster() {
                       <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      Code <span className="text-red-500">*</span>
+                      <span className="text-xs text-gray-400 ml-1">(2-4 characters)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase().slice(0, 4) }))}
+                      disabled={panelMode === 'edit'}
+                      placeholder="e.g., APRL"
+                      maxLength={4}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase ${
+                        formErrors.code ? 'border-red-500' : 'border-gray-300'
+                      } ${panelMode === 'edit' ? 'bg-gray-100' : ''}`}
+                    />
+                    {formErrors.code && (
+                      <p className="text-red-500 text-xs mt-1">{formErrors.code}</p>
+                    )}
+                  </div>
                 </div>
-                
+
+                {/* SKU Code Preview - Always shows */}
+                <div className="mt-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+                  <label className="block text-sm text-emerald-600 mb-1">
+                    SKU Code <span className="text-emerald-400">(Auto-Generated)</span>
+                  </label>
+                  <div className="font-mono text-xl font-bold text-emerald-700">
+                    {formData.item_type}-{formData.code || '____'}
+                  </div>
+                  <p className="text-xs text-emerald-600 mt-1">
+                    Format: ItemType(2)-Code(4)
+                  </p>
+                </div>
+
                 <div className="mt-4">
                   <label className="block text-sm text-gray-600 mb-1">Description</label>
                   <textarea
@@ -1279,7 +1529,10 @@ export default function ItemCategoryMaster() {
 
         {/* Right Panel - Item Type Form (Side Panel) */}
         {showItemTypePanel && (
-          <div className="w-1/2 border-l bg-white overflow-auto">
+          <div
+            className="border-l bg-white overflow-auto"
+            style={{ width: `${100 - leftPanelWidth}%` }}
+          >
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 sticky top-0 z-10">
               <div className="flex items-center justify-between">
@@ -1434,6 +1687,85 @@ export default function ItemCategoryMaster() {
         )}
       </div>
       {/* End Main Content Flex Container */}
+
+      {/* Move Confirmation Modal */}
+      {showMoveConfirm && pendingMoveData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0">
+                <AlertCircle className="w-8 h-8 text-orange-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  Confirm Hierarchy Move
+                </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  You are about to reorganize the category hierarchy. This action will:
+                </p>
+                <ul className="text-sm text-gray-600 space-y-1 mb-4 list-disc list-inside">
+                  <li>Change the parent-child relationship</li>
+                  <li>Update all related paths and references</li>
+                  <li>Affect the entire subtree of items</li>
+                  <li>Update the hierarchy structure immediately</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <GripVertical className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-900">Move Details:</span>
+              </div>
+              <div className="text-sm space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-gray-600 min-w-[80px]">Moving:</span>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{pendingMoveData.draggedItem.name}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs bg-gray-200 px-2 py-0.5 rounded font-mono">{pendingMoveData.draggedItem.code}</span>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                        {LEVELS[pendingMoveData.draggedItem.level - 1]?.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-gray-600 min-w-[80px]">New Parent:</span>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{pendingMoveData.targetNode.name}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs bg-gray-200 px-2 py-0.5 rounded font-mono">{pendingMoveData.targetNode.code}</span>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                        {LEVELS[pendingMoveData.targetNode.level - 1]?.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={executeMoveItem}
+                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2"
+              >
+                <GripVertical className="w-4 h-4" />
+                Confirm Move
+              </button>
+              <button
+                onClick={() => {
+                  setShowMoveConfirm(false)
+                  setPendingMoveData(null)
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2.5 rounded-lg font-medium transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

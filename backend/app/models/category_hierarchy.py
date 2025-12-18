@@ -1,6 +1,6 @@
 """
 5-Level Item Category Hierarchy Models
-All codes are exactly 4 characters
+All codes are 2-4 characters (flexible length)
 
 Level 1: Category (APRL, FABR, ACCS)
 Level 2: Sub-Category (MENS, WMNS, KIDS)
@@ -25,8 +25,8 @@ class CategoryStatus(str, Enum):
 
 class ItemCategory(Document):
     """Level 1: Category - Broadest classification"""
-    
-    category_code: Indexed(str, unique=True)    # 4 chars: APRL
+
+    category_code: Indexed(str, unique=True)    # 2-4 chars: APRL
     category_name: str
     description: Optional[str] = None
     
@@ -65,8 +65,8 @@ class ItemCategory(Document):
 
 class ItemSubCategory(Document):
     """Level 2: Sub-Category - e.g., Men, Women, Kids"""
-    
-    sub_category_code: Indexed(str, unique=True)    # 4 chars: MENS
+
+    sub_category_code: Indexed(str, unique=True)    # 2-4 chars: MENS
     sub_category_name: str
     description: Optional[str] = None
     
@@ -105,8 +105,8 @@ class ItemSubCategory(Document):
 
 class ItemDivision(Document):
     """Level 3: Division - e.g., Topwear, Bottomwear"""
-    
-    division_code: Indexed(str, unique=True)    # 4 chars: TOPW
+
+    division_code: Indexed(str, unique=True)    # 2-4 chars: TOPW
     division_name: str
     description: Optional[str] = None
     
@@ -147,8 +147,8 @@ class ItemDivision(Document):
 
 class ItemClass(Document):
     """Level 4: Class - e.g., T-Shirts, Shirts, Jeans"""
-    
-    class_code: Indexed(str, unique=True)    # 4 chars: TSHT
+
+    class_code: Indexed(str, unique=True)    # 2-4 chars: TSHT
     class_name: str
     description: Optional[str] = None
     
@@ -194,8 +194,8 @@ class ItemClass(Document):
 
 class ItemSubClass(Document):
     """Level 5: Sub-Class - e.g., Round Neck, V-Neck, Polo"""
-    
-    sub_class_code: Indexed(str, unique=True)    # 4 chars: RNCK
+
+    sub_class_code: Indexed(str, unique=True)    # 2-4 chars: RNCK
     sub_class_name: str
     description: Optional[str] = None
     
@@ -211,14 +211,18 @@ class ItemSubClass(Document):
     
     path: str = ""    # APRL/MENS/TOPW/TSHT/RNCK
     path_name: str = ""  # Apparel > Men > Topwear > T-Shirts > Round Neck
-    
+
     # Item Type
     item_type: str = "FG"
-    
+
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
-    
+
+    # SKU Generation
+    sku_prefix: str = ""  # Prefix for SKU generation (defaults to sub_class_code)
+    last_sequence: str = "A0000"  # Last used sequence for SKU generation
+
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
     
@@ -242,15 +246,15 @@ class ItemSubClass(Document):
 # ==================== REQUEST SCHEMAS ====================
 
 def validate_4char_code(v):
-    if len(v) != 4:
-        raise ValueError('Code must be exactly 4 characters')
+    if len(v) < 2 or len(v) > 4:
+        raise ValueError('Code must be 2-4 characters')
     if not v.isalnum():
         raise ValueError('Code must be alphanumeric')
     return v.upper()
 
 
 class ItemCategoryCreate(BaseModel):
-    category_code: str = Field(..., min_length=4, max_length=4)
+    category_code: str = Field(..., min_length=2, max_length=4)
     category_name: str
     description: Optional[str] = None
     item_type: str = "FG"
@@ -274,7 +278,7 @@ class ItemCategoryCreate(BaseModel):
 
 
 class ItemSubCategoryCreate(BaseModel):
-    sub_category_code: str = Field(..., min_length=4, max_length=4)
+    sub_category_code: str = Field(..., min_length=2, max_length=4)
     sub_category_name: str
     description: Optional[str] = None
     category_code: str    # Parent
@@ -293,7 +297,7 @@ class ItemSubCategoryCreate(BaseModel):
 
 
 class ItemDivisionCreate(BaseModel):
-    division_code: str = Field(..., min_length=4, max_length=4)
+    division_code: str = Field(..., min_length=2, max_length=4)
     division_name: str
     description: Optional[str] = None
     category_code: str
@@ -313,7 +317,7 @@ class ItemDivisionCreate(BaseModel):
 
 
 class ItemClassCreate(BaseModel):
-    class_code: str = Field(..., min_length=4, max_length=4)
+    class_code: str = Field(..., min_length=2, max_length=4)
     class_name: str
     description: Optional[str] = None
     category_code: str
@@ -336,7 +340,7 @@ class ItemClassCreate(BaseModel):
 
 
 class ItemSubClassCreate(BaseModel):
-    sub_class_code: str = Field(..., min_length=4, max_length=4)
+    sub_class_code: str = Field(..., min_length=2, max_length=4)
     sub_class_name: str
     description: Optional[str] = None
     category_code: str
@@ -476,12 +480,12 @@ HierarchyTreeNode.model_rebuild()
 
 SEED_CATEGORIES = [
     {"category_code": "APRL", "category_name": "Apparel", "description": "All clothing and garments", "item_type": "FG", "has_color": True, "has_size": True, "has_fabric": True, "default_hsn_code": "6109", "default_gst_rate": 5.0, "icon": "Shirt", "color_code": "#10b981", "sort_order": 1},
-    {"category_code": "FABR", "category_name": "Fabrics", "description": "Grey and dyed fabrics", "item_type": "RM", "has_color": True, "has_size": False, "has_fabric": True, "default_hsn_code": "5407", "default_gst_rate": 5.0, "icon": "Layers", "color_code": "#3b82f6", "sort_order": 2},
-    {"category_code": "TRIM", "category_name": "Trims & Notions", "description": "Buttons, zippers, labels", "item_type": "AC", "has_color": True, "has_size": True, "default_hsn_code": "9606", "default_gst_rate": 12.0, "icon": "Sparkles", "color_code": "#f59e0b", "sort_order": 3},
-    {"category_code": "YARN", "category_name": "Yarns & Fibers", "description": "Cotton, polyester yarns", "item_type": "RM", "has_color": True, "default_hsn_code": "5205", "default_gst_rate": 5.0, "icon": "Circle", "color_code": "#ec4899", "sort_order": 4},
-    {"category_code": "CHEM", "category_name": "Dyes & Chemicals", "description": "Dyes, softeners", "item_type": "CM", "has_color": False, "has_size": False, "default_hsn_code": "3204", "default_gst_rate": 18.0, "icon": "FlaskConical", "color_code": "#ef4444", "sort_order": 5},
-    {"category_code": "PACK", "category_name": "Packaging", "description": "Polybags, cartons, tags", "item_type": "CM", "has_color": False, "default_hsn_code": "3923", "default_gst_rate": 18.0, "icon": "Box", "color_code": "#06b6d4", "sort_order": 6},
-    {"category_code": "CONS", "category_name": "Consumables", "description": "Needles, oil, tools", "item_type": "CM", "has_color": False, "has_size": False, "default_hsn_code": "8452", "default_gst_rate": 18.0, "icon": "Wrench", "color_code": "#64748b", "sort_order": 7},
+    {"category_code": "FABR", "category_name": "Fabrics", "description": "Grey and dyed fabrics", "item_type": "GF", "has_color": True, "has_size": False, "has_fabric": True, "default_hsn_code": "5407", "default_gst_rate": 5.0, "icon": "Layers", "color_code": "#3b82f6", "sort_order": 2},
+    {"category_code": "TRIM", "category_name": "Trims & Notions", "description": "Buttons, zippers, labels", "item_type": "TR", "has_color": True, "has_size": True, "default_hsn_code": "9606", "default_gst_rate": 12.0, "icon": "Sparkles", "color_code": "#f59e0b", "sort_order": 3},
+    {"category_code": "YARN", "category_name": "Yarns & Fibers", "description": "Cotton, polyester yarns", "item_type": "YN", "has_color": True, "default_hsn_code": "5205", "default_gst_rate": 5.0, "icon": "Circle", "color_code": "#ec4899", "sort_order": 4},
+    {"category_code": "CHEM", "category_name": "Dyes & Chemicals", "description": "Dyes, softeners", "item_type": "DY", "has_color": False, "has_size": False, "default_hsn_code": "3204", "default_gst_rate": 18.0, "icon": "FlaskConical", "color_code": "#ef4444", "sort_order": 5},
+    {"category_code": "PACK", "category_name": "Packaging", "description": "Polybags, cartons, tags", "item_type": "PK", "has_color": False, "default_hsn_code": "3923", "default_gst_rate": 18.0, "icon": "Box", "color_code": "#06b6d4", "sort_order": 6},
+    {"category_code": "CONS", "category_name": "Consumables", "description": "Needles, oil, tools", "item_type": "CS", "has_color": False, "has_size": False, "default_hsn_code": "8452", "default_gst_rate": 18.0, "icon": "Wrench", "color_code": "#64748b", "sort_order": 7},
 ]
 
 SEED_SUB_CATEGORIES = [

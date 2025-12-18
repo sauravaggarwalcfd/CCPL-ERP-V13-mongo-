@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
-import { X, Search, ChevronRight, Lock, Package, Save, FileText } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { X, Search, ChevronRight, Lock, Package, Save, FileText, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api, { categoryHierarchy, itemTypes } from '../../services/api'
+import api, { categoryHierarchy, itemTypes, items } from '../../services/api'
 
 // UOM Options
 const UOM_OPTIONS = [
@@ -32,7 +32,11 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
   
   // Search state
   const [searchTerm, setSearchTerm] = useState('')
-  
+  const [searchResults, setSearchResults] = useState([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const searchTimeoutRef = useRef(null)
+
   // Hierarchy data
   const [categories, setCategories] = useState([])
   const [subCategories, setSubCategories] = useState([])
@@ -103,6 +107,236 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
       setItemTypesList(response.data || [])
     } catch (error) {
       console.error('Error fetching item types:', error)
+    }
+  }
+
+  // Search for categories and hierarchy levels (debounced)
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (searchTerm.trim().length >= 2) {
+      setSearching(true)
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const searchLower = searchTerm.toLowerCase()
+          const results = []
+
+          // Search Categories (Level 1)
+          const matchingCategories = categories.filter(c =>
+            c.name.toLowerCase().includes(searchLower) ||
+            c.code.toLowerCase().includes(searchLower)
+          )
+          matchingCategories.forEach(c => {
+            results.push({
+              id: c.id,
+              level: 1,
+              levelName: 'Level 1',
+              code: c.code,
+              name: c.name,
+              path: c.name,
+              data: c
+            })
+          })
+
+          // Search Sub-Categories (Level 2)
+          const subCatsResponse = await categoryHierarchy.getSubCategories({ is_active: true })
+          const allSubCategories = subCatsResponse.data || []
+          const matchingSubCats = allSubCategories.filter(sc =>
+            sc.name.toLowerCase().includes(searchLower) ||
+            sc.code.toLowerCase().includes(searchLower)
+          )
+          matchingSubCats.forEach(sc => {
+            const cat = categories.find(c => c.code === sc.category_code)
+            results.push({
+              id: sc.id,
+              level: 2,
+              levelName: 'Level 2',
+              code: sc.code,
+              name: sc.name,
+              path: `${cat?.name || sc.category_code} > ${sc.name}`,
+              category_code: sc.category_code,
+              data: sc
+            })
+          })
+
+          // Search Divisions (Level 3)
+          const divsResponse = await categoryHierarchy.getDivisions({ is_active: true })
+          const allDivisions = divsResponse.data || []
+          const matchingDivs = allDivisions.filter(d =>
+            d.name.toLowerCase().includes(searchLower) ||
+            d.code.toLowerCase().includes(searchLower)
+          )
+          matchingDivs.forEach(d => {
+            results.push({
+              id: d.id,
+              level: 3,
+              levelName: 'Level 3',
+              code: d.code,
+              name: d.name,
+              path: d.path_name || `${d.category_code} > ${d.sub_category_code} > ${d.name}`,
+              category_code: d.category_code,
+              sub_category_code: d.sub_category_code,
+              data: d
+            })
+          })
+
+          // Search Classes (Level 4)
+          const classesResponse = await categoryHierarchy.getClasses({ is_active: true })
+          const allClasses = classesResponse.data || []
+          const matchingClasses = allClasses.filter(cls =>
+            cls.name.toLowerCase().includes(searchLower) ||
+            cls.code.toLowerCase().includes(searchLower)
+          )
+          matchingClasses.forEach(cls => {
+            results.push({
+              id: cls.id,
+              level: 4,
+              levelName: 'Level 4',
+              code: cls.code,
+              name: cls.name,
+              path: cls.path_name || `${cls.category_code} > ${cls.sub_category_code} > ${cls.division_code} > ${cls.name}`,
+              category_code: cls.category_code,
+              sub_category_code: cls.sub_category_code,
+              division_code: cls.division_code,
+              data: cls
+            })
+          })
+
+          // Search Sub-Classes (Level 5)
+          const subClassesResponse = await categoryHierarchy.getSubClasses({ is_active: true })
+          const allSubClasses = subClassesResponse.data || []
+          const matchingSubClasses = allSubClasses.filter(sc =>
+            sc.name.toLowerCase().includes(searchLower) ||
+            sc.code.toLowerCase().includes(searchLower)
+          )
+          matchingSubClasses.forEach(sc => {
+            results.push({
+              id: sc.id,
+              level: 5,
+              levelName: 'Level 5',
+              code: sc.code,
+              name: sc.name,
+              path: sc.path_name || `Full hierarchy path`,
+              category_code: sc.category_code,
+              sub_category_code: sc.sub_category_code,
+              division_code: sc.division_code,
+              class_code: sc.class_code,
+              data: sc
+            })
+          })
+
+          setSearchResults(results.slice(0, 10)) // Limit to 10 results
+          setShowSearchResults(true)
+        } catch (error) {
+          console.error('Error searching categories:', error)
+          setSearchResults([])
+        } finally {
+          setSearching(false)
+        }
+      }, 300)
+    } else {
+      setSearchResults([])
+      setShowSearchResults(false)
+      setSearching(false)
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchTerm, categories])
+
+  // Auto-select category hierarchy from search result
+  const handleSelectCategoryHierarchy = async (result) => {
+    try {
+      setShowSearchResults(false)
+      setSearchTerm('')
+
+      // Find and set Level 1 (Category)
+      const category = categories.find(c => c.code === result.category_code) ||
+                      (result.level === 1 ? result.data : null)
+
+      if (!category) {
+        toast.error('Category not found')
+        return
+      }
+
+      setSelectedCategory(category)
+      updateAutoFilledData(category)
+
+      // If level >= 2, fetch and select sub-category
+      if (result.level >= 2 && result.sub_category_code) {
+        const subCatsResponse = await categoryHierarchy.getSubCategories({
+          category_code: category.code,
+          is_active: true
+        })
+        const subCats = subCatsResponse.data || []
+        setSubCategories(subCats)
+
+        const subCat = subCats.find(sc => sc.code === result.sub_category_code)
+        if (subCat) {
+          setSelectedSubCategory(subCat)
+
+          // If level >= 3, fetch and select division
+          if (result.level >= 3 && result.division_code) {
+            const divsResponse = await categoryHierarchy.getDivisions({
+              category_code: category.code,
+              sub_category_code: subCat.code,
+              is_active: true
+            })
+            const divs = divsResponse.data || []
+            setDivisions(divs)
+
+            const div = divs.find(d => d.code === result.division_code)
+            if (div) {
+              setSelectedDivision(div)
+
+              // If level >= 4, fetch and select class
+              if (result.level >= 4 && result.class_code) {
+                const classesResponse = await categoryHierarchy.getClasses({
+                  category_code: category.code,
+                  sub_category_code: subCat.code,
+                  division_code: div.code,
+                  is_active: true
+                })
+                const clss = classesResponse.data || []
+                setClasses(clss)
+
+                const cls = clss.find(c => c.code === result.class_code)
+                if (cls) {
+                  setSelectedClass(cls)
+
+                  // If level === 5, fetch and select sub-class
+                  if (result.level === 5 && result.data) {
+                    const subClassesResponse = await categoryHierarchy.getSubClasses({
+                      category_code: category.code,
+                      sub_category_code: subCat.code,
+                      division_code: div.code,
+                      class_code: cls.code,
+                      is_active: true
+                    })
+                    const subClss = subClassesResponse.data || []
+                    setSubClasses(subClss)
+
+                    const subCls = subClss.find(sc => sc.code === result.data.code)
+                    if (subCls) {
+                      setSelectedSubClass(subCls)
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+    } catch (error) {
+      console.error('Error selecting hierarchy:', error)
+      toast.error('Failed to select hierarchy')
     }
   }
 
@@ -246,8 +480,22 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
     }
 
     setSaving(true)
-    
+
     try {
+      // Check if item already exists
+      const checkResponse = await items.checkExists(formData.sku)
+      if (checkResponse.data && checkResponse.data.length > 0) {
+        const existingItem = checkResponse.data[0]
+        if (existingItem.item_code === formData.sku) {
+          toast.error(`Item already exists: ${existingItem.item_code} - ${existingItem.item_name}`, {
+            duration: 5000,
+            icon: '⚠️',
+          })
+          setSaving(false)
+          return
+        }
+      }
+
       const payload = {
         item_code: formData.sku,
         item_name: formData.itemName,
@@ -345,7 +593,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
               <Search className="w-4 h-4" />
-              QUICK SEARCH (Search & Auto-Fill)
+              QUICK SEARCH CATEGORIES (Auto-Select Hierarchy)
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
@@ -353,9 +601,74 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="🔍 Search by Category, SKU, Code, Name..."
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowSearchResults(true)
+                }}
+                placeholder="🔍 Search categories by name or code (Level 1-5)..."
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+
+              {/* Search Results Dropdown */}
+              {showSearchResults && (
+                <div className="absolute z-50 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                  {searching && (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="animate-spin inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      <span className="ml-2">Searching...</span>
+                    </div>
+                  )}
+
+                  {!searching && searchResults.length === 0 && (
+                    <div className="p-4 text-center text-gray-500">
+                      <AlertCircle className="w-5 h-5 inline-block mb-1" />
+                      <div>No categories found</div>
+                    </div>
+                  )}
+
+                  {!searching && searchResults.length > 0 && (
+                    <>
+                      <div className="p-2 bg-blue-50 border-b border-gray-200 text-sm font-medium text-blue-800">
+                        Found {searchResults.length} categor{searchResults.length > 1 ? 'ies' : 'y'} - Click to auto-select
+                      </div>
+                      {searchResults.map((result) => (
+                        <div
+                          key={result.id}
+                          onClick={() => handleSelectCategoryHierarchy(result)}
+                          className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900">{result.name}</span>
+                                <span className="text-xs text-gray-500 font-mono">({result.code})</span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {result.path}
+                              </div>
+                            </div>
+                            <div className="ml-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                {result.levelName}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="p-2 bg-gray-50 text-center">
+                        <button
+                          onClick={() => {
+                            setShowSearchResults(false)
+                            setSearchTerm('')
+                          }}
+                          className="text-sm text-gray-600 hover:text-gray-800"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -370,9 +683,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* Category */}
+              {/* Level 1 */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Category</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Level 1</label>
                 <select
                   value={selectedCategory?.code || ''}
                   onChange={(e) => {
@@ -381,7 +694,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                   }}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
-                  <option value="">Select Category</option>
+                  <option value="">Select Level 1</option>
                   {categories.map(cat => (
                     <option key={cat.code} value={cat.code}>
                       {cat.name}
@@ -390,9 +703,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                 </select>
               </div>
 
-              {/* Sub-Category */}
+              {/* Level 2 */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Sub-Category</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
                 <select
                   value={selectedSubCategory?.code || ''}
                   onChange={(e) => {
@@ -402,7 +715,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                   disabled={!selectedCategory}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select Sub-Category</option>
+                  <option value="">Select Level 2</option>
                   {subCategories.map(subCat => (
                     <option key={subCat.code} value={subCat.code}>
                       {subCat.name}
@@ -411,9 +724,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                 </select>
               </div>
 
-              {/* Division */}
+              {/* Level 3 */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Division</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
                 <select
                   value={selectedDivision?.code || ''}
                   onChange={(e) => {
@@ -423,7 +736,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                   disabled={!selectedSubCategory}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select Division</option>
+                  <option value="">Select Level 3</option>
                   {divisions.map(div => (
                     <option key={div.code} value={div.code}>
                       {div.name}
@@ -434,9 +747,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Class */}
+              {/* Level 4 */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Class</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
                 <select
                   value={selectedClass?.code || ''}
                   onChange={(e) => {
@@ -446,7 +759,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                   disabled={!selectedDivision}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select Class</option>
+                  <option value="">Select Level 4</option>
                   {classes.map(cls => (
                     <option key={cls.code} value={cls.code}>
                       {cls.name}
@@ -455,9 +768,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                 </select>
               </div>
 
-              {/* Sub-Class */}
+              {/* Level 5 */}
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Sub-Class</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
                 <select
                   value={selectedSubClass?.code || ''}
                   onChange={(e) => {
@@ -467,7 +780,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                   disabled={!selectedClass}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select Sub-Class</option>
+                  <option value="">Select Level 5</option>
                   {subClasses.map(subCls => (
                     <option key={subCls.code} value={subCls.code}>
                       {subCls.name}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, ChevronRight, ChevronDown, Trash2, FolderTree, FolderOpen, Folder } from 'lucide-react'
+import { Plus, ChevronRight, ChevronDown, Trash2, FolderTree, FolderOpen, Folder, Move, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ItemCategoryHierarchy() {
@@ -9,11 +9,18 @@ export default function ItemCategoryHierarchy() {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [expandedNodes, setExpandedNodes] = useState(new Set())
   const [editMode, setEditMode] = useState(false)
-  
+
   const [inventoryClasses, setInventoryClasses] = useState([])
   const [unitsOfMeasure, setUnitsOfMeasure] = useState([])
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterClass, setFilterClass] = useState('all')
+
+  // Drag and Drop State
+  const [draggedNode, setDraggedNode] = useState(null)
+  const [dragOverNode, setDragOverNode] = useState(null)
+  const [isDragValid, setIsDragValid] = useState(false)
+  const [showMoveWarning, setShowMoveWarning] = useState(false)
+  const [pendingMove, setPendingMove] = useState(null)
 
   const [formData, setFormData] = useState({
     category_name: '',
@@ -352,18 +359,156 @@ export default function ItemCategoryHierarchy() {
     return tree.map(filterNode).filter(Boolean)
   }
 
+  // Drag and Drop Helper Functions
+  const isDescendant = (parentId, childId) => {
+    if (parentId === childId) return true
+
+    const checkDescendants = (nodeId) => {
+      const children = categories.filter(cat => cat.parent_category_id === nodeId)
+      for (const child of children) {
+        if (child.category_id === childId) return true
+        if (checkDescendants(child.category_id)) return true
+      }
+      return false
+    }
+
+    return checkDescendants(parentId)
+  }
+
+  const canDropOn = (draggedNode, targetNode) => {
+    if (!draggedNode || !targetNode) return false
+    if (draggedNode.category_id === targetNode.category_id) return false
+    if (isDescendant(draggedNode.category_id, targetNode.category_id)) return false
+    return true
+  }
+
+  const handleDragStart = (e, node) => {
+    e.stopPropagation()
+    setDraggedNode(node)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/html', e.currentTarget)
+
+    // Add visual feedback
+    e.currentTarget.style.opacity = '0.5'
+    toast.success(`Dragging: ${node.category_name}`, { duration: 1500 })
+  }
+
+  const handleDragOver = (e, node) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedNode) return
+
+    const isValid = canDropOn(draggedNode, node)
+    setDragOverNode(node)
+    setIsDragValid(isValid)
+
+    e.dataTransfer.dropEffect = isValid ? 'move' : 'none'
+  }
+
+  const handleDragLeave = (e) => {
+    e.stopPropagation()
+    setDragOverNode(null)
+    setIsDragValid(false)
+  }
+
+  const handleDrop = (e, targetNode) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedNode || !canDropOn(draggedNode, targetNode)) {
+      toast.error('Invalid drop: Cannot move a parent into its own child!')
+      resetDragState()
+      return
+    }
+
+    // Show warning modal
+    setPendingMove({
+      source: draggedNode,
+      target: targetNode
+    })
+    setShowMoveWarning(true)
+    resetDragState()
+  }
+
+  const handleDragEnd = (e) => {
+    e.currentTarget.style.opacity = '1'
+    resetDragState()
+  }
+
+  const resetDragState = () => {
+    setDraggedNode(null)
+    setDragOverNode(null)
+    setIsDragValid(false)
+  }
+
+  const confirmMove = async () => {
+    if (!pendingMove) return
+
+    const { source, target } = pendingMove
+
+    try {
+      const updateData = {
+        ...source,
+        parent_category_id: target.category_id,
+        parent_category_name: target.category_name,
+        level: target.level + 1
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/api/items/categories/${source.category_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(updateData)
+      })
+
+      if (response.ok) {
+        toast.success(`Moved "${source.category_name}" under "${target.category_name}"`)
+        setShowMoveWarning(false)
+        setPendingMove(null)
+        fetchCategories()
+      } else {
+        const error = await response.json()
+        toast.error(error.detail || 'Failed to move category')
+      }
+    } catch (error) {
+      toast.error('Error moving category')
+      console.error(error)
+    }
+  }
+
+  const cancelMove = () => {
+    setShowMoveWarning(false)
+    setPendingMove(null)
+  }
+
   const renderTreeNode = (node, level = 0) => {
     const hasChildren = node.children && node.children.length > 0
     const isExpanded = expandedNodes.has(node.category_id)
     const isSelected = selectedCategory?.category_id === node.category_id
     const isInactive = node.is_active === false
 
+    // Drag and Drop styling
+    const isDragging = draggedNode?.category_id === node.category_id
+    const isDraggedOver = dragOverNode?.category_id === node.category_id
+    const dropZoneClass = isDraggedOver
+      ? (isDragValid ? 'bg-green-200 border-2 border-green-500 scale-105' : 'bg-red-200 border-2 border-red-500')
+      : ''
+
     return (
       <div key={node.category_id}>
         <div
-          className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-green-50 transition ${
+          draggable
+          onDragStart={(e) => handleDragStart(e, node)}
+          onDragOver={(e) => handleDragOver(e, node)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, node)}
+          onDragEnd={handleDragEnd}
+          className={`group flex items-center gap-2 px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-green-50 transition-all ${
             isSelected ? 'bg-green-100 border-l-4 border-green-600' : ''
-          } ${isInactive ? 'opacity-50' : ''}`}
+          } ${isInactive ? 'opacity-50' : ''} ${dropZoneClass} ${isDragging ? 'opacity-50' : ''}`}
           style={{ paddingLeft: `${level * 20 + 12}px` }}
           onClick={() => handleEditCategory(node)}
         >
@@ -392,6 +537,9 @@ export default function ItemCategoryHierarchy() {
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
             </div>
           )}
+
+          {/* Drag indicator */}
+          <Move size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition" />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -450,6 +598,10 @@ export default function ItemCategoryHierarchy() {
             <div>
               <h2 className="text-lg font-bold">Multi-Level Category Tree</h2>
               <p className="text-xs text-green-100">{categories.length} categories • Unlimited depth</p>
+              <p className="text-xs text-green-200 flex items-center gap-1 mt-1">
+                <Move size={12} />
+                Drag & drop to reorganize
+              </p>
             </div>
           </div>
           
@@ -796,6 +948,72 @@ export default function ItemCategoryHierarchy() {
           </form>
         </div>
       </div>
+
+      {/* Move Warning Modal */}
+      {showMoveWarning && pendingMove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-8 h-8 text-orange-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  Confirm Category Move
+                </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  You are about to move a category in the hierarchy. This action will:
+                </p>
+                <ul className="text-sm text-gray-600 space-y-1 mb-4 list-disc list-inside">
+                  <li>Change the parent-child relationship</li>
+                  <li>Update the level of the moved category</li>
+                  <li>Potentially affect all child categories</li>
+                  <li>Update the category structure immediately</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Move className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-900">Move Details:</span>
+              </div>
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">Moving:</span>
+                  <span className="font-medium text-gray-900">{pendingMove.source.category_name}</span>
+                  <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">L{pendingMove.source.level}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">New Parent:</span>
+                  <span className="font-medium text-gray-900">{pendingMove.target.category_name}</span>
+                  <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">L{pendingMove.target.level}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">New Level:</span>
+                  <span className="font-medium text-green-700">Level {pendingMove.target.level + 1}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={confirmMove}
+                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2"
+              >
+                <Move className="w-4 h-4" />
+                Confirm Move
+              </button>
+              <button
+                onClick={cancelMove}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2.5 rounded-lg font-medium transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
