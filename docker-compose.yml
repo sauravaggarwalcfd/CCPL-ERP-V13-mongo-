@@ -17,7 +17,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MONGODB_URL: mongodb://admin:admin@mongodb:27017
+      MONGODB_URL: mongodb://mongodb:27017
       DATABASE_NAME: inventory_erp
       SECRET_KEY: your-super-secret-key-change-in-production
     depends_on:

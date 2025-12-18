@@ -58,7 +58,7 @@ async def list_categories(
             "description": c.description,
             "path": c.category_code,
             "path_name": c.category_name,
-            "item_type": c.item_type,
+            "applicable_item_types": c.applicable_item_types,
             "has_color": c.has_color,
             "has_size": c.has_size,
             "has_fabric": c.has_fabric,
@@ -93,7 +93,7 @@ async def get_category(code: str):
         "description": category.description,
         "path": category.category_code,
         "path_name": category.category_name,
-        "item_type": getattr(category, 'item_type', 'FG'),
+        "applicable_item_types": category.applicable_item_types,
         "has_color": category.has_color,
         "has_size": category.has_size,
         "has_fabric": category.has_fabric,
@@ -124,7 +124,7 @@ async def create_category(data: ItemCategoryCreate):
         category_code=data.category_code.upper(),
         category_name=data.category_name,
         description=data.description,
-        item_type=data.item_type,
+        applicable_item_types=[t.upper() for t in data.applicable_item_types],
         has_color=data.has_color,
         has_size=data.has_size,
         has_fabric=data.has_fabric,
@@ -612,8 +612,8 @@ async def list_sub_classes(
             "class_name": i.class_name,
             "path": i.path,
             "path_name": i.path_name,
-            "item_type": getattr(i, 'item_type', 'FG'),
-            "sku_prefix": f"{getattr(i, 'item_type', 'FG')}-{i.sub_class_code}",
+            "sku_prefix": i.sku_prefix or i.sub_class_code,
+            "last_sequence": i.last_sequence,
             "hsn_code": i.hsn_code,
             "gst_rate": i.gst_rate,
             "icon": i.icon,
@@ -650,10 +650,6 @@ async def create_sub_class(data: ItemSubClassCreate):
     if existing:
         raise HTTPException(status_code=400, detail=f"Sub-class '{data.sub_class_code}' already exists")
     
-    # Get item_type from data or inherit from category
-    item_type = getattr(data, 'item_type', None) or getattr(cat, 'item_type', 'FG')
-    sku_prefix = f"{item_type}-{data.sub_class_code.upper()}"
-    
     # Use insert() instead of save()
     item = await ItemSubClass(
         sub_class_code=data.sub_class_code.upper(),
@@ -669,8 +665,8 @@ async def create_sub_class(data: ItemSubClassCreate):
         class_name=cls.class_name,
         path=build_path([cat.category_code, subcat.sub_category_code, div.division_code, cls.class_code, data.sub_class_code.upper()]),
         path_name=build_path_name([cat.category_name, subcat.sub_category_name, div.division_name, cls.class_name, data.sub_class_name]),
-        item_type=item_type,
-        sku_prefix=sku_prefix,
+        sku_prefix=data.sub_class_code.upper(),
+        last_sequence="A0000",
         has_color=data.has_color,
         has_size=data.has_size,
         has_fabric=data.has_fabric,
@@ -830,7 +826,6 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                         ).sort("sort_order").to_list()
                     
                     for subcls in sub_classes:
-                        item_type = getattr(subcls, 'item_type', 'FG')
                         cls_node["children"].append({
                             "level": 5,
                             "code": subcls.sub_class_code,
@@ -839,8 +834,6 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                             "icon": subcls.icon,
                             "color_code": subcls.color_code,
                             "is_active": subcls.is_active,
-                            "item_type": item_type,
-                            "sku_prefix": f"{item_type}-{subcls.sub_class_code}",
                             "item_count": subcls.item_count,
                             "children": []
                         })
@@ -1022,6 +1015,7 @@ async def seed_hierarchy():
                     class_name=cls.class_name,
                     path=build_path([cat.category_code, subcat.sub_category_code, div.division_code, cls.class_code, data["sub_class_code"]]),
                     path_name=build_path_name([cat.category_name, subcat.sub_category_name, div.division_name, cls.class_name, data["sub_class_name"]]),
+                    sku_prefix=data["sub_class_code"],
                     icon=data.get("icon", "Hash"),
                     color_code=data.get("color_code", "#f59e0b"),
                     sort_order=data.get("sort_order", 0),
