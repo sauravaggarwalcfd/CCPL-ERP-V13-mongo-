@@ -95,6 +95,8 @@ class ItemMaster(Document):
     is_active: bool = True
     discontinued: bool = False
     discontinued_date: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None  # Soft delete timestamp
+    deleted_by: Optional[str] = None  # Who deleted it
     
     # Metadata
     created_by: Optional[str] = None

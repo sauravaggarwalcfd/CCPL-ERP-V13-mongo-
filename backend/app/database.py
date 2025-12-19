@@ -16,6 +16,11 @@ from .models.category_hierarchy import (
     ItemClass,
     ItemSubClass
 )
+from .models.colour_master import ColourMaster
+from .models.size_master import SizeMaster
+from .models.uom_master import UOMMaster
+from .models.variant_groups import VariantGroup
+from .models.specifications import CategorySpecifications, ItemSpecifications
 
 
 class Database:
@@ -56,6 +61,12 @@ async def connect_to_mongo():
             ItemDivision,
             ItemClass,
             ItemSubClass,
+            ColourMaster,           # Variant Masters
+            SizeMaster,
+            UOMMaster,
+            VariantGroup,
+            CategorySpecifications,  # Specifications
+            ItemSpecifications,
         ],
     )
 

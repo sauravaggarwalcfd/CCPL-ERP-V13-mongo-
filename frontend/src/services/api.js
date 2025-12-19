@@ -200,6 +200,15 @@ export const items = {
   checkExists: (itemCode) => api.get(`/items`, {
     params: { search: itemCode, limit: 1 }
   }),
+  getNextSku: (prefix) => api.get(`/items/next-sku/${prefix}`),
+  
+  // Bin management
+  bin: {
+    list: () => api.get('/items/bin/list'),
+    restore: (itemCode) => api.post(`/items/bin/restore/${itemCode}`),
+    permanentDelete: (itemCode) => api.delete(`/items/bin/permanent/${itemCode}`),
+    cleanup: () => api.post('/items/bin/cleanup'),
+  }
 }
 
 // Category Hierarchy API (5 Levels)

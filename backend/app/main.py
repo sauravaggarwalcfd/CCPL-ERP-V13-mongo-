@@ -22,6 +22,11 @@ from .routes import (
     items,
     item_types,
     category_hierarchy,
+    colours,
+    sizes,
+    uoms,
+    variant_groups,
+    specifications,
 )
 from .models.item_type import ItemType
 
@@ -84,6 +89,15 @@ app.include_router(
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(item_types.router, prefix="/api/item-types", tags=["Item Types"])
 app.include_router(category_hierarchy.router, prefix="/api/hierarchy", tags=["Category Hierarchy"])
+
+# Variant Master routes
+app.include_router(colours.router, prefix="/api", tags=["Colour Master"])
+app.include_router(sizes.router, prefix="/api", tags=["Size Master"])
+app.include_router(uoms.router, prefix="/api", tags=["UOM Master"])
+app.include_router(variant_groups.router, prefix="/api", tags=["Variant Groups"])
+
+# Specifications routes
+app.include_router(specifications.router, prefix="/api", tags=["Specifications"])
 
 
 @app.get("/")

@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Search, ChevronRight, Lock, Package, Save, FileText, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api, { categoryHierarchy, itemTypes, items } from '../../services/api'
+import DynamicSpecificationForm from '../specifications/DynamicSpecificationForm'
+import { itemSpecificationApi } from '../../services/specificationApi'
 
 // UOM Options
 const UOM_OPTIONS = [
@@ -69,22 +71,44 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
     purchaseUom: 'PCS',
     conversionFactor: 1,
   })
-  
-  // SKU sequence (would come from backend in production)
-  const [skuSequence, setSkuSequence] = useState(1)
 
+  // Specifications data
+  const [specifications, setSpecifications] = useState({
+    colour_code: null,
+    size_code: null,
+    uom_code: null,
+    vendor_code: null,
+    custom_field_values: {}
+  })
+  
   // Fetch initial data
   useEffect(() => {
     if (isOpen) {
       fetchCategories()
       fetchItemTypes()
-      // Generate initial SKU
-      setFormData(prev => ({
-        ...prev,
-        sku: generateSKU('FG', skuSequence)
-      }))
+      // Fetch initial SKU for default item type
+      fetchNextSku('FG')
     }
   }, [isOpen])
+  
+  // Fetch next available SKU from backend
+  const fetchNextSku = async (itemTypePrefix) => {
+    try {
+      const prefix = itemTypePrefix.substring(0, 2).toUpperCase()
+      const response = await items.getNextSku(prefix)
+      setFormData(prev => ({
+        ...prev,
+        sku: response.data.next_sku
+      }))
+    } catch (error) {
+      console.error('Error fetching next SKU:', error)
+      // Fallback to simple generation if API fails
+      setFormData(prev => ({
+        ...prev,
+        sku: generateSKU(itemTypePrefix, 1)
+      }))
+    }
+  }
 
   // Fetch categories
   const fetchCategories = async () => {
@@ -449,10 +473,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
       defaultUom: category.default_uom || 'PCS',
     })
     
-    // Update SKU with new item type
+    // Fetch next available SKU for this item type
+    fetchNextSku(category.item_type || 'FG')
+    
+    // Update stock UOM
     setFormData(prev => ({
       ...prev,
-      sku: generateSKU(category.item_type || 'FG', skuSequence),
       stockUom: category.default_uom || 'PCS',
     }))
   }
@@ -521,8 +547,32 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
 
       const response = await api.post('/items/', payload)
 
+      // Save specifications if any are filled
+      const hasSpecifications = specifications.colour_code ||
+                                specifications.size_code ||
+                                specifications.uom_code ||
+                                specifications.vendor_code ||
+                                Object.keys(specifications.custom_field_values || {}).length > 0;
+
+      if (hasSpecifications && selectedCategory) {
+        try {
+          await itemSpecificationApi.createOrUpdate(
+            formData.sku,
+            selectedCategory.code,
+            specifications
+          );
+        } catch (specError) {
+          console.error('Error saving specifications:', specError);
+          // Don't fail the whole operation if specifications fail
+          toast.error('Item created but specifications could not be saved', { duration: 4000 });
+        }
+      }
+
       toast.success(isDraft ? 'Item saved as draft!' : 'Item created successfully!')
-      setSkuSequence(prev => prev + 1)
+
+      // Fetch next SKU for the same item type
+      await fetchNextSku(autoFilledData.itemType || 'FG')
+
       resetForm()
       onSuccess?.()
       onClose()
@@ -553,7 +603,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
       defaultUom: 'PCS',
     })
     setFormData({
-      sku: generateSKU('FG', skuSequence + 1),
+      sku: '',
       itemName: '',
       stockUom: 'PCS',
       purchaseUom: 'PCS',
@@ -980,6 +1030,26 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
               </div>
             </div>
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200" />
+
+          {/* Step 4: Specifications */}
+          {selectedCategory && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">4</span>
+                SPECIFICATIONS
+                <span className="text-sm text-gray-500 font-normal">(Based on Category Configuration)</span>
+              </h3>
+
+              <DynamicSpecificationForm
+                categoryCode={selectedCategory?.code}
+                onSpecificationsChange={setSpecifications}
+                showTitle={false}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}

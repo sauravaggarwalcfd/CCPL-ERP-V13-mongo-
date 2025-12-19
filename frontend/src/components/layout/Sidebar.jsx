@@ -18,17 +18,16 @@ export default function Sidebar() {
       label: 'Dashboard',
       subItems: []
     },
-    { 
+    {
       icon: Archive,
       label: 'Masters',
       subItems: [
         { to: '/item-categories', label: 'Item Categories', icon: FolderTree },
         { to: '/fabric-category', label: 'Fabric Category' },
         { to: '/item-master', label: 'Item Master' },
-        { to: '/color-master', label: 'Color Master' },
-        { to: '/size-master', label: 'Size Master' },
+        { to: '/variant-master', label: 'Variant Master' },
+        { to: '/specifications', label: 'Specifications' },
         { to: '/brand-master', label: 'Brand Master' },
-        { to: '/uom-master', label: 'UOM Master' },
         { to: '/supplier-master', label: 'Supplier Master' },
         { to: '/warehouse-master', label: 'Warehouse Master' },
         { to: '/bin-location-master', label: 'BIN / Location Master' },

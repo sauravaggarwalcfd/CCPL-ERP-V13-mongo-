@@ -6,7 +6,7 @@ CRUD operations for items using the new 5-level hierarchy
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import List, Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..models.item import ItemMaster, ItemMasterCreate, ItemMasterUpdate, InventoryType
 from ..models.category_hierarchy import ItemSubClass
 from ..core.dependencies import get_current_user
@@ -103,6 +103,9 @@ async def list_items(
     """List all items with optional filters"""
     
     query_conditions = []
+    
+    # Exclude deleted items from main list
+    query_conditions.append(ItemMaster.deleted_at == None)
     
     if category_code:
         query_conditions.append(ItemMaster.category_code == category_code.upper())
@@ -248,12 +251,51 @@ async def update_item(
     return {"message": "Item updated successfully", "item_code": item_code}
 
 
+@router.get("/next-sku/{prefix}")
+async def get_next_sku(prefix: str):
+    """Get next available SKU for given prefix (item type code)"""
+    try:
+        # Normalize prefix to 2 uppercase letters
+        prefix = prefix[:2].upper()
+        
+        # Find all items with this prefix
+        items = await ItemMaster.find(
+            {"item_code": {"$regex": f"^{prefix}\\d{{5}}$"}}
+        ).to_list()
+        
+        if not items:
+            # No items with this prefix yet, start from 1
+            return {"next_sku": f"{prefix}00001", "sequence": 1}
+        
+        # Extract numeric parts and find the maximum
+        max_sequence = 0
+        for item in items:
+            try:
+                numeric_part = int(item.item_code[2:])
+                if numeric_part > max_sequence:
+                    max_sequence = numeric_part
+            except (ValueError, IndexError):
+                continue
+        
+        # Generate next SKU
+        next_sequence = max_sequence + 1
+        next_sku = f"{prefix}{str(next_sequence).zfill(5)}"
+        
+        return {"next_sku": next_sku, "sequence": next_sequence}
+    except Exception as e:
+        logger.error(f"Error generating next SKU: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate next SKU: {str(e)}"
+        )
+
+
 @router.delete("/{item_code}")
 async def delete_item(
     item_code: str,
     current_user = Depends(get_current_user)
 ):
-    """Soft delete an item (deactivate)"""
+    """Soft delete an item (move to bin)"""
     
     item = await ItemMaster.find_one(ItemMaster.item_code == item_code)
     if not item:
@@ -262,9 +304,150 @@ async def delete_item(
             detail=f"Item '{item_code}' not found"
         )
     
+    if item.deleted_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Item '{item_code}' is already in bin"
+        )
+    
+    item.deleted_at = datetime.utcnow()
+    item.deleted_by = str(current_user.id) if current_user else None
     item.is_active = False
     item.updated_at = datetime.utcnow()
     item.updated_by = str(current_user.id) if current_user else None
     await item.save()
     
-    return {"message": "Item deactivated successfully", "item_code": item_code}
+    return {"message": "Item moved to bin successfully", "item_code": item_code}
+
+
+# ==================== BIN MANAGEMENT ROUTES ====================
+
+@router.get("/bin/list")
+async def list_bin_items(
+    current_user = Depends(get_current_user)
+):
+    """List all items in bin (deleted items)"""
+    
+    # Find all deleted items
+    items = await ItemMaster.find(ItemMaster.deleted_at != None).to_list()
+    
+    # Calculate days in bin and filter items older than 10 days
+    now = datetime.utcnow()
+    result = []
+    
+    for item in items:
+        if item.deleted_at:
+            days_in_bin = (now - item.deleted_at).days
+            
+            result.append({
+                "id": str(item.id),
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "category_name": item.category_name,
+                "sub_category_name": item.sub_category_name,
+                "deleted_at": item.deleted_at.isoformat(),
+                "deleted_by": item.deleted_by,
+                "days_in_bin": days_in_bin,
+                "can_restore": days_in_bin <= 10
+            })
+    
+    return result
+
+
+@router.post("/bin/restore/{item_code}")
+async def restore_item(
+    item_code: str,
+    current_user = Depends(get_current_user)
+):
+    """Restore an item from bin"""
+    
+    item = await ItemMaster.find_one(ItemMaster.item_code == item_code)
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item '{item_code}' not found"
+        )
+    
+    if not item.deleted_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Item '{item_code}' is not in bin"
+        )
+    
+    # Check if within 10 days
+    days_in_bin = (datetime.utcnow() - item.deleted_at).days
+    if days_in_bin > 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot restore item after 10 days (currently {days_in_bin} days in bin)"
+        )
+    
+    # Restore the item
+    item.deleted_at = None
+    item.deleted_by = None
+    item.is_active = True
+    item.updated_at = datetime.utcnow()
+    item.updated_by = str(current_user.id) if current_user else None
+    await item.save()
+    
+    return {"message": "Item restored successfully", "item_code": item_code}
+
+
+@router.delete("/bin/permanent/{item_code}")
+async def permanent_delete_item(
+    item_code: str,
+    current_user = Depends(get_current_user)
+):
+    """Permanently delete an item from bin"""
+    
+    item = await ItemMaster.find_one(ItemMaster.item_code == item_code)
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item '{item_code}' not found"
+        )
+    
+    if not item.deleted_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Item '{item_code}' is not in bin. Move to bin first before permanent deletion."
+        )
+    
+    # Store item code for response
+    deleted_code = item.item_code
+    
+    # Permanently delete from database
+    await item.delete()
+    
+    return {
+        "message": "Item permanently deleted", 
+        "item_code": deleted_code,
+        "note": "SKU is now available for reuse"
+    }
+
+
+@router.post("/bin/cleanup")
+async def cleanup_old_bin_items(
+    current_user = Depends(get_current_user)
+):
+    """Automatically delete items in bin older than 10 days"""
+    
+    # Find all deleted items older than 10 days
+    ten_days_ago = datetime.utcnow() - timedelta(days=10)
+    old_items = await ItemMaster.find(
+        ItemMaster.deleted_at != None,
+        ItemMaster.deleted_at < ten_days_ago
+    ).to_list()
+    
+    deleted_count = 0
+    deleted_codes = []
+    
+    for item in old_items:
+        deleted_codes.append(item.item_code)
+        await item.delete()
+        deleted_count += 1
+    
+    return {
+        "message": f"Cleaned up {deleted_count} items from bin",
+        "deleted_codes": deleted_codes
+    }

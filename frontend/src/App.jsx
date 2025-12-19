@@ -11,6 +11,8 @@ import SuppliersList from './pages/suppliers/SuppliersList'
 import ItemMaster from './pages/ItemMaster'
 import ItemCategory from './pages/ItemCategory'
 import ItemCategoryMaster from './pages/ItemCategoryMaster'
+import VariantMaster from './pages/VariantMaster'
+import SpecificationsManager from './pages/SpecificationsManager'
 import PurchaseOrderList from './pages/PurchaseOrderList'
 import PurchaseOrderForm from './pages/PurchaseOrderForm'
 import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
@@ -70,6 +72,16 @@ function App() {
             <Route path="/item-categories" element={
               <ProtectedRoute>
                 <ItemCategoryMaster />
+              </ProtectedRoute>
+            } />
+            <Route path="/variant-master" element={
+              <ProtectedRoute>
+                <VariantMaster />
+              </ProtectedRoute>
+            } />
+            <Route path="/specifications" element={
+              <ProtectedRoute>
+                <SpecificationsManager />
               </ProtectedRoute>
             } />
             <Route path="/purchase-orders" element={
