@@ -59,6 +59,7 @@ async def list_categories(
             "path": c.category_code,
             "path_name": c.category_name,
             "item_type": c.item_type,
+            "level_names": c.level_names,
             "has_color": c.has_color,
             "has_size": c.has_size,
             "has_fabric": c.has_fabric,
@@ -94,6 +95,7 @@ async def get_category(code: str):
         "path": category.category_code,
         "path_name": category.category_name,
         "item_type": category.item_type,
+        "level_names": category.level_names,
         "has_color": category.has_color,
         "has_size": category.has_size,
         "has_fabric": category.has_fabric,
@@ -125,6 +127,7 @@ async def create_category(data: ItemCategoryCreate):
         category_name=data.category_name,
         description=data.description,
         item_type=data.item_type.upper(),
+        level_names=data.level_names,
         has_color=data.has_color,
         has_size=data.has_size,
         has_fabric=data.has_fabric,
@@ -739,6 +742,8 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
             "color_code": cat.color_code,
             "is_active": cat.is_active,
             "child_count": cat.child_count,
+            "level_names": cat.level_names,
+            "item_type": cat.item_type,
             "children": []
         }
         

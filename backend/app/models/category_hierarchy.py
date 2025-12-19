@@ -29,34 +29,37 @@ class ItemCategory(Document):
     category_code: Indexed(str, unique=True)    # 2-4 chars: APRL
     category_name: str
     description: Optional[str] = None
-    
+
     item_type: str = "FG"
-    
+
+    # Custom Level Names for this category hierarchy
+    level_names: Optional[dict] = Field(default=None)  # {"l1": "Category", "l2": "Gender", ...}
+
     has_color: bool = True
     has_size: bool = True
     has_fabric: bool = False
     has_brand: bool = True
     has_style: bool = True
     has_season: bool = False
-    
+
     default_hsn_code: Optional[str] = None
     default_gst_rate: float = 5.0
     default_uom: str = "PCS"
-    
+
     icon: str = "Package"
     color_code: str = "#10b981"
     sort_order: int = 0
-    
+
     status: CategoryStatus = CategoryStatus.ACTIVE
     is_active: bool = True
-    
+
     child_count: int = 0
-    
+
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     class Settings:
         name = "item_categories"
 
@@ -258,6 +261,7 @@ class ItemCategoryCreate(BaseModel):
     category_name: str
     description: Optional[str] = None
     item_type: str = "FG"
+    level_names: Optional[dict] = None  # {"l1": "Category", "l2": "Gender", ...}
     has_color: bool = True
     has_size: bool = True
     has_fabric: bool = False
@@ -270,7 +274,7 @@ class ItemCategoryCreate(BaseModel):
     icon: str = "Package"
     color_code: str = "#10b981"
     sort_order: int = 0
-    
+
     @field_validator('category_code')
     @classmethod
     def validate_code(cls, v):
@@ -369,6 +373,7 @@ class ItemCategoryUpdate(BaseModel):
     category_name: Optional[str] = None
     description: Optional[str] = None
     item_type: Optional[str] = None
+    level_names: Optional[dict] = None  # {"l1": "Category", "l2": "Gender", ...}
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None

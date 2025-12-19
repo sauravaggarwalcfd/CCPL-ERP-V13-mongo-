@@ -11,6 +11,8 @@ import SuppliersList from './pages/suppliers/SuppliersList'
 import ItemMaster from './pages/ItemMaster'
 import ItemCategory from './pages/ItemCategory'
 import ItemCategoryMaster from './pages/ItemCategoryMaster'
+import PurchaseOrderList from './pages/PurchaseOrderList'
+import PurchaseOrderForm from './pages/PurchaseOrderForm'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -67,6 +69,21 @@ function App() {
             <Route path="/item-categories" element={
               <ProtectedRoute>
                 <ItemCategoryMaster />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-orders" element={
+              <ProtectedRoute>
+                <PurchaseOrderList />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-orders/create" element={
+              <ProtectedRoute>
+                <PurchaseOrderForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-orders/:poNumber/edit" element={
+              <ProtectedRoute>
+                <PurchaseOrderForm />
               </ProtectedRoute>
             } />
           </Route>

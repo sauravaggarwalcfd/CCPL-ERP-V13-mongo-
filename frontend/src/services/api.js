@@ -90,13 +90,34 @@ export const suppliers = {
   delete: (id) => api.delete(`/suppliers/${id}`),
 }
 
+// Purchase Orders - Complete PO Management
 export const purchaseOrders = {
-  list: (params) => api.get('/purchase-orders', { params }),
-  create: (data) => api.post('/purchase-orders', data),
-  get: (id) => api.get(`/purchase-orders/${id}`),
-  update: (id, data) => api.put(`/purchase-orders/${id}`, data),
-  confirm: (id) => api.post(`/purchase-orders/${id}/confirm`),
-  receive: (id, items) => api.post(`/purchase-orders/${id}/receive`, { items }),
+  // List POs with filters
+  list: (params = {}) => api.get('/po', { params }),
+
+  // Create new PO
+  create: (data) => api.post('/po', data),
+
+  // Get single PO by PO number
+  get: (poNumber) => api.get(`/po/${poNumber}`),
+
+  // Update PO (only DRAFT)
+  update: (poNumber, data) => api.put(`/po/${poNumber}`, data),
+
+  // Update PO status
+  updateStatus: (poNumber, data) => api.patch(`/po/${poNumber}/status`, data),
+
+  // Approve/Reject PO
+  approve: (poNumber, data) => api.post(`/po/${poNumber}/approve`, data),
+
+  // Delete PO (soft delete, only DRAFT)
+  delete: (poNumber) => api.delete(`/po/${poNumber}`),
+
+  // Get POs by supplier
+  getBySupplier: (supplierCode, params = {}) => api.get(`/po/supplier/${supplierCode}`, { params }),
+
+  // Get POs by status
+  getByStatus: (status, params = {}) => api.get(`/po/status/${status}`, { params }),
 }
 
 export const customers = {

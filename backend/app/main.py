@@ -11,6 +11,7 @@ from .routes import (
     inventory,
     suppliers,
     purchases,
+    purchase_orders,
     customers,
     sales,
     warehouses,
@@ -68,7 +69,8 @@ app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(products.router, prefix="/api/products", tags=["Products"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(suppliers.router, prefix="/api/suppliers", tags=["Suppliers"])
-app.include_router(purchases.router, prefix="/api/purchase-orders", tags=["Purchases"])
+app.include_router(purchases.router, prefix="/api/purchase-orders-old", tags=["Purchases-Old"])
+app.include_router(purchase_orders.router, prefix="/api/po", tags=["Purchase Orders"])
 app.include_router(customers.router, prefix="/api/customers", tags=["Customers"])
 app.include_router(sales.router, prefix="/api/sale-orders", tags=["Sales"])
 app.include_router(warehouses.router, prefix="/api/warehouses", tags=["Warehouses"])

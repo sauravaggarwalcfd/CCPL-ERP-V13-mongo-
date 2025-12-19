@@ -26,6 +26,13 @@ const DEFAULT_FORM = {
   division_code: '',
   class_code: '',
   item_type: 'FG',
+  level_names: {
+    l1: 'Category',
+    l2: 'Sub-Category',
+    l3: 'Division',
+    l4: 'Class',
+    l5: 'Sub-Class'
+  },
   has_color: true,
   has_size: true,
   has_fabric: false,
@@ -74,6 +81,10 @@ export default function ItemCategoryMaster() {
   const [showItemTypePanel, setShowItemTypePanel] = useState(false)
   const [itemTypeFormData, setItemTypeFormData] = useState(DEFAULT_ITEM_TYPE_FORM)
   const [itemTypeMode, setItemTypeMode] = useState('create')
+
+  // Success animation state
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   
   // Legacy modal support (keeping for compatibility)
   const [showModal, setShowModal] = useState(false)
@@ -84,6 +95,9 @@ export default function ItemCategoryMaster() {
   const [subCategoryOptions, setSubCategoryOptions] = useState([])
   const [divisionOptions, setDivisionOptions] = useState([])
   const [classOptions, setClassOptions] = useState([])
+
+  // Parent category level names (for inheritance)
+  const [parentLevelNames, setParentLevelNames] = useState(null)
 
   // Panel resize state
   const [leftPanelWidth, setLeftPanelWidth] = useState(50) // percentage
@@ -299,6 +313,13 @@ export default function ItemCategoryMaster() {
       division_code: divisionCode,
       class_code: classCode,
       item_type: item.item_type || 'FG',
+      level_names: item.level_names || {
+        l1: 'Category',
+        l2: 'Sub-Category',
+        l3: 'Division',
+        l4: 'Class',
+        l5: 'Sub-Class'
+      },
       has_color: item.has_color ?? true,
       has_size: item.has_size ?? true,
       has_fabric: item.has_fabric ?? false,
@@ -360,22 +381,49 @@ export default function ItemCategoryMaster() {
         allow_manufacture: itemTypeFormData.allow_manufacture,
         allow_stock: itemTypeFormData.allow_stock,
       }
-      
+
       if (itemTypeMode === 'create') {
         await itemTypes.create(payload)
-        toast.success('Item Type created successfully!')
+        setSuccessMessage('Item Type created successfully!')
       } else {
         await itemTypes.update(itemTypeFormData.code, payload)
-        toast.success('Item Type updated successfully!')
+        setSuccessMessage('Item Type updated successfully!')
       }
-      
+
+      // Close panel and show success animation
       setShowItemTypePanel(false)
-      fetchItemTypes()
+
+      // Small delay to ensure smooth transition
+      setTimeout(() => {
+        setShowSuccessAnimation(true)
+      }, 100)
+
+      // Refresh list immediately, then hide animation
+      await fetchItemTypes()
+
+      setTimeout(() => {
+        setShowSuccessAnimation(false)
+      }, 2000)
     } catch (error) {
       const message = error.response?.data?.detail || 'Operation failed'
       toast.error(message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleItemTypeDelete = async (type) => {
+    if (!window.confirm(`Are you sure you want to delete "${type.name}" (${type.value})?\n\nThis action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await itemTypes.delete(type.value)
+      toast.success('Item Type deleted successfully!')
+      fetchItemTypes()
+    } catch (error) {
+      const message = error.response?.data?.detail || 'Delete failed'
+      toast.error(message)
     }
   }
 
@@ -395,19 +443,31 @@ export default function ItemCategoryMaster() {
 
   const handleParentChange = async (field, value) => {
     const newData = { ...formData, [field]: value }
-    
+
     // Clear dependent fields
     if (field === 'category_code') {
       newData.sub_category_code = ''
       newData.division_code = ''
       newData.class_code = ''
+
+      // Fetch parent category's level_names
+      if (value) {
+        try {
+          const response = await categoryHierarchy.getOne('categories', value)
+          if (response.data?.level_names) {
+            setParentLevelNames(response.data.level_names)
+          }
+        } catch (error) {
+          console.error('Failed to fetch category level names:', error)
+        }
+      }
     } else if (field === 'sub_category_code') {
       newData.division_code = ''
       newData.class_code = ''
     } else if (field === 'division_code') {
       newData.class_code = ''
     }
-    
+
     setFormData(newData)
     await fetchDropdownOptions(formData.level, newData)
   }
@@ -467,6 +527,7 @@ export default function ItemCategoryMaster() {
       
       // Add level-specific fields for Level 1
       if (formData.level === 1) {
+        payload.level_names = formData.level_names
         payload.has_color = formData.has_color
         payload.has_size = formData.has_size
         payload.has_fabric = formData.has_fabric
@@ -483,15 +544,28 @@ export default function ItemCategoryMaster() {
       
       if (panelMode === 'create') {
         await categoryHierarchy.create(levelConfig.key, payload)
-        toast.success(`${levelConfig.name} created successfully!`)
+        setSuccessMessage(`${levelConfig.name} created successfully!`)
       } else {
         await categoryHierarchy.update(levelConfig.key, formData.code, payload)
-        toast.success(`${levelConfig.name} updated successfully!`)
+        setSuccessMessage(`${levelConfig.name} updated successfully!`)
       }
-      
+
+      // Close panel and show success animation
       setShowPanel(false)
-      fetchTree()
-      fetchList()
+
+      // Small delay to ensure smooth transition
+      setTimeout(() => {
+        setShowSuccessAnimation(true)
+      }, 100)
+
+      // Refresh data immediately
+      await fetchTree()
+      await fetchList()
+
+      // Hide animation after delay
+      setTimeout(() => {
+        setShowSuccessAnimation(false)
+      }, 2000)
     } catch (error) {
       const message = error.response?.data?.detail || 'Operation failed'
       toast.error(message)
@@ -1084,12 +1158,12 @@ export default function ItemCategoryMaster() {
             
             <div className="grid grid-cols-2 gap-4 p-4">
               {itemTypesList.map((type) => (
-                <div 
+                <div
                   key={type.value}
                   className="border rounded-lg p-4 hover:shadow-md transition group"
                 >
                   <div className="flex items-center gap-3">
-                    <div 
+                    <div
                       className="w-12 h-12 rounded-lg flex items-center justify-center"
                       style={{ backgroundColor: type.color }}
                     >
@@ -1109,14 +1183,23 @@ export default function ItemCategoryMaster() {
                         )}
                       </div>
                     </div>
-                    {/* Edit Button */}
-                    <button
-                      onClick={() => openItemTypeEdit(type)}
-                      className="opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-100 rounded transition"
-                      title="Edit Item Type"
-                    >
-                      <Edit3 size={16} className="text-gray-500" />
-                    </button>
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <button
+                        onClick={() => openItemTypeEdit(type)}
+                        className="p-2 hover:bg-blue-100 rounded text-blue-600"
+                        title="Edit Item Type"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleItemTypeDelete(type)}
+                        className="p-2 hover:bg-red-100 rounded text-red-600"
+                        title="Delete Item Type"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1235,6 +1318,7 @@ export default function ItemCategoryMaster() {
                 <div className="grid grid-cols-1 gap-2">
                   {LEVELS.map((level) => {
                     const IconComponent = level.icon
+                    const customLevelName = parentLevelNames?.[`l${level.level}`] || formData.level_names?.[`l${level.level}`]
                     return (
                       <label
                         key={level.level}
@@ -1253,14 +1337,19 @@ export default function ItemCategoryMaster() {
                           disabled={panelMode === 'edit'}
                           className="sr-only"
                         />
-                        <div 
+                        <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center"
                           style={{ backgroundColor: level.color }}
                         >
                           <IconComponent size={20} className="text-white" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">Level {level.level}</div>
+                          <div className="font-medium">
+                            L{level.level} {customLevelName && `- ${customLevelName}`}
+                          </div>
+                          {!customLevelName && (
+                            <div className="text-xs text-gray-500">{level.name}</div>
+                          )}
                         </div>
                         {formData.level === level.level && (
                           <Check size={20} className="text-emerald-600" />
@@ -1270,6 +1359,40 @@ export default function ItemCategoryMaster() {
                   })}
                 </div>
               </div>
+
+              {/* Level Names Configuration - Only for Level 1 */}
+              {formData.level === 1 && (
+                <div className="mb-6 p-4 bg-purple-50 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Custom Level Names (Optional)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Define custom names for each level in this category hierarchy. These will be displayed throughout the system.
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <div key={level} className="flex items-center gap-3">
+                        <label className="text-sm text-gray-600 w-20">Level {level}:</label>
+                        <input
+                          type="text"
+                          value={formData.level_names?.[`l${level}`] || ''}
+                          onChange={(e) => {
+                            setFormData(prev => ({
+                              ...prev,
+                              level_names: {
+                                ...prev.level_names,
+                                [`l${level}`]: e.target.value
+                              }
+                            }))
+                          }}
+                          placeholder={`e.g., ${level === 1 ? 'Category' : level === 2 ? 'Gender' : level === 3 ? 'Occasion' : level === 4 ? 'Product Type' : 'Style'}`}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Step 3: Select Parent Hierarchy */}
               {formData.level > 1 && (
@@ -1762,6 +1885,37 @@ export default function ItemCategoryMaster() {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Animation Modal */}
+      {showSuccessAnimation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 animate-scaleIn">
+            <div className="flex flex-col items-center">
+              {/* Animated Checkmark */}
+              <div className="relative mb-6">
+                <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center animate-bounceIn shadow-lg">
+                  <Check size={48} className="text-white animate-checkmark" strokeWidth={3} />
+                </div>
+                {/* Ripple effect */}
+                <div className="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-20"></div>
+              </div>
+
+              {/* Success Message */}
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+                Success!
+              </h3>
+              <p className="text-gray-600 text-center mb-6">
+                {successMessage}
+              </p>
+
+              {/* Progress bar */}
+              <div className="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
+                <div className="bg-gradient-to-r from-green-400 to-emerald-600 h-full animate-progress"></div>
+              </div>
             </div>
           </div>
         </div>
