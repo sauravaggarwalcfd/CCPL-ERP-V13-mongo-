@@ -54,7 +54,11 @@ const PurchaseOrderForm = () => {
       try {
         const response = await suppliers.list()
         if (response && response.data) {
-          setSuppliersList(response.data || [])
+          // Handle both array and paginated response formats
+          const supplierData = Array.isArray(response.data)
+            ? response.data
+            : (response.data.data || response.data.items || [])
+          setSuppliersList(supplierData)
         }
       } catch (error) {
         console.error('Error fetching suppliers:', error)
@@ -72,7 +76,11 @@ const PurchaseOrderForm = () => {
       try {
         const response = await itemsAPI.list()
         if (response && response.data) {
-          setItemsList(response.data || [])
+          // Handle both array and paginated response formats
+          const itemData = Array.isArray(response.data)
+            ? response.data
+            : (response.data.data || response.data.items || [])
+          setItemsList(itemData)
         }
       } catch (error) {
         console.error('Error fetching items:', error)

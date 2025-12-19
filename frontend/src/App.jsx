@@ -13,6 +13,7 @@ import ItemCategory from './pages/ItemCategory'
 import ItemCategoryMaster from './pages/ItemCategoryMaster'
 import PurchaseOrderList from './pages/PurchaseOrderList'
 import PurchaseOrderForm from './pages/PurchaseOrderForm'
+import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -84,6 +85,11 @@ function App() {
             <Route path="/purchase-orders/:poNumber/edit" element={
               <ProtectedRoute>
                 <PurchaseOrderForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-orders/:poNumber" element={
+              <ProtectedRoute>
+                <PurchaseOrderDetail />
               </ProtectedRoute>
             } />
           </Route>

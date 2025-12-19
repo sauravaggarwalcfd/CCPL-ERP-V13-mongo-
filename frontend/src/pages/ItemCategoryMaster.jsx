@@ -46,15 +46,17 @@ const DEFAULT_FORM = {
 
 // Default Item Type Form
 const DEFAULT_ITEM_TYPE_FORM = {
-  code: '',
-  name: '',
+  type_code: '',
+  type_name: '',
   description: '',
-  color: '#10b981',
+  color_code: '#10b981',
   icon: 'Package',
   allow_purchase: true,
-  allow_sale: true,
-  allow_manufacture: false,
-  allow_stock: true,
+  allow_sale: false,
+  track_inventory: true,
+  require_quality_check: false,
+  default_uom: 'PCS',
+  sort_order: 0,
 }
 
 export default function ItemCategoryMaster() {
@@ -351,15 +353,17 @@ export default function ItemCategoryMaster() {
 
   const openItemTypeEdit = (type) => {
     setItemTypeFormData({
-      code: type.value,
-      name: type.name,
+      type_code: type.value,
+      type_name: type.name,
       description: type.description || '',
-      color: type.color || '#10b981',
+      color_code: type.color || '#10b981',
       icon: type.icon || 'Package',
       allow_purchase: type.allow_purchase ?? true,
-      allow_sale: type.allow_sale ?? true,
-      allow_manufacture: type.allow_manufacture ?? false,
-      allow_stock: type.allow_stock ?? true,
+      allow_sale: type.allow_sale ?? false,
+      track_inventory: type.track_inventory ?? true,
+      require_quality_check: type.require_quality_check ?? false,
+      default_uom: type.default_uom || 'PCS',
+      sort_order: type.sort_order || 0,
     })
     setItemTypeMode('edit')
     setShowItemTypePanel(true)
@@ -371,22 +375,24 @@ export default function ItemCategoryMaster() {
     setSaving(true)
     try {
       const payload = {
-        code: itemTypeFormData.code.toUpperCase(),
-        name: itemTypeFormData.name,
-        description: itemTypeFormData.description,
-        color: itemTypeFormData.color,
+        type_code: itemTypeFormData.type_code.toUpperCase(),
+        type_name: itemTypeFormData.type_name,
+        description: itemTypeFormData.description || '',
+        color_code: itemTypeFormData.color_code,
         icon: itemTypeFormData.icon,
         allow_purchase: itemTypeFormData.allow_purchase,
         allow_sale: itemTypeFormData.allow_sale,
-        allow_manufacture: itemTypeFormData.allow_manufacture,
-        allow_stock: itemTypeFormData.allow_stock,
+        track_inventory: itemTypeFormData.track_inventory,
+        require_quality_check: itemTypeFormData.require_quality_check,
+        default_uom: itemTypeFormData.default_uom,
+        sort_order: itemTypeFormData.sort_order,
       }
 
       if (itemTypeMode === 'create') {
         await itemTypes.create(payload)
         setSuccessMessage('Item Type created successfully!')
       } else {
-        await itemTypes.update(itemTypeFormData.code, payload)
+        await itemTypes.update(itemTypeFormData.type_code, payload)
         setSuccessMessage('Item Type updated successfully!')
       }
 
@@ -405,7 +411,16 @@ export default function ItemCategoryMaster() {
         setShowSuccessAnimation(false)
       }, 2000)
     } catch (error) {
-      const message = error.response?.data?.detail || 'Operation failed'
+      // Handle both string and array error formats
+      let message = 'Operation failed'
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // FastAPI validation errors
+          message = error.response.data.detail.map(err => err.msg).join(', ')
+        } else if (typeof error.response.data.detail === 'string') {
+          message = error.response.data.detail
+        }
+      }
       toast.error(message)
     } finally {
       setSaving(false)
@@ -422,7 +437,16 @@ export default function ItemCategoryMaster() {
       toast.success('Item Type deleted successfully!')
       fetchItemTypes()
     } catch (error) {
-      const message = error.response?.data?.detail || 'Delete failed'
+      // Handle both string and array error formats
+      let message = 'Delete failed'
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // FastAPI validation errors
+          message = error.response.data.detail.map(err => err.msg).join(', ')
+        } else if (typeof error.response.data.detail === 'string') {
+          message = error.response.data.detail
+        }
+      }
       toast.error(message)
     }
   }
@@ -567,7 +591,16 @@ export default function ItemCategoryMaster() {
         setShowSuccessAnimation(false)
       }, 2000)
     } catch (error) {
-      const message = error.response?.data?.detail || 'Operation failed'
+      // Handle both string and array error formats
+      let message = 'Operation failed'
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // FastAPI validation errors
+          message = error.response.data.detail.map(err => err.msg).join(', ')
+        } else if (typeof error.response.data.detail === 'string') {
+          message = error.response.data.detail
+        }
+      }
       toast.error(message)
     } finally {
       setSaving(false)
@@ -576,18 +609,27 @@ export default function ItemCategoryMaster() {
 
   const handleDelete = async (item) => {
     const levelConfig = LEVELS[item.level - 1]
-    
+
     if (!window.confirm(`Are you sure you want to deactivate "${item.name}"?`)) {
       return
     }
-    
+
     try {
       await categoryHierarchy.delete(levelConfig.key, item.code)
       toast.success(`${levelConfig.name} deactivated`)
       fetchTree()
       fetchList()
     } catch (error) {
-      const message = error.response?.data?.detail || 'Delete failed'
+      // Handle both string and array error formats
+      let message = 'Delete failed'
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // FastAPI validation errors
+          message = error.response.data.detail.map(err => err.msg).join(', ')
+        } else if (typeof error.response.data.detail === 'string') {
+          message = error.response.data.detail
+        }
+      }
       toast.error(message)
     }
   }
@@ -771,7 +813,16 @@ export default function ItemCategoryMaster() {
       fetchTree()
       fetchList()
     } catch (error) {
-      const message = error.response?.data?.detail || 'Failed to move item'
+      // Handle both string and array error formats
+      let message = 'Failed to move item'
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // FastAPI validation errors
+          message = error.response.data.detail.map(err => err.msg).join(', ')
+        } else if (typeof error.response.data.detail === 'string') {
+          message = error.response.data.detail
+        }
+      }
       toast.error(message)
     } finally {
       setShowMoveConfirm(false)
@@ -1687,8 +1738,8 @@ export default function ItemCategoryMaster() {
                     </label>
                     <input
                       type="text"
-                      value={itemTypeFormData.code}
-                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, code: e.target.value.toUpperCase().slice(0, 2) }))}
+                      value={itemTypeFormData.type_code}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, type_code: e.target.value.toUpperCase().slice(0, 2) }))}
                       disabled={itemTypeMode === 'edit'}
                       placeholder="e.g., FG"
                       maxLength={2}
@@ -1697,15 +1748,15 @@ export default function ItemCategoryMaster() {
                       }`}
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
                       Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={itemTypeFormData.name}
-                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, name: e.target.value }))}
+                      value={itemTypeFormData.type_name}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, type_name: e.target.value }))}
                       placeholder="e.g., Finished Goods"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -1740,7 +1791,7 @@ export default function ItemCategoryMaster() {
                     />
                     <span className="text-sm text-gray-700">Allow Purchase</span>
                   </label>
-                  
+
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1750,26 +1801,55 @@ export default function ItemCategoryMaster() {
                     />
                     <span className="text-sm text-gray-700">Allow Sale</span>
                   </label>
-                  
+
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={itemTypeFormData.is_active}
-                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                      checked={itemTypeFormData.track_inventory}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, track_inventory: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-sm text-gray-700">Track Inventory</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={itemTypeFormData.require_quality_check}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, require_quality_check: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Require Quality Check</span>
                   </label>
                 </div>
-                
-                <div className="mt-4">
-                  <label className="block text-sm text-gray-600 mb-1">Color</label>
-                  <input
-                    type="color"
-                    value={itemTypeFormData.color}
-                    onChange={(e) => setItemTypeFormData(prev => ({ ...prev, color: e.target.value }))}
-                    className="w-full h-10 rounded cursor-pointer"
-                  />
+
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Color</label>
+                    <input
+                      type="color"
+                      value={itemTypeFormData.color_code}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, color_code: e.target.value }))}
+                      className="w-full h-10 rounded cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Default UOM</label>
+                    <select
+                      value={itemTypeFormData.default_uom}
+                      onChange={(e) => setItemTypeFormData(prev => ({ ...prev, default_uom: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="PCS">PCS - Pieces</option>
+                      <option value="KG">KG - Kilograms</option>
+                      <option value="MTR">MTR - Meters</option>
+                      <option value="LTR">LTR - Liters</option>
+                      <option value="DOZ">DOZ - Dozen</option>
+                      <option value="SET">SET - Set</option>
+                      <option value="ROLL">ROLL - Roll</option>
+                      <option value="BOX">BOX - Box</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
