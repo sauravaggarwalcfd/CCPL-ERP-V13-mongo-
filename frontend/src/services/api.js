@@ -246,7 +246,10 @@ export const categoryHierarchy = {
   create: (levelKey, data) => api.post(`/hierarchy/${levelKey}`, data),
   update: (levelKey, code, data) => api.put(`/hierarchy/${levelKey}/${code}`, data),
   delete: (levelKey, code) => api.delete(`/hierarchy/${levelKey}/${code}`),
-  
+
+  // Variant Groups
+  getVariantGroups: (params = {}) => api.get('/variant-groups', { params }),
+
   // Seed data
   seed: () => api.post('/hierarchy/seed'),
 }

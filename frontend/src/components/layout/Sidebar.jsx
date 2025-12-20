@@ -26,7 +26,6 @@ export default function Sidebar() {
         { to: '/fabric-category', label: 'Fabric Category' },
         { to: '/item-master', label: 'Item Master' },
         { to: '/variant-master', label: 'Variant Master' },
-        { to: '/specifications', label: 'Specifications' },
         { to: '/brand-master', label: 'Brand Master' },
         { to: '/supplier-master', label: 'Supplier Master' },
         { to: '/warehouse-master', label: 'Warehouse Master' },

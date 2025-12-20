@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { categoryHierarchy, itemTypes } from '../services/api'
+import { specificationApi } from '../services/specificationApi'
 
 // Level Configuration
 const LEVELS = [
@@ -101,6 +102,21 @@ export default function ItemCategoryMaster() {
   // Parent category level names (for inheritance)
   const [parentLevelNames, setParentLevelNames] = useState(null)
 
+  // Specifications configuration state
+  const [variantGroups, setVariantGroups] = useState({
+    colour: [],
+    size: [],
+    uom: [],
+    vendor: []
+  })
+  const [specifications, setSpecifications] = useState({
+    colour: { enabled: false, required: false, groups: [] },
+    size: { enabled: false, required: false, groups: [] },
+    uom: { enabled: false, required: false, groups: [] },
+    vendor: { enabled: false, required: false, groups: [] }
+  })
+  const [customFields, setCustomFields] = useState([])
+
   // Panel resize state
   const [leftPanelWidth, setLeftPanelWidth] = useState(50) // percentage
   const [isResizing, setIsResizing] = useState(false)
@@ -181,6 +197,25 @@ export default function ItemCategoryMaster() {
     }
   }, [])
 
+  const fetchVariantGroups = useCallback(async () => {
+    try {
+      const response = await categoryHierarchy.getVariantGroups()
+      const groups = response.data || []
+
+      // Organize groups by variant type
+      const organized = {
+        colour: groups.filter(g => g.variant_type === 'COLOUR'),
+        size: groups.filter(g => g.variant_type === 'SIZE'),
+        uom: groups.filter(g => g.variant_type === 'UOM'),
+        vendor: [] // Vendors don't have groups
+      }
+
+      setVariantGroups(organized)
+    } catch (error) {
+      console.error('Fetch variant groups error:', error)
+    }
+  }, [])
+
   // Fetch dropdown options
   const fetchDropdownOptions = useCallback(async (level, parentCodes = {}) => {
     try {
@@ -218,7 +253,8 @@ export default function ItemCategoryMaster() {
     fetchTree()
     fetchList()
     fetchItemTypes()
-  }, [fetchTree, fetchList, fetchItemTypes])
+    fetchVariantGroups()
+  }, [fetchTree, fetchList, fetchItemTypes, fetchVariantGroups])
 
   useEffect(() => {
     fetchList()
@@ -254,7 +290,7 @@ export default function ItemCategoryMaster() {
   // Modal handlers
   const openCreateModal = (parentNode = null) => {
     const newForm = { ...DEFAULT_FORM }
-    
+
     if (parentNode) {
       // Pre-fill parent info
       newForm.level = parentNode.level + 1
@@ -262,7 +298,7 @@ export default function ItemCategoryMaster() {
       if (parentNode.level >= 2) newForm.sub_category_code = parentNode.code
       if (parentNode.level >= 3) newForm.division_code = parentNode.code
       if (parentNode.level >= 4) newForm.class_code = parentNode.code
-      
+
       // Inherit from parent path
       const pathParts = parentNode.path?.split('/') || []
       if (pathParts[0]) newForm.category_code = pathParts[0]
@@ -270,13 +306,22 @@ export default function ItemCategoryMaster() {
       if (pathParts[2]) newForm.division_code = pathParts[2]
       if (pathParts[3]) newForm.class_code = pathParts[3]
     }
-    
+
     setFormData(newForm)
     setFormErrors({})
     setPanelMode('create')
     setShowPanel(true)
     setShowItemTypePanel(false)
-    
+
+    // Reset specifications state
+    setSpecifications({
+      colour: { enabled: false, required: false, groups: [] },
+      size: { enabled: false, required: false, groups: [] },
+      uom: { enabled: false, required: false, groups: [] },
+      vendor: { enabled: false, required: false, groups: [] }
+    })
+    setCustomFields([])
+
     // Fetch dropdown options
     fetchDropdownOptions(newForm.level, newForm)
   }
@@ -284,13 +329,13 @@ export default function ItemCategoryMaster() {
   const openEditModal = async (item) => {
     // Extract parent codes from path if not directly available
     const pathParts = item.path?.split('/') || []
-    
+
     // For items at different levels, extract parent codes from path
     let categoryCode = item.category_code || ''
     let subCategoryCode = item.sub_category_code || ''
     let divisionCode = item.division_code || ''
     let classCode = item.class_code || ''
-    
+
     // If parent codes not directly available, extract from path
     if (item.level >= 2 && !categoryCode && pathParts[0]) {
       categoryCode = pathParts[0]
@@ -304,7 +349,7 @@ export default function ItemCategoryMaster() {
     if (item.level >= 5 && !classCode && pathParts[3]) {
       classCode = pathParts[3]
     }
-    
+
     const editFormData = {
       level: item.level,
       code: item.code,
@@ -332,13 +377,23 @@ export default function ItemCategoryMaster() {
       color_code: item.color_code || '#10b981',
       sort_order: item.sort_order || 0,
     }
-    
+
     setFormData(editFormData)
     setFormErrors({})
     setPanelMode('edit')
     setShowPanel(true)
     setShowItemTypePanel(false)
-    
+
+    // NOTE: Specifications cannot be edited after category creation
+    // Reset specifications state (won't be shown in edit mode anyway)
+    setSpecifications({
+      colour: { enabled: false, required: false, groups: [] },
+      size: { enabled: false, required: false, groups: [] },
+      uom: { enabled: false, required: false, groups: [] },
+      vendor: { enabled: false, required: false, groups: [] }
+    })
+    setCustomFields([])
+
     // Fetch dropdown options with the extracted parent codes
     await fetchDropdownOptions(item.level, editFormData)
   }
@@ -572,6 +627,46 @@ export default function ItemCategoryMaster() {
       } else {
         await categoryHierarchy.update(levelConfig.key, formData.code, payload)
         setSuccessMessage(`${levelConfig.name} updated successfully!`)
+      }
+
+      // Save specifications configuration ONLY when creating new Level 1 category
+      if (formData.level === 1 && panelMode === 'create') {
+        try {
+          const specsPayload = {
+            category_code: formData.code.toUpperCase(),
+            category_name: formData.name,
+            category_level: 1,
+            specifications: {
+              colour: specifications.colour.enabled ? {
+                enabled: specifications.colour.enabled,
+                required: specifications.colour.required,
+                groups: specifications.colour.groups
+              } : undefined,
+              size: specifications.size.enabled ? {
+                enabled: specifications.size.enabled,
+                required: specifications.size.required,
+                groups: specifications.size.groups
+              } : undefined,
+              uom: specifications.uom.enabled ? {
+                enabled: specifications.uom.enabled,
+                required: specifications.uom.required,
+                groups: specifications.uom.groups
+              } : undefined,
+              vendor: specifications.vendor.enabled ? {
+                enabled: specifications.vendor.enabled,
+                required: specifications.vendor.required,
+                groups: specifications.vendor.groups
+              } : undefined,
+            },
+            custom_fields: customFields
+          }
+
+          await specificationApi.createOrUpdate(formData.code.toUpperCase(), specsPayload)
+          console.log('Saved specifications for new category:', formData.code)
+        } catch (error) {
+          console.error('Error saving specifications:', error)
+          toast.error('Category created but specifications failed to save')
+        }
       }
 
       // Close panel and show success animation
@@ -1664,6 +1759,178 @@ export default function ItemCategoryMaster() {
                   )}
                 </div>
               </div>
+
+              {/* Specifications Configuration (ONLY for NEW Level 1 Category) */}
+              {formData.level === 1 && panelMode === 'create' && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                      <Settings size={16} />
+                      Specifications Configuration
+                    </h3>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Configure which variant fields are available when creating items in this category (can only be set during creation)
+                    </p>
+                  </div>
+
+                  {/* Variant Fields (Colour, Size, UOM, Vendor) */}
+                  <div className="space-y-4">
+                    {['colour', 'size', 'uom', 'vendor'].map((field) => (
+                      <div key={field} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={specifications[field]?.enabled || false}
+                            onChange={(e) => {
+                              setSpecifications(prev => ({
+                                ...prev,
+                                [field]: {
+                                  ...prev[field],
+                                  enabled: e.target.checked,
+                                  required: e.target.checked ? prev[field]?.required || false : false,
+                                  groups: e.target.checked ? prev[field]?.groups || [] : []
+                                }
+                              }))
+                            }}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm font-medium text-gray-900 capitalize">
+                                {field === 'uom' ? 'UOM' : field}
+                              </label>
+                              {specifications[field]?.enabled && (
+                                <label className="flex items-center gap-1 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={specifications[field]?.required || false}
+                                    onChange={(e) => {
+                                      setSpecifications(prev => ({
+                                        ...prev,
+                                        [field]: {
+                                          ...prev[field],
+                                          required: e.target.checked
+                                        }
+                                      }))
+                                    }}
+                                    className="scale-75"
+                                  />
+                                  <span className="text-gray-600">Required</span>
+                                </label>
+                              )}
+                            </div>
+
+                            {specifications[field]?.enabled && field !== 'vendor' && (
+                              <div className="mt-2">
+                                <label className="text-xs text-gray-600 block mb-1">
+                                  Select Groups (leave empty for all)
+                                </label>
+                                <select
+                                  multiple
+                                  value={specifications[field]?.groups || []}
+                                  onChange={(e) => {
+                                    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value)
+                                    setSpecifications(prev => ({
+                                      ...prev,
+                                      [field]: {
+                                        ...prev[field],
+                                        groups: selectedOptions
+                                      }
+                                    }))
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                                  size="3"
+                                >
+                                  {variantGroups[field]?.map(group => (
+                                    <option key={group.group_code} value={group.group_code}>
+                                      {group.group_name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Hold Ctrl/Cmd to select multiple groups
+                                </p>
+                              </div>
+                            )}
+
+                            {specifications[field]?.enabled && field === 'vendor' && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                All active vendors will be available
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Custom Fields */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-gray-900">Custom Fields</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomFields(prev => [...prev, {
+                            field_code: `CUSTOM_${Date.now()}`,
+                            field_name: 'New Field',
+                            field_type: 'TEXT',
+                            enabled: true,
+                            required: false,
+                            options: [],
+                            display_order: customFields.length
+                          }])
+                        }}
+                        className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        + Add Custom Field
+                      </button>
+                    </div>
+
+                    {customFields.length > 0 && (
+                      <div className="space-y-2">
+                        {customFields.map((field, idx) => (
+                          <div key={idx} className="bg-white p-2 rounded border border-gray-200 flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={field.field_name}
+                              onChange={(e) => {
+                                const updated = [...customFields]
+                                updated[idx].field_name = e.target.value
+                                setCustomFields(updated)
+                              }}
+                              placeholder="Field Name"
+                              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded"
+                            />
+                            <select
+                              value={field.field_type}
+                              onChange={(e) => {
+                                const updated = [...customFields]
+                                updated[idx].field_type = e.target.value
+                                setCustomFields(updated)
+                              }}
+                              className="px-2 py-1 text-xs border border-gray-300 rounded"
+                            >
+                              <option value="TEXT">Text</option>
+                              <option value="NUMBER">Number</option>
+                              <option value="SELECT">Select</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomFields(prev => prev.filter((_, i) => i !== idx))
+                              }}
+                              className="text-red-600 hover:text-red-800 text-xs px-2 py-1"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Panel Footer */}
               <div className="border-t pt-4 mt-4 flex items-center justify-between">
