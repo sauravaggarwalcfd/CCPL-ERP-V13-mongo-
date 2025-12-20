@@ -128,6 +128,11 @@ export default function ItemCategoryMaster() {
   const [showMoveConfirm, setShowMoveConfirm] = useState(false)
   const [pendingMoveData, setPendingMoveData] = useState(null)
 
+  // Preview state
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewData, setPreviewData] = useState(null)
+  const [previewType, setPreviewType] = useState('') // 'tree', 'list', 'types'
+
   // Fetch data
   const fetchTree = useCallback(async () => {
     try {
@@ -384,15 +389,29 @@ export default function ItemCategoryMaster() {
     setShowPanel(true)
     setShowItemTypePanel(false)
 
-    // NOTE: Specifications cannot be edited after category creation
-    // Reset specifications state (won't be shown in edit mode anyway)
-    setSpecifications({
-      colour: { enabled: false, required: false, groups: [] },
-      size: { enabled: false, required: false, groups: [] },
-      uom: { enabled: false, required: false, groups: [] },
-      vendor: { enabled: false, required: false, groups: [] }
-    })
-    setCustomFields([])
+    // Load existing specifications for editing
+    try {
+      const specsData = await specificationApi.get(item.code.toUpperCase())
+      if (specsData && specsData.specifications) {
+        setSpecifications({
+          colour: specsData.specifications.colour || { enabled: false, required: false, groups: [] },
+          size: specsData.specifications.size || { enabled: false, required: false, groups: [] },
+          uom: specsData.specifications.uom || { enabled: false, required: false, groups: [] },
+          vendor: specsData.specifications.vendor || { enabled: false, required: false, groups: [] }
+        })
+        setCustomFields(specsData.custom_fields || [])
+      }
+    } catch (error) {
+      // If no specifications exist yet, reset to defaults
+      console.log('No existing specifications found for category:', item.code)
+      setSpecifications({
+        colour: { enabled: false, required: false, groups: [] },
+        size: { enabled: false, required: false, groups: [] },
+        uom: { enabled: false, required: false, groups: [] },
+        vendor: { enabled: false, required: false, groups: [] }
+      })
+      setCustomFields([])
+    }
 
     // Fetch dropdown options with the extracted parent codes
     await fetchDropdownOptions(item.level, editFormData)
@@ -629,44 +648,42 @@ export default function ItemCategoryMaster() {
         setSuccessMessage(`${levelConfig.name} updated successfully!`)
       }
 
-      // Save specifications configuration ONLY when creating new Level 1 category
-      if (formData.level === 1 && panelMode === 'create') {
-        try {
-          const specsPayload = {
-            category_code: formData.code.toUpperCase(),
-            category_name: formData.name,
-            category_level: 1,
-            specifications: {
-              colour: specifications.colour.enabled ? {
-                enabled: specifications.colour.enabled,
-                required: specifications.colour.required,
-                groups: specifications.colour.groups
-              } : undefined,
-              size: specifications.size.enabled ? {
-                enabled: specifications.size.enabled,
-                required: specifications.size.required,
-                groups: specifications.size.groups
-              } : undefined,
-              uom: specifications.uom.enabled ? {
-                enabled: specifications.uom.enabled,
-                required: specifications.uom.required,
-                groups: specifications.uom.groups
-              } : undefined,
-              vendor: specifications.vendor.enabled ? {
-                enabled: specifications.vendor.enabled,
-                required: specifications.vendor.required,
-                groups: specifications.vendor.groups
-              } : undefined,
-            },
-            custom_fields: customFields
-          }
-
-          await specificationApi.createOrUpdate(formData.code.toUpperCase(), specsPayload)
-          console.log('Saved specifications for new category:', formData.code)
-        } catch (error) {
-          console.error('Error saving specifications:', error)
-          toast.error('Category created but specifications failed to save')
+      // Save specifications configuration for all category levels (both create and edit)
+      try {
+        const specsPayload = {
+          category_code: formData.code.toUpperCase(),
+          category_name: formData.name,
+          category_level: formData.level,
+          specifications: {
+            colour: specifications.colour.enabled ? {
+              enabled: specifications.colour.enabled,
+              required: specifications.colour.required,
+              groups: specifications.colour.groups
+            } : undefined,
+            size: specifications.size.enabled ? {
+              enabled: specifications.size.enabled,
+              required: specifications.size.required,
+              groups: specifications.size.groups
+            } : undefined,
+            uom: specifications.uom.enabled ? {
+              enabled: specifications.uom.enabled,
+              required: specifications.uom.required,
+              groups: specifications.uom.groups
+            } : undefined,
+            vendor: specifications.vendor.enabled ? {
+              enabled: specifications.vendor.enabled,
+              required: specifications.vendor.required,
+              groups: specifications.vendor.groups
+            } : undefined,
+          },
+          custom_fields: customFields
         }
+
+        await specificationApi.createOrUpdate(formData.code.toUpperCase(), specsPayload)
+        console.log('Saved specifications for category:', formData.code, 'at level', formData.level)
+      } catch (error) {
+        console.error('Error saving specifications:', error)
+        toast.error(`Category ${panelMode === 'create' ? 'created' : 'updated'} but specifications failed to save`)
       }
 
       // Close panel and show success animation
@@ -931,6 +948,39 @@ export default function ItemCategoryMaster() {
     setIsDragging(false)
   }, [])
 
+  // Preview functionality
+  const handleTabPreview = (type) => {
+    let data = null
+    let title = ''
+
+    switch (type) {
+      case 'tree':
+        data = treeData
+        title = 'Category Tree Structure Preview'
+        break
+      case 'list':
+        data = listData
+        title = 'Category List Preview'
+        break
+      case 'types':
+        data = itemTypesList
+        title = 'Item Types Preview'
+        break
+      default:
+        return
+    }
+
+    setPreviewType(type)
+    setPreviewData(data)
+    setShowPreview(true)
+  }
+
+  const closePreview = () => {
+    setShowPreview(false)
+    setPreviewData(null)
+    setPreviewType('')
+  }
+
   // Render tree node
   const renderTreeNode = (node, depth = 0) => {
     const hasChildren = node.children?.length > 0
@@ -1075,26 +1125,38 @@ export default function ItemCategoryMaster() {
             {/* View Mode Toggle */}
             <div className="flex bg-white/20 rounded-lg p-1">
               <button
-                onClick={() => setViewMode('tree')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition ${
+                onClick={() => {
+                  setViewMode('tree')
+                  handleTabPreview('tree')
+                }}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
                   viewMode === 'tree' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
                 }`}
+                title="Click to preview tree structure"
               >
                 <FolderTree size={18} /> Tree
               </button>
               <button
-                onClick={() => setViewMode('list')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition ${
+                onClick={() => {
+                  setViewMode('list')
+                  handleTabPreview('list')
+                }}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
                   viewMode === 'list' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
                 }`}
+                title="Click to preview list view"
               >
                 <List size={18} /> List
               </button>
               <button
-                onClick={() => setViewMode('types')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition ${
+                onClick={() => {
+                  setViewMode('types')
+                  handleTabPreview('types')
+                }}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
                   viewMode === 'types' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
                 }`}
+                title="Click to preview item types"
               >
                 <Settings size={18} /> Item Types
               </button>
@@ -1760,21 +1822,20 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
 
-              {/* Specifications Configuration (ONLY for NEW Level 1 Category) */}
-              {formData.level === 1 && panelMode === 'create' && (
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-                      <Settings size={16} />
-                      Specifications Configuration
-                    </h3>
-                    <p className="text-xs text-blue-700 mt-1">
-                      Configure which variant fields are available when creating items in this category (can only be set during creation)
-                    </p>
-                  </div>
+              {/* Specifications Configuration (Available for ALL Levels) */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                    <Settings size={16} />
+                    Specifications Configuration
+                  </h3>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Configure which variant fields are available when creating items in this category hierarchy
+                  </p>
+                </div>
 
-                  {/* Variant Fields (Colour, Size, UOM, Vendor) */}
-                  <div className="space-y-4">
+                {/* Variant Fields (Colour, Size, UOM, Vendor) */}
+                <div className="space-y-4">
                     {['colour', 'size', 'uom', 'vendor'].map((field) => (
                       <div key={field} className="bg-white p-3 rounded-lg border border-gray-200">
                         <div className="flex items-start gap-3">
@@ -1862,10 +1923,10 @@ export default function ItemCategoryMaster() {
                         </div>
                       </div>
                     ))}
-                  </div>
+                </div>
 
-                  {/* Custom Fields */}
-                  <div className="mt-4">
+                {/* Custom Fields */}
+                <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-gray-900">Custom Fields</label>
                       <button
@@ -1928,9 +1989,8 @@ export default function ItemCategoryMaster() {
                         ))}
                       </div>
                     )}
-                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Panel Footer */}
               <div className="border-t pt-4 mt-4 flex items-center justify-between">
@@ -2262,6 +2322,175 @@ export default function ItemCategoryMaster() {
               {/* Progress bar */}
               <div className="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
                 <div className="bg-gradient-to-r from-green-400 to-emerald-600 h-full animate-progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg">
+              <div className="flex items-center gap-3">
+                {previewType === 'tree' && <FolderTree size={24} />}
+                {previewType === 'list' && <List size={24} />}
+                {previewType === 'types' && <Settings size={24} />}
+                <h3 className="text-xl font-bold">
+                  {previewType === 'tree' && 'Category Tree Structure Preview'}
+                  {previewType === 'list' && 'Category List Preview'}
+                  {previewType === 'types' && 'Item Types Preview'}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-white/20 rounded-lg transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 p-6 overflow-auto">
+              {previewType === 'tree' && (
+                <div className="space-y-2">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-emerald-800 mb-2">Tree Structure Overview</h4>
+                    <p className="text-emerald-700 text-sm">
+                      Total Categories: {previewData?.length || 0} | 
+                      Hierarchical view of all category levels
+                    </p>
+                  </div>
+                  {previewData && previewData.length > 0 ? (
+                    previewData.map((item, index) => (
+                      <div key={index} className="bg-white border rounded-lg p-4 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <Package size={20} className="text-emerald-600" />
+                          <div>
+                            <h5 className="font-medium text-gray-900">{item.name}</h5>
+                            <p className="text-sm text-gray-600">Code: {item.code} | Level: {item.level}</p>
+                            {item.children && item.children.length > 0 && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Children: {item.children.length}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FolderTree size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p>No tree data available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {previewType === 'list' && (
+                <div className="space-y-2">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-blue-800 mb-2">List View Overview</h4>
+                    <p className="text-blue-700 text-sm">
+                      Total Items: {previewData?.length || 0} | 
+                      Flat view of all categories
+                    </p>
+                  </div>
+                  {previewData && previewData.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {previewData.slice(0, 12).map((item, index) => (
+                        <div key={index} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0">
+                              <Package size={16} className="text-blue-600 mt-1" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-medium text-gray-900 truncate">{item.name}</h5>
+                              <p className="text-sm text-gray-600">Level {item.level}</p>
+                              <p className="text-xs text-gray-500 font-mono">{item.code}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {previewData.length > 12 && (
+                        <div className="col-span-full text-center py-4 text-gray-500">
+                          ... and {previewData.length - 12} more items
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <List size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p>No list data available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {previewType === 'types' && (
+                <div className="space-y-4">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-purple-800 mb-2">Item Types Overview</h4>
+                    <p className="text-purple-700 text-sm">
+                      Total Types: {previewData?.length || 0} | 
+                      Configuration for different item categories
+                    </p>
+                  </div>
+                  {previewData && previewData.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {previewData.map((type, index) => (
+                        <div key={index} className="bg-white border rounded-lg p-4 shadow-sm">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div 
+                              className="w-4 h-4 rounded" 
+                              style={{ backgroundColor: type.color_code || '#8b5cf6' }}
+                            ></div>
+                            <div>
+                              <h5 className="font-medium text-gray-900">{type.type_name}</h5>
+                              <p className="text-sm text-gray-600 font-mono">{type.type_code}</p>
+                            </div>
+                          </div>
+                          {type.description && (
+                            <p className="text-sm text-gray-600 mb-2">{type.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {type.allow_purchase && (
+                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Purchase</span>
+                            )}
+                            {type.allow_sale && (
+                              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Sale</span>
+                            )}
+                            {type.track_inventory && (
+                              <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded">Inventory</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Settings size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p>No item types available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Preview Footer */}
+            <div className="border-t p-4 bg-gray-50 rounded-b-lg">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-600">
+                  Preview generated at {new Date().toLocaleTimeString()}
+                </p>
+                <button
+                  onClick={closePreview}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition"
+                >
+                  Close Preview
+                </button>
               </div>
             </div>
           </div>

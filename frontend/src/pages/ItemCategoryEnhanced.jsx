@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, ChevronRight, ChevronDown, Trash2, FolderTree, FolderOpen, Folder } from 'lucide-react'
+import { Plus, ChevronRight, ChevronDown, Trash2, FolderTree, FolderOpen, Folder, Package, Settings, X, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ItemCategoryEnhanced() {
@@ -9,6 +9,12 @@ export default function ItemCategoryEnhanced() {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [expandedNodes, setExpandedNodes] = useState(new Set())
   const [editMode, setEditMode] = useState(false) // false = create, true = edit
+  const [activeTab, setActiveTab] = useState('all')
+  
+  // Preview state
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewData, setPreviewData] = useState(null)
+  const [previewType, setPreviewType] = useState('') // 'all', 'level1', 'level2', 'level3'
   
   // Enum options
   const [inventoryClasses, setInventoryClasses] = useState([])
@@ -175,6 +181,34 @@ export default function ItemCategoryEnhanced() {
     resetForm()
     setEditMode(false)
     setSelectedCategory(null)
+  }
+
+  // Preview functionality
+  const handleTabPreview = (tabKey) => {
+    const filteredData = categories.filter(cat => {
+      if (tabKey === 'all') return true
+      if (tabKey === 'level1') return cat.level === 1
+      if (tabKey === 'level2') return cat.level === 2
+      if (tabKey === 'level3') return cat.level === 3
+      return true
+    })
+
+    const titles = {
+      'all': 'All Categories Preview',
+      'level1': 'Level 1 - Inventory Class Preview',
+      'level2': 'Level 2 - Material Type Preview',
+      'level3': 'Level 3 - Sub-Category Preview'
+    }
+
+    setPreviewType(tabKey)
+    setPreviewData(filteredData)
+    setShowPreview(true)
+  }
+
+  const closePreview = () => {
+    setShowPreview(false)
+    setPreviewData(null)
+    setPreviewType('')
   }toggleNode = (categoryId) => {
     const newExpanded = new Set(expandedNodes)
     if (newExpanded.has(categoryId)) {
@@ -403,12 +437,16 @@ export default function ItemCategoryEnhanced() {
             ].map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition ${
+                onClick={() => {
+                  setActiveTab(tab.key)
+                  handleTabPreview(tab.key)
+                }}
+                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition cursor-pointer hover:bg-green-50 ${
                   activeTab === tab.key
                     ? 'border-green-600 text-green-600 font-medium'
                     : 'border-transparent text-gray-600 hover:text-green-600'
                 }`}
+                title={`Click to preview ${tab.label.toLowerCase()}`}
               >
                 <tab.icon size={18} />
                 {tab.label}
@@ -951,6 +989,127 @@ function CategoryView({ category }) {
           <InfoField label="Handling Instructions" value={category.handling_instructions || '-'} />
         </div>
       </div>
+
+      {/* Tab Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-green-600 to-green-800 text-white rounded-t-lg">
+              <div className="flex items-center gap-3">
+                {previewType === 'all' && <Package size={24} />}
+                {previewType === 'level1' && <Package size={24} />}
+                {previewType === 'level2' && <Settings size={24} />}
+                {previewType === 'level3' && <ChevronRight size={24} />}
+                <h3 className="text-xl font-bold">
+                  {previewType === 'all' && 'All Categories Preview'}
+                  {previewType === 'level1' && 'Level 1 - Inventory Class Preview'}
+                  {previewType === 'level2' && 'Level 2 - Material Type Preview'}
+                  {previewType === 'level3' && 'Level 3 - Sub-Category Preview'}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-white/20 rounded-lg transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 p-6 overflow-auto">
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <h4 className="font-semibold text-green-800 mb-2">
+                    {previewType === 'all' && 'Complete Category Overview'}
+                    {previewType === 'level1' && 'Level 1 Categories - Inventory Classes'}
+                    {previewType === 'level2' && 'Level 2 Categories - Material Types'}
+                    {previewType === 'level3' && 'Level 3 Categories - Sub-Categories'}
+                  </h4>
+                  <p className="text-green-700 text-sm">
+                    Total Items: {previewData?.length || 0} | 
+                    Enhanced category management for manufacturing
+                  </p>
+                </div>
+                
+                {previewData && previewData.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {previewData.slice(0, 12).map((item, index) => (
+                      <div key={index} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            {previewType === 'level1' && <Package size={16} className="text-green-600 mt-1" />}
+                            {previewType === 'level2' && <Settings size={16} className="text-blue-600 mt-1" />}
+                            {previewType === 'level3' && <ChevronRight size={16} className="text-purple-600 mt-1" />}
+                            {previewType === 'all' && <Eye size={16} className="text-gray-600 mt-1" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-medium text-gray-900 truncate">{item.category_name}</h5>
+                            <p className="text-sm text-gray-600 font-mono">{item.category_code}</p>
+                            <p className="text-xs text-gray-500">Level {item.level}</p>
+                            
+                            <div className="mt-2 space-y-1">
+                              {item.inventory_class && (
+                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-2">
+                                  {item.inventory_class.replace('_', ' ')}
+                                </span>
+                              )}
+                              {item.default_uom && (
+                                <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded mr-2">
+                                  {item.default_uom.toUpperCase()}
+                                </span>
+                              )}
+                              {item.requires_batch_tracking && (
+                                <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded mr-2">
+                                  Batch Tracking
+                                </span>
+                              )}
+                              {item.quality_check_required && (
+                                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">
+                                  Quality Check
+                                </span>
+                              )}
+                            </div>
+                            
+                            {item.description && (
+                              <p className="text-xs text-gray-400 mt-2 line-clamp-2">{item.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {previewData.length > 12 && (
+                      <div className="col-span-full text-center py-4 text-gray-500">
+                        ... and {previewData.length - 12} more categories
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package size={48} className="mx-auto mb-4 text-gray-300" />
+                    <p>No categories available for this level</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Preview Footer */}
+            <div className="border-t p-4 bg-gray-50 rounded-b-lg">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-600">
+                  Preview generated at {new Date().toLocaleTimeString()}
+                </p>
+                <button
+                  onClick={closePreview}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition"
+                >
+                  Close Preview
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

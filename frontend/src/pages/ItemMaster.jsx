@@ -22,6 +22,11 @@ export default function ItemMaster() {
   const [selectedItem, setSelectedItem] = useState(null)
   const [binItems, setBinItems] = useState([])
 
+  // Preview state
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewData, setPreviewData] = useState(null)
+  const [previewType, setPreviewType] = useState('') // 'items', 'categories', 'filters'
+
   // Fetch categories on mount
   useEffect(() => {
     fetchCategories()
@@ -128,6 +133,47 @@ export default function ItemMaster() {
     }
   }
 
+  // Preview functionality
+  const handleSectionPreview = (type) => {
+    let data = null
+    let title = ''
+
+    switch (type) {
+      case 'items':
+        data = filteredItems
+        title = 'Items Overview Preview'
+        break
+      case 'categories':
+        data = categories
+        title = 'Categories Preview'
+        break
+      case 'filters':
+        data = {
+          totalItems: items.length,
+          filteredItems: filteredItems.length,
+          selectedCategory,
+          selectedSubCategory,
+          searchTerm,
+          categories: categories.length,
+          subCategories: subCategories.length
+        }
+        title = 'Filters & Statistics Preview'
+        break
+      default:
+        return
+    }
+
+    setPreviewType(type)
+    setPreviewData(data)
+    setShowPreview(true)
+  }
+
+  const closePreview = () => {
+    setShowPreview(false)
+    setPreviewData(null)
+    setPreviewType('')
+  }
+
   const handleCategoryChange = (e) => {
     setSelectedCategory(e.target.value)
     setSelectedSubCategory('')
@@ -167,15 +213,27 @@ export default function ItemMaster() {
     <div className="flex-1 overflow-auto">
       <div className="bg-white">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg">
+        <div 
+          className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg cursor-pointer hover:from-blue-700 hover:to-blue-900 transition-all"
+          onClick={() => handleSectionPreview('items')}
+          title="Click to preview all items"
+        >
           <h1 className="text-3xl font-bold">Item Master</h1>
-          <p className="text-blue-100 mt-1">Manage items, categories, and inventory</p>
+          <p className="text-blue-100 mt-1">Manage items, categories, and inventory • Click to preview</p>
         </div>
 
         {/* Main Content */}
         <div className="p-6">
           {/* Filters Section */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div 
+            className="bg-white rounded-lg shadow-md p-6 mb-6 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => handleSectionPreview('filters')}
+            title="Click to preview filter statistics"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Filter size={20} className="text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Filters & Search • Click to preview</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Search */}
               <div className="relative">
@@ -191,6 +249,13 @@ export default function ItemMaster() {
 
               {/* Category Filter */}
               <div>
+                <div 
+                  className="flex items-center gap-2 mb-2 cursor-pointer hover:text-blue-600"
+                  onClick={() => handleSectionPreview('categories')}
+                  title="Click to preview all categories"
+                >
+                  <span className="text-sm font-medium text-gray-700">Categories • Click to preview</span>
+                </div>
                 <select
                   value={selectedCategory}
                   onChange={handleCategoryChange}
@@ -588,6 +653,202 @@ export default function ItemMaster() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-t-lg">
+              <div className="flex items-center gap-3">
+                {previewType === 'items' && <Eye size={24} />}
+                {previewType === 'categories' && <Filter size={24} />}
+                {previewType === 'filters' && <Search size={24} />}
+                <h3 className="text-xl font-bold">
+                  {previewType === 'items' && 'Items Overview Preview'}
+                  {previewType === 'categories' && 'Categories Preview'}
+                  {previewType === 'filters' && 'Filters & Statistics Preview'}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-white/20 rounded-lg transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 p-6 overflow-auto">
+              {previewType === 'items' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-blue-800 mb-2">Items Overview</h4>
+                    <p className="text-blue-700 text-sm">
+                      Total Items: {previewData?.length || 0} | 
+                      Complete inventory overview
+                    </p>
+                  </div>
+                  {previewData && previewData.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {previewData.slice(0, 12).map((item, index) => (
+                        <div key={index} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0">
+                              <Eye size={16} className="text-blue-600 mt-1" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-medium text-gray-900 truncate">{item.item_name}</h5>
+                              <p className="text-sm text-gray-600 font-mono">{item.item_code}</p>
+                              <p className="text-xs text-gray-500">{item.category_name}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-sm font-semibold text-green-600">₹{item.selling_price?.toFixed(2)}</span>
+                                {item.size_name && (
+                                  <span className="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded">{item.size_name}</span>
+                                )}
+                                {item.color_name && (
+                                  <span className="bg-pink-100 text-pink-700 text-xs px-2 py-1 rounded">{item.color_name}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {previewData.length > 12 && (
+                        <div className="col-span-full text-center py-4 text-gray-500">
+                          ... and {previewData.length - 12} more items
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Eye size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p>No items available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {previewType === 'categories' && (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-green-800 mb-2">Categories Overview</h4>
+                    <p className="text-green-700 text-sm">
+                      Total Categories: {previewData?.length || 0} | 
+                      All available item categories
+                    </p>
+                  </div>
+                  {previewData && previewData.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {previewData.map((category, index) => (
+                        <div key={index} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition">
+                          <div className="text-center">
+                            <Filter size={24} className="mx-auto text-green-600 mb-2" />
+                            <h5 className="font-medium text-gray-900 mb-1">{category.name}</h5>
+                            <p className="text-sm text-gray-600 font-mono">{category.code}</p>
+                            <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mt-2">
+                              Active
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Filter size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p>No categories available</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {previewType === 'filters' && (
+                <div className="space-y-4">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-purple-800 mb-2">Filter Statistics & Overview</h4>
+                    <p className="text-purple-700 text-sm">
+                      Current filtering status and search results
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="bg-white border rounded-lg p-4 shadow-sm">
+                      <div className="text-center">
+                        <Search size={32} className="mx-auto text-purple-600 mb-2" />
+                        <h5 className="font-semibold text-gray-900 mb-1">Search Results</h5>
+                        <p className="text-2xl font-bold text-purple-600">{previewData?.filteredItems || 0}</p>
+                        <p className="text-sm text-gray-500">out of {previewData?.totalItems || 0} total</p>
+                        {previewData?.searchTerm && (
+                          <p className="text-xs text-gray-400 mt-1">Search: "{previewData.searchTerm}"</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white border rounded-lg p-4 shadow-sm">
+                      <div className="text-center">
+                        <Filter size={32} className="mx-auto text-blue-600 mb-2" />
+                        <h5 className="font-semibold text-gray-900 mb-1">Category Filter</h5>
+                        <p className="text-lg font-medium text-blue-600">
+                          {previewData?.selectedCategory || 'All Categories'}
+                        </p>
+                        <p className="text-sm text-gray-500">{previewData?.categories || 0} total categories</p>
+                        {previewData?.selectedSubCategory && (
+                          <p className="text-xs text-gray-400 mt-1">Sub: {previewData.selectedSubCategory}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white border rounded-lg p-4 shadow-sm">
+                      <div className="text-center">
+                        <Plus size={32} className="mx-auto text-green-600 mb-2" />
+                        <h5 className="font-semibold text-gray-900 mb-1">Sub-Categories</h5>
+                        <p className="text-2xl font-bold text-green-600">{previewData?.subCategories || 0}</p>
+                        <p className="text-sm text-gray-500">available options</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 border rounded-lg p-4">
+                    <h5 className="font-medium text-gray-900 mb-3">Current Filter Status</h5>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Search Term:</span>
+                        <span className="font-medium">{previewData?.searchTerm || 'None'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Selected Category:</span>
+                        <span className="font-medium">{previewData?.selectedCategory || 'All'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Selected Sub-Category:</span>
+                        <span className="font-medium">{previewData?.selectedSubCategory || 'All'}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="text-gray-600">Filtered Results:</span>
+                        <span className="font-bold text-purple-600">{previewData?.filteredItems || 0} items</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Preview Footer */}
+            <div className="border-t p-4 bg-gray-50 rounded-b-lg">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-600">
+                  Preview generated at {new Date().toLocaleTimeString()}
+                </p>
+                <button
+                  onClick={closePreview}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition"
+                >
+                  Close Preview
+                </button>
+              </div>
             </div>
           </div>
         </div>
