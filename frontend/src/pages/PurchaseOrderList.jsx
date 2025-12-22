@@ -54,10 +54,17 @@ const PurchaseOrderList = () => {
       }
     } catch (error) {
       console.error('Error fetching POs:', error)
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to load Purchase Orders'
-      setError(errorMessage)
-      toast.error(errorMessage)
       setPOList([])
+      
+      // More specific error messages for network issues
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+        const errorMessage = 'Backend server not available. Please start the server on port 8000.'
+        setError(errorMessage)
+      } else {
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load Purchase Orders'
+        setError(errorMessage)
+        toast.error(errorMessage)
+      }
     } finally {
       setLoading(false)
     }

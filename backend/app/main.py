@@ -27,6 +27,7 @@ from .routes import (
     uoms,
     variant_groups,
     specifications,
+    brands,
 )
 from .models.item_type import ItemType
 
@@ -57,10 +58,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS - Allow both localhost and Codespaces URLs
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:3000",
+        "https://ominous-enigma-jjv4wpjw767w3xvp-5173.app.github.dev",
+        "https://ominous-enigma-jjv4wpjw767w3xvp-8000.app.github.dev",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,6 +99,7 @@ app.include_router(
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(item_types.router, prefix="/api/item-types", tags=["Item Types"])
 app.include_router(category_hierarchy.router, prefix="/api/hierarchy", tags=["Category Hierarchy"])
+app.include_router(brands.router, prefix="/api/brands", tags=["Brand Master"])
 
 # Variant Master routes
 app.include_router(colours.router, prefix="/api", tags=["Colour Master"])

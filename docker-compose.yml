@@ -38,7 +38,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      VITE_API_URL: http://localhost:8000/api
+      VITE_API_URL: https://ominous-enigma-jjv4wpjw767w3xvp-8000.app.github.dev/api
     networks:
       - inventory-net
     command: npm run dev -- --host

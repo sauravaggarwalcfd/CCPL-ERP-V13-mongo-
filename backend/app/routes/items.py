@@ -23,9 +23,12 @@ async def create_item(
     current_user = Depends(get_current_user)
 ):
     """Create a new Item Master entry"""
-    
-    # Check if item already exists
-    existing = await ItemMaster.find_one(ItemMaster.item_code == data.item_code)
+
+    # Check if non-deleted item already exists
+    existing = await ItemMaster.find_one(
+        ItemMaster.item_code == data.item_code,
+        ItemMaster.deleted_at == None
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -257,16 +260,19 @@ async def get_next_sku(prefix: str):
     try:
         # Normalize prefix to 2 uppercase letters
         prefix = prefix[:2].upper()
-        
-        # Find all items with this prefix
+
+        # Find all NON-DELETED items with this prefix
         items = await ItemMaster.find(
-            {"item_code": {"$regex": f"^{prefix}\\d{{5}}$"}}
+            {
+                "item_code": {"$regex": f"^{prefix}\\d{{5}}$"},
+                "deleted_at": None  # Exclude deleted items
+            }
         ).to_list()
-        
+
         if not items:
             # No items with this prefix yet, start from 1
             return {"next_sku": f"{prefix}00001", "sequence": 1}
-        
+
         # Extract numeric parts and find the maximum
         max_sequence = 0
         for item in items:
@@ -276,11 +282,11 @@ async def get_next_sku(prefix: str):
                     max_sequence = numeric_part
             except (ValueError, IndexError):
                 continue
-        
+
         # Generate next SKU
         next_sequence = max_sequence + 1
         next_sku = f"{prefix}{str(next_sequence).zfill(5)}"
-        
+
         return {"next_sku": next_sku, "sequence": next_sequence}
     except Exception as e:
         logger.error(f"Error generating next SKU: {e}")

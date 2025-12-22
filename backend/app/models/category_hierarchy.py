@@ -52,6 +52,8 @@ class ItemCategory(Document):
 
     status: CategoryStatus = CategoryStatus.ACTIVE
     is_active: bool = True
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
 
     child_count: int = 0
 
@@ -93,6 +95,8 @@ class ItemSubCategory(Document):
     
     status: CategoryStatus = CategoryStatus.ACTIVE
     is_active: bool = True
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
     child_count: int = 0
     
     created_by: Optional[str] = None
@@ -135,13 +139,15 @@ class ItemDivision(Document):
     
     status: CategoryStatus = CategoryStatus.ACTIVE
     is_active: bool = True
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
     child_count: int = 0
-    
+
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     class Settings:
         name = "item_divisions"
 
@@ -182,6 +188,8 @@ class ItemClass(Document):
     
     status: CategoryStatus = CategoryStatus.ACTIVE
     is_active: bool = True
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
     child_count: int = 0
     
     created_by: Optional[str] = None
@@ -235,6 +243,8 @@ class ItemSubClass(Document):
     
     status: CategoryStatus = CategoryStatus.ACTIVE
     is_active: bool = True
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
     item_count: int = 0
     
     created_by: Optional[str] = None

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit, Trash2 } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { suppliers } from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -8,6 +8,7 @@ export default function SuppliersList() {
   const navigate = useNavigate()
   const [supplierList, setSupplierList] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const limit = 10
@@ -19,15 +20,35 @@ export default function SuppliersList() {
   const fetchSuppliers = async () => {
     try {
       setLoading(true)
+      setError('') // Clear previous errors
       const response = await suppliers.list({
         skip: page * limit,
         limit,
         search: search || undefined,
       })
-      setSupplierList(response.data.data)
+      
+      // Handle response format variations
+      if (response && response.data) {
+        const supplierData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.data || [])
+        setSupplierList(supplierData)
+      } else {
+        setSupplierList([])
+      }
     } catch (error) {
-      toast.error('Failed to fetch suppliers')
-      console.error(error)
+      console.error('Error fetching suppliers:', error)
+      setSupplierList([])
+      
+      // More specific error messages for network issues
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+        const errorMessage = 'Backend server not available. Please start the server first.'
+        setError(errorMessage)
+      } else {
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch suppliers'
+        setError(errorMessage)
+        toast.error(errorMessage)
+      }
     } finally {
       setLoading(false)
     }
@@ -41,7 +62,15 @@ export default function SuppliersList() {
       toast.success('Supplier deleted')
       fetchSuppliers()
     } catch (error) {
-      toast.error('Failed to delete supplier')
+      console.error('Error deleting supplier:', error)
+      
+      // More specific error messages
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+        toast.error('Backend server not available. Cannot delete supplier.')
+      } else {
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to delete supplier'
+        toast.error(errorMessage)
+      }
     }
   }
 
@@ -77,6 +106,18 @@ export default function SuppliersList() {
 
         {loading ? (
           <div className="text-center py-8 text-gray-500">Loading...</div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <AlertCircle size={48} className="mx-auto text-red-400 mb-2" />
+            <p className="text-red-600 font-medium mb-2">Error Loading Suppliers</p>
+            <p className="text-gray-600 text-sm mb-4">{error}</p>
+            <button
+              onClick={fetchSuppliers}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+            >
+              Try Again
+            </button>
+          </div>
         ) : supplierList.length === 0 ? (
           <div className="text-center py-8 text-gray-500">No suppliers found</div>
         ) : (

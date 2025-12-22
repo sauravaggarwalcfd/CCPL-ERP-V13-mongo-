@@ -80,6 +80,10 @@ export default function ItemCategoryMaster() {
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
   
+  // Preview panel state
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false)
+  const [previewPanelData, setPreviewPanelData] = useState(null)
+  
   // Item Type Panel state
   const [showItemTypePanel, setShowItemTypePanel] = useState(false)
   const [itemTypeFormData, setItemTypeFormData] = useState(DEFAULT_ITEM_TYPE_FORM)
@@ -975,6 +979,20 @@ export default function ItemCategoryMaster() {
     setShowPreview(true)
   }
 
+  // Individual category preview
+  const handleCategoryPreview = (category) => {
+    setPreviewPanelData(category)
+    setShowPreviewPanel(true)
+    // Close other panels
+    setShowPanel(false)
+    setShowItemTypePanel(false)
+  }
+
+  const closePreviewPanel = () => {
+    setShowPreviewPanel(false)
+    setPreviewPanelData(null)
+  }
+
   const closePreview = () => {
     setShowPreview(false)
     setPreviewData(null)
@@ -1047,7 +1065,11 @@ export default function ItemCategoryMaster() {
           </div>
           
           {/* Name and Code */}
-          <div className="flex-1 min-w-0">
+          <div 
+            className="flex-1 min-w-0 cursor-pointer hover:bg-blue-50 rounded p-1 transition-colors"
+            onClick={() => handleCategoryPreview(node)}
+            title="Click to preview category details"
+          >
             <div className="flex items-center gap-2">
               <span className="font-medium text-gray-900">{node.name}</span>
               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-600">
@@ -1178,7 +1200,7 @@ export default function ItemCategoryMaster() {
         <div
           className="p-6 overflow-auto transition-all duration-300"
           style={{
-            width: (showPanel || showItemTypePanel) ? `${leftPanelWidth}%` : '100%'
+            width: (showPanel || showItemTypePanel || showPreviewPanel) ? `${leftPanelWidth}%` : '100%'
           }}
         >
         {/* Tree View */}
@@ -1442,7 +1464,7 @@ export default function ItemCategoryMaster() {
         {/* End Left Panel */}
 
         {/* Resize Handle */}
-        {(showPanel || showItemTypePanel) && (
+        {(showPanel || showItemTypePanel || showPreviewPanel) && (
           <div
             className={`w-1 bg-gray-300 hover:bg-emerald-500 cursor-col-resize flex-shrink-0 transition-colors ${
               isResizing ? 'bg-emerald-500' : ''
@@ -2215,6 +2237,177 @@ export default function ItemCategoryMaster() {
             </form>
           </div>
         )}
+
+        {/* Preview Panel */}
+        {showPreviewPanel && (
+          <div
+            className="border-l bg-white overflow-auto"
+            style={{ width: `${100 - leftPanelWidth}%` }}
+          >
+            {/* Panel Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Package size={24} />
+                  <div>
+                    <h2 className="text-xl font-bold">{previewPanelData?.name || 'Category'} Details</h2>
+                    <p className="text-emerald-100 text-sm">{previewPanelData?.code} • Level {previewPanelData?.level}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      closePreviewPanel()
+                      openEditModal(previewPanelData)
+                    }}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg flex items-center gap-2 transition"
+                  >
+                    <Edit2 size={16} />
+                    Edit
+                  </button>
+                  <button
+                    onClick={closePreviewPanel}
+                    className="p-2 hover:bg-white/20 rounded-lg transition"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Panel Content */}
+            <div className="p-6 space-y-6">
+              {previewPanelData && (
+                <>
+                  {/* Category Header */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-16 h-16 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: previewPanelData.color_code || LEVELS[previewPanelData.level - 1]?.color }}
+                      >
+                        <Package size={32} className="text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-emerald-800">{previewPanelData.name}</h3>
+                        <p className="text-emerald-600 font-mono text-lg">{previewPanelData.code}</p>
+                        <p className="text-emerald-600 text-sm">{LEVELS[previewPanelData.level - 1]?.name}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Basic Information */}
+                  <div className="bg-white border rounded-lg p-4">
+                    <h5 className="font-semibold text-gray-800 border-b pb-2 mb-4">Basic Information</h5>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Code:</label>
+                        <p className="font-mono bg-gray-100 px-3 py-1 rounded text-sm mt-1">{previewPanelData.code}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Name:</label>
+                        <p className="font-medium mt-1">{previewPanelData.name}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Level:</label>
+                        <p className="text-gray-700 mt-1">{previewPanelData.level} - {LEVELS[previewPanelData.level - 1]?.name}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Status:</label>
+                        <span className={`inline-block px-3 py-1 rounded text-sm mt-1 ${
+                          previewPanelData.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {previewPanelData.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      {previewPanelData.description && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Description:</label>
+                          <p className="text-gray-700 text-sm mt-1 bg-gray-50 p-3 rounded">{previewPanelData.description}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Hierarchy Information */}
+                  <div className="bg-white border rounded-lg p-4">
+                    <h5 className="font-semibold text-gray-800 border-b pb-2 mb-4">Hierarchy Information</h5>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Full Path:</label>
+                        <p className="text-gray-700 text-sm mt-1 font-mono bg-gray-50 p-2 rounded">{previewPanelData.path_name || previewPanelData.name}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Children Count:</label>
+                          <p className="text-lg font-bold text-blue-600 mt-1">{previewPanelData.child_count || 0}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Items Count:</label>
+                          <p className="text-lg font-bold text-green-600 mt-1">{previewPanelData.item_count || 0}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Configuration Settings */}
+                  <div className="bg-white border rounded-lg p-4">
+                    <h5 className="font-semibold text-gray-800 border-b pb-2 mb-4">Configuration Settings</h5>
+                    <div className="space-y-3">
+                      {previewPanelData.item_type && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Item Type:</label>
+                          <p className="text-gray-700 mt-1">{previewPanelData.item_type}</p>
+                        </div>
+                      )}
+                      {previewPanelData.default_hsn_code && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Default HSN Code:</label>
+                          <p className="font-mono bg-gray-100 px-2 py-1 rounded text-sm mt-1">{previewPanelData.default_hsn_code}</p>
+                        </div>
+                      )}
+                      {previewPanelData.default_gst_rate && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Default GST Rate:</label>
+                          <p className="text-gray-700 mt-1">{previewPanelData.default_gst_rate}%</p>
+                        </div>
+                      )}
+                      {previewPanelData.sku_prefix && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">SKU Prefix:</label>
+                          <p className="font-mono bg-amber-100 text-amber-800 px-2 py-1 rounded text-sm mt-1">{previewPanelData.sku_prefix}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Features & Capabilities */}
+                  {(previewPanelData.has_color || previewPanelData.has_size || previewPanelData.has_fabric || previewPanelData.has_brand) && (
+                    <div className="bg-white border rounded-lg p-4">
+                      <h5 className="font-semibold text-gray-800 border-b pb-2 mb-4">Features & Capabilities</h5>
+                      <div className="flex flex-wrap gap-2">
+                        {previewPanelData.has_color && (
+                          <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">Color Variants</span>
+                        )}
+                        {previewPanelData.has_size && (
+                          <span className="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full">Size Variants</span>
+                        )}
+                        {previewPanelData.has_fabric && (
+                          <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">Fabric Options</span>
+                        )}
+                        {previewPanelData.has_brand && (
+                          <span className="bg-orange-100 text-orange-800 text-sm px-3 py-1 rounded-full">Brand Support</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       {/* End Main Content Flex Container */}
 
@@ -2338,22 +2531,181 @@ export default function ItemCategoryMaster() {
                 {previewType === 'tree' && <FolderTree size={24} />}
                 {previewType === 'list' && <List size={24} />}
                 {previewType === 'types' && <Settings size={24} />}
+                {previewType === 'category' && <Package size={24} />}
                 <h3 className="text-xl font-bold">
                   {previewType === 'tree' && 'Category Tree Structure Preview'}
                   {previewType === 'list' && 'Category List Preview'}
                   {previewType === 'types' && 'Item Types Preview'}
+                  {previewType === 'category' && `${previewData?.name || 'Category'} Details`}
                 </h3>
               </div>
-              <button
-                onClick={closePreview}
-                className="p-2 hover:bg-white/20 rounded-lg transition"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                {previewType === 'category' && (
+                  <button
+                    onClick={() => {
+                      closePreview()
+                      openEditModal(previewData)
+                    }}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg flex items-center gap-2 transition"
+                  >
+                    <Edit2 size={16} />
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={closePreview}
+                  className="p-2 hover:bg-white/20 rounded-lg transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             {/* Preview Content */}
             <div className="flex-1 p-6 overflow-auto">
+              {previewType === 'category' && (
+                <div className="space-y-6">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-6">
+                    <h4 className="font-semibold text-emerald-800 mb-2">Category Details</h4>
+                    <p className="text-emerald-700 text-sm">
+                      Complete information for the selected category
+                    </p>
+                  </div>
+                  
+                  {previewData && (
+                    <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                      {/* Category Header */}
+                      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-6">
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className="w-16 h-16 rounded-lg flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                          >
+                            <Package size={32} />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-bold">{previewData.name}</h3>
+                            <p className="text-emerald-100 font-mono text-lg">{previewData.code}</p>
+                            <p className="text-emerald-100 text-sm">Level {previewData.level} • {LEVELS[previewData.level - 1]?.name}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Category Details */}
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {/* Basic Information */}
+                          <div className="space-y-3">
+                            <h5 className="font-semibold text-gray-800 border-b pb-2">Basic Information</h5>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Code:</label>
+                              <p className="font-mono bg-gray-100 px-3 py-1 rounded text-sm">{previewData.code}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Name:</label>
+                              <p className="font-medium">{previewData.name}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Level:</label>
+                              <p className="text-gray-700">{previewData.level} - {LEVELS[previewData.level - 1]?.name}</p>
+                            </div>
+                            {previewData.description && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Description:</label>
+                                <p className="text-gray-700 text-sm">{previewData.description}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Hierarchy Information */}
+                          <div className="space-y-3">
+                            <h5 className="font-semibold text-gray-800 border-b pb-2">Hierarchy Path</h5>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Full Path:</label>
+                              <p className="text-gray-700 text-sm">{previewData.path_name || previewData.name}</p>
+                            </div>
+                            {previewData.parent_path && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Parent Path:</label>
+                                <p className="text-gray-600 text-sm font-mono">{previewData.parent_path}</p>
+                              </div>
+                            )}
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Children Count:</label>
+                              <p className="text-gray-700">{previewData.child_count || 0}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Items Count:</label>
+                              <p className="text-gray-700">{previewData.item_count || 0}</p>
+                            </div>
+                          </div>
+
+                          {/* Settings & Configuration */}
+                          <div className="space-y-3">
+                            <h5 className="font-semibold text-gray-800 border-b pb-2">Settings</h5>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Status:</label>
+                              <span className={`inline-block px-3 py-1 rounded text-sm ml-2 ${
+                                previewData.is_active 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {previewData.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                            {previewData.item_type && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Item Type:</label>
+                                <p className="text-gray-700">{previewData.item_type}</p>
+                              </div>
+                            )}
+                            {previewData.default_hsn_code && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Default HSN Code:</label>
+                                <p className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">{previewData.default_hsn_code}</p>
+                              </div>
+                            )}
+                            {previewData.default_gst_rate && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Default GST Rate:</label>
+                                <p className="text-gray-700">{previewData.default_gst_rate}%</p>
+                              </div>
+                            )}
+                            {previewData.sku_prefix && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">SKU Prefix:</label>
+                                <p className="font-mono bg-amber-100 text-amber-800 px-2 py-1 rounded text-sm">{previewData.sku_prefix}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Features & Capabilities */}
+                        {(previewData.has_color || previewData.has_size || previewData.has_fabric || previewData.has_brand) && (
+                          <div className="mt-6 pt-6 border-t">
+                            <h5 className="font-semibold text-gray-800 mb-3">Features & Capabilities</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {previewData.has_color && (
+                                <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">Color Variants</span>
+                              )}
+                              {previewData.has_size && (
+                                <span className="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full">Size Variants</span>
+                              )}
+                              {previewData.has_fabric && (
+                                <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">Fabric Options</span>
+                              )}
+                              {previewData.has_brand && (
+                                <span className="bg-orange-100 text-orange-800 text-sm px-3 py-1 rounded-full">Brand Support</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {previewType === 'tree' && (
                 <div className="space-y-2">
                   <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">

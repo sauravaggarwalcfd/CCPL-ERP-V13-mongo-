@@ -16,6 +16,8 @@ import SpecificationsManager from './pages/SpecificationsManager'
 import PurchaseOrderList from './pages/PurchaseOrderList'
 import PurchaseOrderForm from './pages/PurchaseOrderForm'
 import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
+import BrandMaster from './pages/Masters/BrandMaster'
+import SupplierMaster from './pages/Masters/SupplierMaster'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -77,6 +79,16 @@ function App() {
             <Route path="/variant-master" element={
               <ProtectedRoute>
                 <VariantMaster />
+              </ProtectedRoute>
+            } />
+            <Route path="/masters/brands" element={
+              <ProtectedRoute>
+                <BrandMaster />
+              </ProtectedRoute>
+            } />
+            <Route path="/masters/suppliers" element={
+              <ProtectedRoute>
+                <SupplierMaster />
               </ProtectedRoute>
             } />
             <Route path="/specifications" element={

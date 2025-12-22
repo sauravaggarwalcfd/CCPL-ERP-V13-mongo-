@@ -494,6 +494,17 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
     return parts.join(' > ')
   }, [selectedCategory, selectedSubCategory, selectedDivision, selectedClass, selectedSubClass])
 
+  // Get the most specific category code for specifications
+  const effectiveCategoryCode = useMemo(() => {
+    // Use the deepest level category that's been selected
+    if (selectedSubClass) return selectedSubClass.code
+    if (selectedClass) return selectedClass.code
+    if (selectedDivision) return selectedDivision.code
+    if (selectedSubCategory) return selectedSubCategory.code
+    if (selectedCategory) return selectedCategory.code
+    return null
+  }, [selectedCategory, selectedSubCategory, selectedDivision, selectedClass, selectedSubClass])
+
   // Handle form submission
   const handleSubmit = async (isDraft = false) => {
     if (!selectedCategory) {
@@ -554,11 +565,11 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
                                 specifications.vendor_code ||
                                 Object.keys(specifications.custom_field_values || {}).length > 0;
 
-      if (hasSpecifications && selectedCategory) {
+      if (hasSpecifications && effectiveCategoryCode) {
         try {
           await itemSpecificationApi.createOrUpdate(
             formData.sku,
-            selectedCategory.code,
+            effectiveCategoryCode,
             specifications
           );
         } catch (specError) {
@@ -1044,7 +1055,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess }) {
               </h3>
 
               <DynamicSpecificationForm
-                categoryCode={selectedCategory?.code}
+                categoryCode={effectiveCategoryCode}
                 onSpecificationsChange={setSpecifications}
                 showTitle={false}
               />

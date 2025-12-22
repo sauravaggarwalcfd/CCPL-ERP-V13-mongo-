@@ -21,6 +21,8 @@ from .models.size_master import SizeMaster
 from .models.uom_master import UOMMaster
 from .models.variant_groups import VariantGroup
 from .models.specifications import CategorySpecifications, ItemSpecifications
+from .models.brand_master import BrandMaster
+from .models.supplier_master import SupplierMaster
 
 
 class Database:
@@ -67,6 +69,8 @@ async def connect_to_mongo():
             VariantGroup,
             CategorySpecifications,  # Specifications
             ItemSpecifications,
+            BrandMaster,            # Masters
+            SupplierMaster,
         ],
     )
 

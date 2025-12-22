@@ -168,6 +168,27 @@ export default function ItemMaster() {
     setShowPreview(true)
   }
 
+  // Item preview functionality
+  const handleItemPreview = (item) => {
+    const data = {
+      item_code: item.item_code,
+      item_name: item.item_name,
+      category: item.category_name,
+      sub_category: item.sub_category_name,
+      size: item.size_name,
+      color: item.color_name,
+      selling_price: item.selling_price,
+      mrp: item.mrp,
+      material: item.material,
+      weight: item.weight,
+      description: item.description || 'No description available'
+    }
+    
+    setPreviewType('item_detail')
+    setPreviewData(data)
+    setShowPreview(true)
+  }
+
   const closePreview = () => {
     setShowPreview(false)
     setPreviewData(null)
@@ -213,30 +234,22 @@ export default function ItemMaster() {
     <div className="flex-1 overflow-auto">
       <div className="bg-white">
         {/* Header */}
-        <div 
-          className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg cursor-pointer hover:from-blue-700 hover:to-blue-900 transition-all"
-          onClick={() => handleSectionPreview('items')}
-          title="Click to preview all items"
-        >
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg">
           <h1 className="text-3xl font-bold">Item Master</h1>
-          <p className="text-blue-100 mt-1">Manage items, categories, and inventory • Click to preview</p>
+          <p className="text-blue-100 mt-1">Manage items, categories, and inventory</p>
         </div>
 
         {/* Main Content */}
         <div className="p-6">
           {/* Filters Section */}
-          <div 
-            className="bg-white rounded-lg shadow-md p-6 mb-6 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => handleSectionPreview('filters')}
-            title="Click to preview filter statistics"
-          >
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Filter size={20} className="text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-800">Filters & Search • Click to preview</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Filters & Search</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               {/* Search */}
-              <div className="relative">
+              <div className="relative flex-1 min-w-64">
                 <Search className="absolute left-3 top-3 text-gray-400" size={20} />
                 <input
                   type="text"
@@ -248,14 +261,7 @@ export default function ItemMaster() {
               </div>
 
               {/* Category Filter */}
-              <div>
-                <div 
-                  className="flex items-center gap-2 mb-2 cursor-pointer hover:text-blue-600"
-                  onClick={() => handleSectionPreview('categories')}
-                  title="Click to preview all categories"
-                >
-                  <span className="text-sm font-medium text-gray-700">Categories • Click to preview</span>
-                </div>
+              <div className="min-w-48">
                 <select
                   value={selectedCategory}
                   onChange={handleCategoryChange}
@@ -271,7 +277,7 @@ export default function ItemMaster() {
               </div>
 
               {/* Sub-Category Filter */}
-              <div>
+              <div className="min-w-48">
                 <select
                   value={selectedSubCategory}
                   onChange={(e) => setSelectedSubCategory(e.target.value)}
@@ -291,7 +297,7 @@ export default function ItemMaster() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition flex-1"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition whitespace-nowrap"
                 >
                   <Plus size={20} /> Add Item
                 </button>
@@ -331,7 +337,12 @@ export default function ItemMaster() {
                   </thead>
                   <tbody>
                     {filteredItems.map((item, idx) => (
-                      <tr key={idx} className="border-b hover:bg-gray-50 transition">
+                      <tr 
+                        key={idx} 
+                        className="border-b hover:bg-blue-50 transition cursor-pointer"
+                        onClick={() => handleItemPreview(item)}
+                        title="Click to preview item details"
+                      >
                         <td className="px-6 py-4">
                           <span className="font-mono text-sm bg-blue-50 px-3 py-1 rounded text-blue-700">
                             {item.item_code}
@@ -366,21 +377,30 @@ export default function ItemMaster() {
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button 
-                              onClick={() => handleViewItem(item)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewItem(item)
+                              }}
                               className="p-2 hover:bg-blue-100 rounded text-blue-600 transition" 
                               title="View"
                             >
                               <Eye size={16} />
                             </button>
                             <button 
-                              onClick={() => handleEditItem(item)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditItem(item)
+                              }}
                               className="p-2 hover:bg-orange-100 rounded text-orange-600 transition" 
                               title="Edit"
                             >
                               <Edit2 size={16} />
                             </button>
                             <button 
-                              onClick={() => handleDeleteItem(item)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteItem(item)
+                              }}
                               className="p-2 hover:bg-red-100 rounded text-red-600 transition" 
                               title="Delete"
                             >
@@ -832,6 +852,123 @@ export default function ItemMaster() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {previewType === 'item_detail' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-blue-800 mb-2">Item Details Preview</h4>
+                    <p className="text-blue-700 text-sm">
+                      Detailed information for selected item
+                    </p>
+                  </div>
+                  
+                  {previewData && (
+                    <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                      {/* Item Header */}
+                      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-white/20 p-3 rounded-lg">
+                            <Eye size={24} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold">{previewData.item_name}</h3>
+                            <p className="text-blue-100 font-mono text-sm">{previewData.item_code}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Item Details */}
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {/* Basic Information */}
+                          <div className="space-y-3">
+                            <h5 className="font-semibold text-gray-800 border-b pb-2">Basic Information</h5>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Item Code:</label>
+                              <p className="font-mono bg-gray-100 px-3 py-1 rounded text-sm">{previewData.item_code}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Item Name:</label>
+                              <p className="font-medium">{previewData.item_name}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Description:</label>
+                              <p className="text-gray-700 text-sm">{previewData.description}</p>
+                            </div>
+                          </div>
+
+                          {/* Category Information */}
+                          <div className="space-y-3">
+                            <h5 className="font-semibold text-gray-800 border-b pb-2">Category Details</h5>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Category:</label>
+                              <span className="inline-block px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full ml-2">
+                                {previewData.category}
+                              </span>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Sub-Category:</label>
+                              <span className="inline-block px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full ml-2">
+                                {previewData.sub_category}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Attributes & Pricing */}
+                          <div className="space-y-3">
+                            <h5 className="font-semibold text-gray-800 border-b pb-2">Attributes & Pricing</h5>
+                            {previewData.size && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Size:</label>
+                                <span className="inline-block px-3 py-1 bg-orange-100 text-orange-800 text-sm rounded ml-2">
+                                  {previewData.size}
+                                </span>
+                              </div>
+                            )}
+                            {previewData.color && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Color:</label>
+                                <span className="inline-block px-3 py-1 bg-pink-100 text-pink-800 text-sm rounded ml-2">
+                                  {previewData.color}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">Selling Price:</label>
+                              <p className="text-lg font-bold text-green-600">₹{previewData.selling_price?.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">MRP:</label>
+                              <p className="text-gray-700">₹{previewData.mrp?.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Additional Details */}
+                        {(previewData.material || previewData.weight) && (
+                          <div className="mt-6 pt-6 border-t">
+                            <h5 className="font-semibold text-gray-800 mb-3">Additional Details</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {previewData.material && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">Material:</label>
+                                  <p className="text-gray-700">{previewData.material}</p>
+                                </div>
+                              )}
+                              {previewData.weight && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">Weight:</label>
+                                  <p className="text-gray-700">{previewData.weight}g</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

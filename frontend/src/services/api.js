@@ -28,6 +28,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
     
+    // Handle network errors
+    if (!error.response) {
+      // Network error or server not available
+      error.message = 'Backend server not available. Please start the server first.'
+      return Promise.reject(error)
+    }
+    
     // Handle 401 Unauthorized - attempt token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
@@ -82,42 +89,35 @@ api.interceptors.response.use(
 )
 
 // Service methods for API operations
-export const suppliers = {
-  list: (params) => api.get('/suppliers', { params }),
-  create: (data) => api.post('/suppliers', data),
-  get: (id) => api.get(`/suppliers/${id}`),
-  update: (id, data) => api.put(`/suppliers/${id}`, data),
-  delete: (id) => api.delete(`/suppliers/${id}`),
-}
 
 // Purchase Orders - Complete PO Management
 export const purchaseOrders = {
   // List POs with filters
-  list: (params = {}) => api.get('/po', { params }),
+  list: (params = {}) => api.get('/po/', { params }),
 
   // Create new PO
-  create: (data) => api.post('/po', data),
+  create: (data) => api.post('/po/', data),
 
   // Get single PO by PO number
-  get: (poNumber) => api.get(`/po/${poNumber}`),
+  get: (poNumber) => api.get(`/po/${poNumber}/`),
 
   // Update PO (only DRAFT)
-  update: (poNumber, data) => api.put(`/po/${poNumber}`, data),
+  update: (poNumber, data) => api.put(`/po/${poNumber}/`, data),
 
   // Update PO status
-  updateStatus: (poNumber, data) => api.patch(`/po/${poNumber}/status`, data),
+  updateStatus: (poNumber, data) => api.patch(`/po/${poNumber}/status/`, data),
 
   // Approve/Reject PO
-  approve: (poNumber, data) => api.post(`/po/${poNumber}/approve`, data),
+  approve: (poNumber, data) => api.post(`/po/${poNumber}/approve/`, data),
 
   // Delete PO (soft delete, only DRAFT)
-  delete: (poNumber) => api.delete(`/po/${poNumber}`),
+  delete: (poNumber) => api.delete(`/po/${poNumber}/`),
 
   // Get POs by supplier
-  getBySupplier: (supplierCode, params = {}) => api.get(`/po/supplier/${supplierCode}`, { params }),
+  getBySupplier: (supplierCode, params = {}) => api.get(`/po/supplier/${supplierCode}/`, { params }),
 
   // Get POs by status
-  getByStatus: (status, params = {}) => api.get(`/po/status/${status}`, { params }),
+  getByStatus: (status, params = {}) => api.get(`/po/status/${status}/`, { params }),
 }
 
 export const customers = {
@@ -189,25 +189,25 @@ export const itemTypes = {
 
 // Items API
 export const items = {
-  list: (params = {}) => api.get('/items', { params }),
-  search: (searchTerm, limit = 10) => api.get('/items', {
+  list: (params = {}) => api.get('/items/', { params }),
+  search: (searchTerm, limit = 10) => api.get('/items/', {
     params: { search: searchTerm, limit }
   }),
-  get: (id) => api.get(`/items/${id}`),
-  create: (data) => api.post('/items', data),
-  update: (id, data) => api.put(`/items/${id}`, data),
-  delete: (id) => api.delete(`/items/${id}`),
-  checkExists: (itemCode) => api.get(`/items`, {
+  get: (id) => api.get(`/items/${id}/`),
+  create: (data) => api.post('/items/', data),
+  update: (id, data) => api.put(`/items/${id}/`, data),
+  delete: (id) => api.delete(`/items/${id}/`),
+  checkExists: (itemCode) => api.get(`/items/`, {
     params: { search: itemCode, limit: 1 }
   }),
-  getNextSku: (prefix) => api.get(`/items/next-sku/${prefix}`),
-  
+  getNextSku: (prefix) => api.get(`/items/next-sku/${prefix}/`),
+
   // Bin management
   bin: {
-    list: () => api.get('/items/bin/list'),
-    restore: (itemCode) => api.post(`/items/bin/restore/${itemCode}`),
-    permanentDelete: (itemCode) => api.delete(`/items/bin/permanent/${itemCode}`),
-    cleanup: () => api.post('/items/bin/cleanup'),
+    list: () => api.get('/items/bin/list/'),
+    restore: (itemCode) => api.post(`/items/bin/restore/${itemCode}/`),
+    permanentDelete: (itemCode) => api.delete(`/items/bin/permanent/${itemCode}/`),
+    cleanup: () => api.post('/items/bin/cleanup/'),
   }
 }
 
@@ -252,6 +252,26 @@ export const categoryHierarchy = {
 
   // Seed data
   seed: () => api.post('/hierarchy/seed'),
+}
+
+// Brand Master API
+export const brands = {
+  list: (params = {}) => api.get('/brands/', { params }),
+  get: (code) => api.get(`/brands/${code}/`),
+  create: (data) => api.post('/brands/', data),
+  update: (code, data) => api.put(`/brands/${code}/`, data),
+  delete: (code) => api.delete(`/brands/${code}/`),
+  getDropdown: () => api.get('/brands/dropdown/list/'),
+}
+
+// Supplier Master API
+export const suppliers = {
+  list: (params = {}) => api.get('/suppliers/', { params }),
+  get: (code) => api.get(`/suppliers/${code}/`),
+  create: (data) => api.post('/suppliers/', data),
+  update: (code, data) => api.put(`/suppliers/${code}/`, data),
+  delete: (code) => api.delete(`/suppliers/${code}/`),
+  getDropdown: () => api.get('/suppliers/dropdown/list/'),
 }
 
 export default api

@@ -79,7 +79,7 @@ async def list_specifications(
     if is_active is not None:
         query["is_active"] = is_active
 
-    specs = await CategorySpecifications.find(query).sort("category_name", 1).to_list()
+    specs = await CategorySpecifications.find(query).sort("+category_name").to_list()
     return [spec_to_response(s) for s in specs]
 
 
@@ -542,7 +542,7 @@ async def get_field_values(category_code: str, field_key: str):
         if field_config.groups:
             query["colour_group"] = {"$in": field_config.groups}
 
-        colours = await ColourMaster.find(query).sort("display_order", 1).to_list()
+        colours = await ColourMaster.find(query).sort("+display_order").to_list()
         options = [
             FieldOption(
                 code=c.colour_code,
@@ -557,7 +557,7 @@ async def get_field_values(category_code: str, field_key: str):
         if field_config.groups:
             query["size_group"] = {"$in": field_config.groups}
 
-        sizes = await SizeMaster.find(query).sort("display_order", 1).to_list()
+        sizes = await SizeMaster.find(query).sort("+display_order").to_list()
         options = [
             FieldOption(
                 code=s.size_code,
@@ -572,7 +572,7 @@ async def get_field_values(category_code: str, field_key: str):
         if field_config.groups:
             query["uom_group"] = {"$in": field_config.groups}
 
-        uoms = await UOMMaster.find(query).sort("display_order", 1).to_list()
+        uoms = await UOMMaster.find(query).sort("+display_order").to_list()
         options = [
             FieldOption(
                 code=u.uom_code,

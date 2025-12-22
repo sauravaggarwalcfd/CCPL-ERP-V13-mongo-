@@ -62,9 +62,11 @@ const PurchaseOrderForm = () => {
         }
       } catch (error) {
         console.error('Error fetching suppliers:', error)
-        const errorMsg = error.response?.data?.detail || 'Failed to load suppliers'
+        // Set empty array to prevent form from breaking
+        setSuppliersList([])
+        const errorMsg = 'Backend server not available. Please start the server first.'
         setLoadError(errorMsg)
-        toast.error(errorMsg)
+        // Don't show toast error for initial load failures
       }
     }
     fetchSuppliers()
@@ -84,9 +86,11 @@ const PurchaseOrderForm = () => {
         }
       } catch (error) {
         console.error('Error fetching items:', error)
-        const errorMsg = error.response?.data?.detail || 'Failed to load items'
+        // Set empty array to prevent form from breaking
+        setItemsList([])
+        const errorMsg = 'Backend server not available. Please start the server first.'
         setLoadError(errorMsg)
-        toast.error(errorMsg)
+        // Don't show toast error for initial load failures
       }
     }
     fetchItems()
@@ -302,6 +306,20 @@ const PurchaseOrderForm = () => {
           <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
             <X size={18} />
           </button>
+        </div>
+      )}
+
+      {/* Load Error Display */}
+      {loadError && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Package size={20} />
+            <div>
+              <p className="font-medium">Unable to load required data</p>
+              <p className="text-sm mt-1">{loadError}</p>
+              <p className="text-sm mt-1">Please ensure the backend server is running on port 8000.</p>
+            </div>
+          </div>
         </div>
       )}
 

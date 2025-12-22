@@ -166,23 +166,33 @@ async def update_category(code: str, data: ItemCategoryUpdate):
 
 
 @router.delete("/categories/{code}")
-async def delete_category(code: str):
-    """Soft delete a category"""
+async def delete_category(code: str, force: bool = Query(False, description="Force delete with all children")):
+    """Soft delete a category with optional cascade deletion"""
     
     category = await ItemCategory.find_one(ItemCategory.category_code == code.upper())
     if not category:
         raise HTTPException(status_code=404, detail=f"Category '{code}' not found")
     
-    # Check for children
-    children = await ItemSubCategory.find(ItemSubCategory.category_code == code.upper()).count()
-    if children > 0:
-        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} sub-categories exist")
+    # Check for children (exclude already deleted items)
+    children = await ItemSubCategory.find(
+        ItemSubCategory.category_code == code.upper(),
+        ItemSubCategory.is_deleted == False
+    ).count()
+    if children > 0 and not force:
+        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} sub-categories exist. Use force=true to delete all children.")
     
+    # If force=true, cascade delete all children
+    if force and children > 0:
+        await cascade_delete_category_children(code.upper())
+    
+    # Move to bin (soft delete)
     category.is_active = False
+    category.is_deleted = True
+    category.deleted_at = datetime.utcnow()
     category.updated_at = datetime.utcnow()
     await category.save()
-    
-    return {"message": "Category deactivated", "code": code}
+
+    return {"message": "Category moved to bin", "code": code, "children_deleted": children if force else 0}
 
 
 # ==================== LEVEL 2: SUB-CATEGORIES ====================
@@ -258,8 +268,11 @@ async def create_sub_category(data: ItemSubCategoryCreate):
         sort_order=data.sort_order,
     ).insert()
     
-    # Update parent count
-    parent.child_count = await ItemSubCategory.find(ItemSubCategory.category_code == parent.category_code).count()
+    # Update parent count (exclude deleted items)
+    parent.child_count = await ItemSubCategory.find(
+        ItemSubCategory.category_code == parent.category_code,
+        ItemSubCategory.is_deleted == False
+    ).count()
     await parent.save()
     
     return {"message": "Sub-category created", "code": item.sub_category_code}
@@ -288,22 +301,41 @@ async def update_sub_category(code: str, data: ItemSubCategoryUpdate):
 
 
 @router.delete("/sub-categories/{code}")
-async def delete_sub_category(code: str):
-    """Soft delete a sub-category"""
+async def delete_sub_category(code: str, force: bool = Query(False, description="Force delete with all children")):
+    """Soft delete a sub-category with optional cascade deletion"""
     
     item = await ItemSubCategory.find_one(ItemSubCategory.sub_category_code == code.upper())
     if not item:
         raise HTTPException(status_code=404, detail=f"Sub-category '{code}' not found")
     
-    children = await ItemDivision.find(ItemDivision.sub_category_code == code.upper()).count()
-    if children > 0:
-        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} divisions exist")
+    children = await ItemDivision.find(
+        ItemDivision.sub_category_code == code.upper(),
+        ItemDivision.is_deleted == False
+    ).count()
+    if children > 0 and not force:
+        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} divisions exist. Use force=true to delete all children.")
     
+    # If force=true, cascade delete all children
+    if force and children > 0:
+        await cascade_delete_sub_category_children(code.upper())
+    
+    # Move to bin (soft delete)
     item.is_active = False
+    item.is_deleted = True
+    item.deleted_at = datetime.utcnow()
     item.updated_at = datetime.utcnow()
     await item.save()
-    
-    return {"message": "Sub-category deactivated", "code": code}
+
+    # Update parent's child count
+    parent = await ItemCategory.find_one(ItemCategory.category_code == item.category_code)
+    if parent:
+        parent.child_count = await ItemSubCategory.find(
+            ItemSubCategory.category_code == parent.category_code,
+            ItemSubCategory.is_deleted == False
+        ).count()
+        await parent.save()
+
+    return {"message": "Sub-category moved to bin", "code": code, "children_deleted": children if force else 0}
 
 
 # ==================== LEVEL 3: DIVISIONS ====================
@@ -389,7 +421,10 @@ async def create_division(data: ItemDivisionCreate):
         sort_order=data.sort_order,
     ).insert()
     
-    subcat.child_count = await ItemDivision.find(ItemDivision.sub_category_code == subcat.sub_category_code).count()
+    subcat.child_count = await ItemDivision.find(
+        ItemDivision.sub_category_code == subcat.sub_category_code,
+        ItemDivision.is_deleted == False
+    ).count()
     await subcat.save()
     
     return {"message": "Division created", "code": item.division_code}
@@ -415,19 +450,41 @@ async def update_division(code: str, data: ItemDivisionUpdate):
 
 
 @router.delete("/divisions/{code}")
-async def delete_division(code: str):
+async def delete_division(code: str, force: bool = Query(False, description="Force delete with all children")):
+    """Soft delete a division with optional cascade deletion"""
+    
     item = await ItemDivision.find_one(ItemDivision.division_code == code.upper())
     if not item:
         raise HTTPException(status_code=404, detail=f"Division '{code}' not found")
     
-    children = await ItemClass.find(ItemClass.division_code == code.upper()).count()
-    if children > 0:
-        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} classes exist")
+    children = await ItemClass.find(
+        ItemClass.division_code == code.upper(),
+        ItemClass.is_deleted == False
+    ).count()
+    if children > 0 and not force:
+        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} classes exist. Use force=true to delete all children.")
     
+    # If force=true, cascade delete all children
+    if force and children > 0:
+        await cascade_delete_division_children(code.upper())
+    
+    # Move to bin (soft delete)
     item.is_active = False
+    item.is_deleted = True
+    item.deleted_at = datetime.utcnow()
+    item.updated_at = datetime.utcnow()
     await item.save()
-    
-    return {"message": "Division deactivated", "code": code}
+
+    # Update parent's child count
+    parent = await ItemSubCategory.find_one(ItemSubCategory.sub_category_code == item.sub_category_code)
+    if parent:
+        parent.child_count = await ItemDivision.find(
+            ItemDivision.sub_category_code == parent.sub_category_code,
+            ItemDivision.is_deleted == False
+        ).count()
+        await parent.save()
+
+    return {"message": "Division moved to bin", "code": code, "children_deleted": children if force else 0}
 
 
 # ==================== LEVEL 4: CLASSES ====================
@@ -527,7 +584,10 @@ async def create_class(data: ItemClassCreate):
         sort_order=data.sort_order,
     ).insert()
     
-    div.child_count = await ItemClass.find(ItemClass.division_code == div.division_code).count()
+    div.child_count = await ItemClass.find(
+        ItemClass.division_code == div.division_code,
+        ItemClass.is_deleted == False
+    ).count()
     await div.save()
     
     return {"message": "Class created", "code": item.class_code}
@@ -553,19 +613,41 @@ async def update_class(code: str, data: ItemClassUpdate):
 
 
 @router.delete("/classes/{code}")
-async def delete_class(code: str):
+async def delete_class(code: str, force: bool = Query(False, description="Force delete with all children")):
+    """Soft delete a class with optional cascade deletion"""
+    
     item = await ItemClass.find_one(ItemClass.class_code == code.upper())
     if not item:
         raise HTTPException(status_code=404, detail=f"Class '{code}' not found")
     
-    children = await ItemSubClass.find(ItemSubClass.class_code == code.upper()).count()
-    if children > 0:
-        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} sub-classes exist")
+    children = await ItemSubClass.find(
+        ItemSubClass.class_code == code.upper(),
+        ItemSubClass.is_deleted == False
+    ).count()
+    if children > 0 and not force:
+        raise HTTPException(status_code=400, detail=f"Cannot delete: {children} sub-classes exist. Use force=true to delete all children.")
     
+    # If force=true, cascade delete all children
+    if force and children > 0:
+        await cascade_delete_class_children(code.upper())
+    
+    # Move to bin (soft delete)
     item.is_active = False
+    item.is_deleted = True
+    item.deleted_at = datetime.utcnow()
+    item.updated_at = datetime.utcnow()
     await item.save()
-    
-    return {"message": "Class deactivated", "code": code}
+
+    # Update parent's child count
+    parent = await ItemDivision.find_one(ItemDivision.division_code == item.division_code)
+    if parent:
+        parent.child_count = await ItemClass.find(
+            ItemClass.division_code == parent.division_code,
+            ItemClass.is_deleted == False
+        ).count()
+        await parent.save()
+
+    return {"message": "Class moved to bin", "code": code, "children_deleted": children if force else 0}
 
 
 # ==================== LEVEL 5: SUB-CLASSES ====================
@@ -680,7 +762,10 @@ async def create_sub_class(data: ItemSubClassCreate):
         sort_order=data.sort_order,
     ).insert()
     
-    cls.child_count = await ItemSubClass.find(ItemSubClass.class_code == cls.class_code).count()
+    cls.child_count = await ItemSubClass.find(
+        ItemSubClass.class_code == cls.class_code,
+        ItemSubClass.is_deleted == False
+    ).count()
     await cls.save()
     
     return {"message": "Sub-class created", "code": item.sub_class_code}
@@ -706,15 +791,30 @@ async def update_sub_class(code: str, data: ItemSubClassUpdate):
 
 
 @router.delete("/sub-classes/{code}")
-async def delete_sub_class(code: str):
+async def delete_sub_class(code: str, force: bool = Query(False, description="Force delete with all children")):
+    """Soft delete a sub-class (Level 5 has no children, so force parameter is optional)"""
+    
     item = await ItemSubClass.find_one(ItemSubClass.sub_class_code == code.upper())
     if not item:
         raise HTTPException(status_code=404, detail=f"Sub-class '{code}' not found")
     
+    # Move to bin (soft delete)
     item.is_active = False
+    item.is_deleted = True
+    item.deleted_at = datetime.utcnow()
+    item.updated_at = datetime.utcnow()
     await item.save()
-    
-    return {"message": "Sub-class deactivated", "code": code}
+
+    # Update parent's child count
+    parent = await ItemClass.find_one(ItemClass.class_code == item.class_code)
+    if parent:
+        parent.child_count = await ItemSubClass.find(
+            ItemSubClass.class_code == parent.class_code,
+            ItemSubClass.is_deleted == False
+        ).count()
+        await parent.save()
+
+    return {"message": "Sub-class moved to bin", "code": code}
 
 
 # ==================== TREE VIEW ====================
@@ -1027,21 +1127,273 @@ async def seed_hierarchy():
                 ).insert()
                 created["sub_classes"] += 1
     
-    # Update child counts
+    # Update child counts (exclude deleted items)
     for cat in await ItemCategory.find_all().to_list():
-        cat.child_count = await ItemSubCategory.find(ItemSubCategory.category_code == cat.category_code).count()
+        cat.child_count = await ItemSubCategory.find(
+            ItemSubCategory.category_code == cat.category_code,
+            ItemSubCategory.is_deleted == False
+        ).count()
         await cat.save()
-    
+
     for subcat in await ItemSubCategory.find_all().to_list():
-        subcat.child_count = await ItemDivision.find(ItemDivision.sub_category_code == subcat.sub_category_code).count()
+        subcat.child_count = await ItemDivision.find(
+            ItemDivision.sub_category_code == subcat.sub_category_code,
+            ItemDivision.is_deleted == False
+        ).count()
         await subcat.save()
-    
+
     for div in await ItemDivision.find_all().to_list():
-        div.child_count = await ItemClass.find(ItemClass.division_code == div.division_code).count()
+        div.child_count = await ItemClass.find(
+            ItemClass.division_code == div.division_code,
+            ItemClass.is_deleted == False
+        ).count()
         await div.save()
-    
+
     for cls in await ItemClass.find_all().to_list():
-        cls.child_count = await ItemSubClass.find(ItemSubClass.class_code == cls.class_code).count()
+        cls.child_count = await ItemSubClass.find(
+            ItemSubClass.class_code == cls.class_code,
+            ItemSubClass.is_deleted == False
+        ).count()
         await cls.save()
     
     return {"message": "Hierarchy seeded", "created": created}
+
+
+# ==================== CASCADE DELETION HELPERS ====================
+
+async def cascade_delete_category_children(category_code: str):
+    """Recursively delete all children of a category"""
+    sub_categories = await ItemSubCategory.find(
+        ItemSubCategory.category_code == category_code,
+        ItemSubCategory.is_deleted == False
+    ).to_list()
+
+    for sub_cat in sub_categories:
+        await cascade_delete_sub_category_children(sub_cat.sub_category_code)
+        # Move sub-category to bin
+        sub_cat.is_active = False
+        sub_cat.is_deleted = True
+        sub_cat.deleted_at = datetime.utcnow()
+        await sub_cat.save()
+
+
+async def cascade_delete_sub_category_children(sub_category_code: str):
+    """Recursively delete all children of a sub-category"""
+    divisions = await ItemDivision.find(
+        ItemDivision.sub_category_code == sub_category_code,
+        ItemDivision.is_deleted == False
+    ).to_list()
+
+    for div in divisions:
+        await cascade_delete_division_children(div.division_code)
+        # Move division to bin
+        div.is_active = False
+        div.is_deleted = True
+        div.deleted_at = datetime.utcnow()
+        await div.save()
+
+
+async def cascade_delete_division_children(division_code: str):
+    """Recursively delete all children of a division"""
+    classes = await ItemClass.find(
+        ItemClass.division_code == division_code,
+        ItemClass.is_deleted == False
+    ).to_list()
+
+    for cls in classes:
+        await cascade_delete_class_children(cls.class_code)
+        # Move class to bin
+        cls.is_active = False
+        cls.is_deleted = True
+        cls.deleted_at = datetime.utcnow()
+        await cls.save()
+
+
+async def cascade_delete_class_children(class_code: str):
+    """Delete all sub-classes of a class"""
+    sub_classes = await ItemSubClass.find(
+        ItemSubClass.class_code == class_code,
+        ItemSubClass.is_deleted == False
+    ).to_list()
+
+    for sub_cls in sub_classes:
+        # Move sub-class to bin
+        sub_cls.is_active = False
+        sub_cls.is_deleted = True
+        sub_cls.deleted_at = datetime.utcnow()
+        await sub_cls.save()
+
+
+# ==================== BIN MANAGEMENT ROUTES ====================
+
+@router.get("/bin", response_model=List[dict])
+async def list_bin_items():
+    """List all deleted category hierarchy items in the bin"""
+    
+    deleted_categories = await ItemCategory.find(ItemCategory.is_deleted == True).to_list()
+    deleted_sub_categories = await ItemSubCategory.find(ItemSubCategory.is_deleted == True).to_list()
+    deleted_divisions = await ItemDivision.find(ItemDivision.is_deleted == True).to_list()
+    deleted_classes = await ItemClass.find(ItemClass.is_deleted == True).to_list()
+    deleted_sub_classes = await ItemSubClass.find(ItemSubClass.is_deleted == True).to_list()
+    
+    bin_items = []
+    
+    # Add categories
+    for item in deleted_categories:
+        bin_items.append({
+            "id": item.category_code,
+            "name": item.category_name,
+            "type": "category",
+            "level": 1,
+            "deleted_at": item.deleted_at,
+            "path_name": item.category_name  # Level 1 categories don't have path_name
+        })
+    
+    # Add sub-categories
+    for item in deleted_sub_categories:
+        bin_items.append({
+            "id": item.sub_category_code,
+            "name": item.sub_category_name,
+            "type": "sub-category",
+            "level": 2,
+            "deleted_at": item.deleted_at,
+            "path_name": item.path_name
+        })
+    
+    # Add divisions
+    for item in deleted_divisions:
+        bin_items.append({
+            "id": item.division_code,
+            "name": item.division_name,
+            "type": "division",
+            "level": 3,
+            "deleted_at": item.deleted_at,
+            "path_name": item.path_name
+        })
+    
+    # Add classes
+    for item in deleted_classes:
+        bin_items.append({
+            "id": item.class_code,
+            "name": item.class_name,
+            "type": "class",
+            "level": 4,
+            "deleted_at": item.deleted_at,
+            "path_name": item.path_name
+        })
+    
+    # Add sub-classes
+    for item in deleted_sub_classes:
+        bin_items.append({
+            "id": item.sub_class_code,
+            "name": item.sub_class_name,
+            "type": "sub-class",
+            "level": 5,
+            "deleted_at": item.deleted_at,
+            "path_name": item.path_name
+        })
+    
+    # Sort by deleted_at descending
+    bin_items.sort(key=lambda x: x['deleted_at'], reverse=True)
+    
+    return bin_items
+
+
+@router.post("/bin/restore/{item_type}/{code}")
+async def restore_from_bin(item_type: str, code: str):
+    """Restore an item from bin"""
+    
+    code = code.upper()
+    
+    if item_type == "category":
+        item = await ItemCategory.find_one(ItemCategory.category_code == code)
+    elif item_type == "sub-category":
+        item = await ItemSubCategory.find_one(ItemSubCategory.sub_category_code == code)
+    elif item_type == "division":
+        item = await ItemDivision.find_one(ItemDivision.division_code == code)
+    elif item_type == "class":
+        item = await ItemClass.find_one(ItemClass.class_code == code)
+    elif item_type == "sub-class":
+        item = await ItemSubClass.find_one(ItemSubClass.sub_class_code == code)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid item type")
+    
+    if not item:
+        raise HTTPException(status_code=404, detail=f"{item_type.title()} '{code}' not found")
+    
+    if not item.is_deleted:
+        raise HTTPException(status_code=400, detail=f"{item_type.title()} '{code}' is not in bin")
+    
+    # Restore item
+    item.is_active = True
+    item.is_deleted = False
+    item.deleted_at = None
+    item.updated_at = datetime.utcnow()
+    await item.save()
+
+    # Update parent's child count after restoration
+    if item_type == "sub-category":
+        parent = await ItemCategory.find_one(ItemCategory.category_code == item.category_code)
+        if parent:
+            parent.child_count = await ItemSubCategory.find(
+                ItemSubCategory.category_code == parent.category_code,
+                ItemSubCategory.is_deleted == False
+            ).count()
+            await parent.save()
+    elif item_type == "division":
+        parent = await ItemSubCategory.find_one(ItemSubCategory.sub_category_code == item.sub_category_code)
+        if parent:
+            parent.child_count = await ItemDivision.find(
+                ItemDivision.sub_category_code == parent.sub_category_code,
+                ItemDivision.is_deleted == False
+            ).count()
+            await parent.save()
+    elif item_type == "class":
+        parent = await ItemDivision.find_one(ItemDivision.division_code == item.division_code)
+        if parent:
+            parent.child_count = await ItemClass.find(
+                ItemClass.division_code == parent.division_code,
+                ItemClass.is_deleted == False
+            ).count()
+            await parent.save()
+    elif item_type == "sub-class":
+        parent = await ItemClass.find_one(ItemClass.class_code == item.class_code)
+        if parent:
+            parent.child_count = await ItemSubClass.find(
+                ItemSubClass.class_code == parent.class_code,
+                ItemSubClass.is_deleted == False
+            ).count()
+            await parent.save()
+
+    return {"message": f"{item_type.title()} restored from bin", "code": code}
+
+
+@router.delete("/bin/permanent/{item_type}/{code}")
+async def permanent_delete_from_bin(item_type: str, code: str):
+    """Permanently delete an item from bin"""
+    
+    code = code.upper()
+    
+    if item_type == "category":
+        item = await ItemCategory.find_one(ItemCategory.category_code == code)
+    elif item_type == "sub-category":
+        item = await ItemSubCategory.find_one(ItemSubCategory.sub_category_code == code)
+    elif item_type == "division":
+        item = await ItemDivision.find_one(ItemDivision.division_code == code)
+    elif item_type == "class":
+        item = await ItemClass.find_one(ItemClass.class_code == code)
+    elif item_type == "sub-class":
+        item = await ItemSubClass.find_one(ItemSubClass.sub_class_code == code)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid item type")
+    
+    if not item:
+        raise HTTPException(status_code=404, detail=f"{item_type.title()} '{code}' not found")
+    
+    if not item.is_deleted:
+        raise HTTPException(status_code=400, detail=f"{item_type.title()} '{code}' is not in bin")
+    
+    # Permanently delete
+    await item.delete()
+    
+    return {"message": f"{item_type.title()} permanently deleted", "code": code}
