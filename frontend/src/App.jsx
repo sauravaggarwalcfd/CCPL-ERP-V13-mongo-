@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
+import { LayoutProvider } from './context/LayoutContext'
 import { useAuth } from './hooks/useAuth'
 import MainLayout from './components/layout/MainLayout'
 import Login from './pages/Login'
@@ -33,8 +34,9 @@ function ProtectedRoute({ children }) {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <LayoutProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/login" element={<Login />} />
           
           <Route element={<MainLayout />}>
@@ -274,8 +276,9 @@ function App() {
             } />
           </Route>
         </Routes>
-      </BrowserRouter>
-      <Toaster position="top-right" />
+        </BrowserRouter>
+        <Toaster position="top-right" />
+      </LayoutProvider>
     </AuthProvider>
   )
 }

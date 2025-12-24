@@ -1,155 +1,195 @@
 import { createContext, useState, useEffect, useCallback } from 'react'
-import { authService } from '../services/authService'
+import {
+  loginUser,
+  verifyToken,
+  logoutUser,
+  getToken,
+  getStoredUser,
+  changePassword as changePasswordApi
+} from '../services/authApi'
 
 export const AuthContext = createContext()
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
+  const [isAuth, setIsAuth] = useState(false)
+  const [user, setUser] = useState(null)
   const [error, setError] = useState(null)
-  const [tokenExpiresAt, setTokenExpiresAt] = useState(null)
 
-  // Check if token is about to expire (within 5 minutes)
-  const isTokenExpiringSoon = useCallback(() => {
-    if (!tokenExpiresAt) return false
-    const now = new Date()
-    const timeUntilExpiry = new Date(tokenExpiresAt) - now
-    return timeUntilExpiry < 5 * 60 * 1000 // 5 minutes
-  }, [tokenExpiresAt])
-
-  // Initialize auth from localStorage
+  // Initialize authentication on mount
   useEffect(() => {
-    const initializeAuth = async () => {
+    const initAuth = async () => {
+      setLoading(true)
+      console.log('🔄 Initializing authentication...')
+
       try {
-        const token = localStorage.getItem('access_token')
-        const expiresAt = localStorage.getItem('token_expires_at')
-        
-        if (token && expiresAt) {
-          setTokenExpiresAt(expiresAt)
-          // Try to fetch user data
-          const userData = await authService.getMe()
-          setUser(userData)
+        const token = getToken()
+
+        if (!token) {
+          console.log('ℹ️ No token found - user not authenticated')
+          setIsAuth(false)
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        console.log('🔍 Verifying token with server...')
+        const verifyResult = await verifyToken()
+
+        if (verifyResult && verifyResult.valid) {
+          setIsAuth(true)
+          setUser(verifyResult.user || getStoredUser())
+          console.log('✅ Authentication verified - user logged in')
+        } else {
+          console.warn('⚠️ Token invalid - clearing auth data')
+          setIsAuth(false)
+          setUser(null)
         }
       } catch (err) {
-        console.error('Failed to initialize auth:', err)
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('token_expires_at')
+        console.error('❌ Auth initialization error:', err)
+        // If server verification fails but we have a token, assume authenticated
+        // (handles offline scenarios)
+        const token = getToken()
+        if (token) {
+          const storedUser = getStoredUser()
+          if (storedUser) {
+            setIsAuth(true)
+            setUser(storedUser)
+            console.warn('⚠️ Using offline auth - could not verify with server')
+          } else {
+            setIsAuth(false)
+            setUser(null)
+          }
+        } else {
+          setIsAuth(false)
+          setUser(null)
+        }
       } finally {
         setLoading(false)
       }
     }
 
-    initializeAuth()
+    initAuth()
   }, [])
 
-  // Setup token refresh interval
+  // Listen for token expiration events from axios interceptor
   useEffect(() => {
-    let refreshInterval = null
-
-    if (user && tokenExpiresAt) {
-      refreshInterval = setInterval(() => {
-        if (isTokenExpiringSoon()) {
-          refreshToken()
-        }
-      }, 60000) // Check every minute
-    }
-
-    return () => {
-      if (refreshInterval) clearInterval(refreshInterval)
-    }
-  }, [user, tokenExpiresAt, isTokenExpiringSoon])
-
-  const login = async (email, password) => {
-    try {
-      setError(null)
-      const response = await authService.login(email, password)
-      localStorage.setItem('access_token', response.access_token)
-      localStorage.setItem('refresh_token', response.refresh_token)
-      
-      // Calculate and store token expiry time
-      const expiresAt = new Date(Date.now() + (response.expires_in * 1000))
-      localStorage.setItem('token_expires_at', expiresAt.toISOString())
-      setTokenExpiresAt(expiresAt.toISOString())
-      
-      setUser(response.user)
-      return response
-    } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Login failed'
-      setError(errorMessage)
-      throw err
-    }
-  }
-
-  const logout = async () => {
-    try {
-      await authService.logout()
-    } catch (err) {
-      console.error('Logout API call failed:', err)
-      // Continue with local logout even if API fails
-    } finally {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('token_expires_at')
+    const handleTokenExpired = () => {
+      console.warn('🔐 Token expired event received')
+      setIsAuth(false)
       setUser(null)
-      setTokenExpiresAt(null)
-      setError(null)
+      setError('Session expired. Please login again.')
     }
-  }
 
-  const refreshToken = async () => {
-    try {
-      const refreshTokenValue = localStorage.getItem('refresh_token')
-      if (!refreshTokenValue) {
-        throw new Error('No refresh token available')
-      }
+    window.addEventListener('authTokenExpired', handleTokenExpired)
+    return () => window.removeEventListener('authTokenExpired', handleTokenExpired)
+  }, [])
 
-      const response = await authService.refresh(refreshTokenValue)
-      localStorage.setItem('access_token', response.access_token)
-      localStorage.setItem('refresh_token', response.refresh_token)
-      
-      // Update expiry time
-      const expiresAt = new Date(Date.now() + (response.expires_in * 1000))
-      localStorage.setItem('token_expires_at', expiresAt.toISOString())
-      setTokenExpiresAt(expiresAt.toISOString())
-      
-      if (response.user) {
-        setUser(response.user)
-      }
-      
-      return response
-    } catch (err) {
-      console.error('Token refresh failed:', err)
-      await logout()
-      throw err
-    }
-  }
-
-  const changePassword = async (currentPassword, newPassword, confirmPassword) => {
+  /**
+   * Login user
+   */
+  const login = useCallback(async (email, password) => {
     try {
       setError(null)
-      const response = await authService.changePassword(currentPassword, newPassword, confirmPassword)
+      console.log('🔐 Logging in user:', email)
+
+      const { token, user: userData } = await loginUser(email, password)
+
+      setIsAuth(true)
+      setUser(userData)
+
+      console.log('✅ Login successful')
+      return true
+    } catch (err) {
+      const message = err.message || 'Login failed. Please try again.'
+      console.error('❌ Login failed:', message)
+      setError(message)
+      setIsAuth(false)
+      setUser(null)
+      return false
+    }
+  }, [])
+
+  /**
+   * Logout user
+   */
+  const logout = useCallback(async () => {
+    try {
+      setError(null)
+      console.log('👋 Logging out user...')
+
+      await logoutUser()
+
+      setIsAuth(false)
+      setUser(null)
+
+      console.log('✅ Logout successful')
+    } catch (err) {
+      console.error('❌ Logout error:', err)
+      // Still clear local state even if API call fails
+      setIsAuth(false)
+      setUser(null)
+    }
+  }, [])
+
+  /**
+   * Change password
+   */
+  const changePassword = useCallback(async (currentPassword, newPassword, confirmPassword) => {
+    try {
+      setError(null)
+      console.log('🔑 Changing password...')
+
+      const response = await changePasswordApi(currentPassword, newPassword, confirmPassword)
+
+      console.log('✅ Password changed successfully')
       return response
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to change password'
-      setError(errorMessage)
+      const message = err.message || 'Failed to change password'
+      console.error('❌ Password change failed:', message)
+      setError(message)
       throw err
     }
+  }, [])
+
+  /**
+   * Clear error state
+   */
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+
+  /**
+   * Update user data
+   */
+  const updateUser = useCallback((userData) => {
+    setUser(userData)
+  }, [])
+
+  const value = {
+    // State
+    loading,
+    isAuth,
+    user,
+    error,
+
+    // Actions
+    login,
+    logout,
+    changePassword,
+    clearError,
+    updateUser,
+
+    // Aliases for backward compatibility
+    isAuthenticated: isAuth,
   }
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      error,
-      login,
-      logout,
-      refreshToken,
-      changePassword,
-      isTokenExpiringSoon: isTokenExpiringSoon()
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
 }
 
+export { AuthProvider }
+export default AuthProvider

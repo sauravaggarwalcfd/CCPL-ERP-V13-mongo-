@@ -52,7 +52,7 @@ class ItemType(Document):
 
 
 class ItemTypeCreate(BaseModel):
-    type_code: str = Field(..., min_length=2, max_length=4)
+    type_code: str = Field(..., min_length=2, max_length=20)
     type_name: str
     description: Optional[str] = None
     allow_purchase: bool = True

@@ -132,10 +132,7 @@ export default function ItemCategoryMaster() {
   const [showMoveConfirm, setShowMoveConfirm] = useState(false)
   const [pendingMoveData, setPendingMoveData] = useState(null)
 
-  // Preview state
-  const [showPreview, setShowPreview] = useState(false)
-  const [previewData, setPreviewData] = useState(null)
-  const [previewType, setPreviewType] = useState('') // 'tree', 'list', 'types'
+
 
   // Fetch data
   const fetchTree = useCallback(async () => {
@@ -952,32 +949,7 @@ export default function ItemCategoryMaster() {
     setIsDragging(false)
   }, [])
 
-  // Preview functionality
-  const handleTabPreview = (type) => {
-    let data = null
-    let title = ''
 
-    switch (type) {
-      case 'tree':
-        data = treeData
-        title = 'Category Tree Structure Preview'
-        break
-      case 'list':
-        data = listData
-        title = 'Category List Preview'
-        break
-      case 'types':
-        data = itemTypesList
-        title = 'Item Types Preview'
-        break
-      default:
-        return
-    }
-
-    setPreviewType(type)
-    setPreviewData(data)
-    setShowPreview(true)
-  }
 
   // Individual category preview
   const handleCategoryPreview = (category) => {
@@ -993,11 +965,7 @@ export default function ItemCategoryMaster() {
     setPreviewPanelData(null)
   }
 
-  const closePreview = () => {
-    setShowPreview(false)
-    setPreviewData(null)
-    setPreviewType('')
-  }
+
 
   // Render tree node
   const renderTreeNode = (node, depth = 0) => {
@@ -1147,38 +1115,29 @@ export default function ItemCategoryMaster() {
             {/* View Mode Toggle */}
             <div className="flex bg-white/20 rounded-lg p-1">
               <button
-                onClick={() => {
-                  setViewMode('tree')
-                  handleTabPreview('tree')
-                }}
+                onClick={() => setViewMode('tree')}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
                   viewMode === 'tree' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
                 }`}
-                title="Click to preview tree structure"
+                title="Tree View"
               >
                 <FolderTree size={18} /> Tree
               </button>
               <button
-                onClick={() => {
-                  setViewMode('list')
-                  handleTabPreview('list')
-                }}
+                onClick={() => setViewMode('list')}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
                   viewMode === 'list' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
                 }`}
-                title="Click to preview list view"
+                title="List View"
               >
                 <List size={18} /> List
               </button>
               <button
-                onClick={() => {
-                  setViewMode('types')
-                  handleTabPreview('types')
-                }}
+                onClick={() => setViewMode('types')}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
                   viewMode === 'types' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
                 }`}
-                title="Click to preview item types"
+                title="Item Types"
               >
                 <Settings size={18} /> Item Types
               </button>
@@ -2521,333 +2480,7 @@ export default function ItemCategoryMaster() {
         </div>
       )}
 
-      {/* Tab Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
-            {/* Preview Header */}
-            <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg">
-              <div className="flex items-center gap-3">
-                {previewType === 'tree' && <FolderTree size={24} />}
-                {previewType === 'list' && <List size={24} />}
-                {previewType === 'types' && <Settings size={24} />}
-                {previewType === 'category' && <Package size={24} />}
-                <h3 className="text-xl font-bold">
-                  {previewType === 'tree' && 'Category Tree Structure Preview'}
-                  {previewType === 'list' && 'Category List Preview'}
-                  {previewType === 'types' && 'Item Types Preview'}
-                  {previewType === 'category' && `${previewData?.name || 'Category'} Details`}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                {previewType === 'category' && (
-                  <button
-                    onClick={() => {
-                      closePreview()
-                      openEditModal(previewData)
-                    }}
-                    className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg flex items-center gap-2 transition"
-                  >
-                    <Edit2 size={16} />
-                    Edit
-                  </button>
-                )}
-                <button
-                  onClick={closePreview}
-                  className="p-2 hover:bg-white/20 rounded-lg transition"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-            </div>
 
-            {/* Preview Content */}
-            <div className="flex-1 p-6 overflow-auto">
-              {previewType === 'category' && (
-                <div className="space-y-6">
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-6">
-                    <h4 className="font-semibold text-emerald-800 mb-2">Category Details</h4>
-                    <p className="text-emerald-700 text-sm">
-                      Complete information for the selected category
-                    </p>
-                  </div>
-                  
-                  {previewData && (
-                    <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
-                      {/* Category Header */}
-                      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-6">
-                        <div className="flex items-center gap-4">
-                          <div 
-                            className="w-16 h-16 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                          >
-                            <Package size={32} />
-                          </div>
-                          <div>
-                            <h3 className="text-2xl font-bold">{previewData.name}</h3>
-                            <p className="text-emerald-100 font-mono text-lg">{previewData.code}</p>
-                            <p className="text-emerald-100 text-sm">Level {previewData.level} • {LEVELS[previewData.level - 1]?.name}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Category Details */}
-                      <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {/* Basic Information */}
-                          <div className="space-y-3">
-                            <h5 className="font-semibold text-gray-800 border-b pb-2">Basic Information</h5>
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Code:</label>
-                              <p className="font-mono bg-gray-100 px-3 py-1 rounded text-sm">{previewData.code}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Name:</label>
-                              <p className="font-medium">{previewData.name}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Level:</label>
-                              <p className="text-gray-700">{previewData.level} - {LEVELS[previewData.level - 1]?.name}</p>
-                            </div>
-                            {previewData.description && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600">Description:</label>
-                                <p className="text-gray-700 text-sm">{previewData.description}</p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Hierarchy Information */}
-                          <div className="space-y-3">
-                            <h5 className="font-semibold text-gray-800 border-b pb-2">Hierarchy Path</h5>
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Full Path:</label>
-                              <p className="text-gray-700 text-sm">{previewData.path_name || previewData.name}</p>
-                            </div>
-                            {previewData.parent_path && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600">Parent Path:</label>
-                                <p className="text-gray-600 text-sm font-mono">{previewData.parent_path}</p>
-                              </div>
-                            )}
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Children Count:</label>
-                              <p className="text-gray-700">{previewData.child_count || 0}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Items Count:</label>
-                              <p className="text-gray-700">{previewData.item_count || 0}</p>
-                            </div>
-                          </div>
-
-                          {/* Settings & Configuration */}
-                          <div className="space-y-3">
-                            <h5 className="font-semibold text-gray-800 border-b pb-2">Settings</h5>
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Status:</label>
-                              <span className={`inline-block px-3 py-1 rounded text-sm ml-2 ${
-                                previewData.is_active 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {previewData.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            </div>
-                            {previewData.item_type && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600">Item Type:</label>
-                                <p className="text-gray-700">{previewData.item_type}</p>
-                              </div>
-                            )}
-                            {previewData.default_hsn_code && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600">Default HSN Code:</label>
-                                <p className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">{previewData.default_hsn_code}</p>
-                              </div>
-                            )}
-                            {previewData.default_gst_rate && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600">Default GST Rate:</label>
-                                <p className="text-gray-700">{previewData.default_gst_rate}%</p>
-                              </div>
-                            )}
-                            {previewData.sku_prefix && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600">SKU Prefix:</label>
-                                <p className="font-mono bg-amber-100 text-amber-800 px-2 py-1 rounded text-sm">{previewData.sku_prefix}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Features & Capabilities */}
-                        {(previewData.has_color || previewData.has_size || previewData.has_fabric || previewData.has_brand) && (
-                          <div className="mt-6 pt-6 border-t">
-                            <h5 className="font-semibold text-gray-800 mb-3">Features & Capabilities</h5>
-                            <div className="flex flex-wrap gap-2">
-                              {previewData.has_color && (
-                                <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">Color Variants</span>
-                              )}
-                              {previewData.has_size && (
-                                <span className="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full">Size Variants</span>
-                              )}
-                              {previewData.has_fabric && (
-                                <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">Fabric Options</span>
-                              )}
-                              {previewData.has_brand && (
-                                <span className="bg-orange-100 text-orange-800 text-sm px-3 py-1 rounded-full">Brand Support</span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {previewType === 'tree' && (
-                <div className="space-y-2">
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-semibold text-emerald-800 mb-2">Tree Structure Overview</h4>
-                    <p className="text-emerald-700 text-sm">
-                      Total Categories: {previewData?.length || 0} | 
-                      Hierarchical view of all category levels
-                    </p>
-                  </div>
-                  {previewData && previewData.length > 0 ? (
-                    previewData.map((item, index) => (
-                      <div key={index} className="bg-white border rounded-lg p-4 shadow-sm">
-                        <div className="flex items-center gap-3">
-                          <Package size={20} className="text-emerald-600" />
-                          <div>
-                            <h5 className="font-medium text-gray-900">{item.name}</h5>
-                            <p className="text-sm text-gray-600">Code: {item.code} | Level: {item.level}</p>
-                            {item.children && item.children.length > 0 && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Children: {item.children.length}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <FolderTree size={48} className="mx-auto mb-4 text-gray-300" />
-                      <p>No tree data available</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {previewType === 'list' && (
-                <div className="space-y-2">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-semibold text-blue-800 mb-2">List View Overview</h4>
-                    <p className="text-blue-700 text-sm">
-                      Total Items: {previewData?.length || 0} | 
-                      Flat view of all categories
-                    </p>
-                  </div>
-                  {previewData && previewData.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {previewData.slice(0, 12).map((item, index) => (
-                        <div key={index} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0">
-                              <Package size={16} className="text-blue-600 mt-1" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-medium text-gray-900 truncate">{item.name}</h5>
-                              <p className="text-sm text-gray-600">Level {item.level}</p>
-                              <p className="text-xs text-gray-500 font-mono">{item.code}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {previewData.length > 12 && (
-                        <div className="col-span-full text-center py-4 text-gray-500">
-                          ... and {previewData.length - 12} more items
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <List size={48} className="mx-auto mb-4 text-gray-300" />
-                      <p>No list data available</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {previewType === 'types' && (
-                <div className="space-y-4">
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-semibold text-purple-800 mb-2">Item Types Overview</h4>
-                    <p className="text-purple-700 text-sm">
-                      Total Types: {previewData?.length || 0} | 
-                      Configuration for different item categories
-                    </p>
-                  </div>
-                  {previewData && previewData.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {previewData.map((type, index) => (
-                        <div key={index} className="bg-white border rounded-lg p-4 shadow-sm">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div 
-                              className="w-4 h-4 rounded" 
-                              style={{ backgroundColor: type.color_code || '#8b5cf6' }}
-                            ></div>
-                            <div>
-                              <h5 className="font-medium text-gray-900">{type.type_name}</h5>
-                              <p className="text-sm text-gray-600 font-mono">{type.type_code}</p>
-                            </div>
-                          </div>
-                          {type.description && (
-                            <p className="text-sm text-gray-600 mb-2">{type.description}</p>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            {type.allow_purchase && (
-                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Purchase</span>
-                            )}
-                            {type.allow_sale && (
-                              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Sale</span>
-                            )}
-                            {type.track_inventory && (
-                              <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded">Inventory</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <Settings size={48} className="mx-auto mb-4 text-gray-300" />
-                      <p>No item types available</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Preview Footer */}
-            <div className="border-t p-4 bg-gray-50 rounded-b-lg">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  Preview generated at {new Date().toLocaleTimeString()}
-                </p>
-                <button
-                  onClick={closePreview}
-                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition"
-                >
-                  Close Preview
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

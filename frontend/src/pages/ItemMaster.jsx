@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Search, Plus, Filter, Download, Edit2, Trash2, Eye, X, Archive, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useLayout } from '../context/LayoutContext'
 import ItemCreateForm from '../components/items/ItemCreateForm'
 import ItemEditForm from '../components/items/ItemEditForm'
 import { items as itemsApi, categoryHierarchy, files } from '../services/api'
 
 export default function ItemMaster() {
+  const { setTitle } = useLayout()
   const [items, setItems] = useState([])
   const [categories, setCategories] = useState([])
   const [subCategories, setSubCategories] = useState([])
@@ -36,6 +38,7 @@ export default function ItemMaster() {
 
   // Fetch categories on mount
   useEffect(() => {
+    setTitle('Item Master')
     fetchCategories()
     fetchItems()
   }, [])
@@ -271,88 +274,76 @@ export default function ItemMaster() {
   )
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="bg-white">
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg">
-          <h1 className="text-3xl font-bold">Item Master</h1>
-          <p className="text-blue-100 mt-1">Manage items, categories, and inventory</p>
-        </div>
-
-        {/* Main Content - Two Column Layout */}
-        <div className="p-6 lg:flex lg:gap-3">
-          <div className="flex-1">
-          {/* Filters Section */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter size={20} className="text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-800">Filters & Search</h3>
-            </div>
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Search */}
-              <div className="relative flex-1 min-w-64">
-                <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Search by code or name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Category Filter */}
-              <div className="min-w-48">
-                <select
-                  value={selectedCategory}
-                  onChange={handleCategoryChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat.code} value={cat.code}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sub-Category Filter */}
-              <div className="min-w-48">
-                <select
-                  value={selectedSubCategory}
-                  onChange={(e) => setSelectedSubCategory(e.target.value)}
-                  disabled={!selectedCategory}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">All Sub-Categories</option>
-                  {subCategories.map(subcat => (
-                    <option key={subcat.code} value={subcat.code}>
-                      {subcat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setSidebarView('create'); setSidebarOpen(true) }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition whitespace-nowrap"
-                >
-                  <Plus size={20} /> Add Item
-                </button>
-                <button
-                  onClick={handleOpenBin}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
-                  title="View Deleted Items (Bin)"
-                >
-                  <Archive size={20} />
-                </button>
-              </div>
-            </div>
+    <div className="flex flex-col h-full">
+      {/* Top Bar - Filters & Actions */}
+      <div className="bg-white p-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+        {/* Left: Search & Filters */}
+        <div className="flex flex-wrap items-center gap-4 flex-1">
+          <div className="relative min-w-64">
+            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by code or name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
+          <div className="min-w-48">
+            <select
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat.code} value={cat.code}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-48">
+            <select
+              value={selectedSubCategory}
+              onChange={(e) => setSelectedSubCategory(e.target.value)}
+              disabled={!selectedCategory}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            >
+              <option value="">All Sub-Categories</option>
+              {subCategories.map(subcat => (
+                <option key={subcat.code} value={subcat.code}>
+                  {subcat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setSidebarView('create'); setSidebarOpen(true) }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition whitespace-nowrap"
+          >
+            <Plus size={20} /> Add Item
+          </button>
+          <button
+            onClick={handleOpenBin}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
+            title="View Deleted Items (Bin)"
+          >
+            <Archive size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content - Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel: Items List */}
+        <div className={`flex-1 overflow-auto p-4 transition-all duration-300 ${sidebarOpen ? 'w-1/2' : 'w-full'}`}>
           {/* Items Table */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             {loading ? (
@@ -489,114 +480,105 @@ export default function ItemMaster() {
               <p className="text-2xl font-bold text-purple-600 mt-2">{subCategories.length}</p>
             </div>
           </div>
-          </div>
+        </div>
 
-          {/* Column Width Resizer (lg+, shown only when sidebar open) */}
-          {sidebarOpen && (
-            <div
-              className="hidden lg:block w-2 self-stretch bg-gray-200 hover:bg-gray-300 rounded cursor-col-resize"
-              onMouseDown={startResize}
-              title="Drag to resize sidebar"
-            />
-          )}
-
-          {/* Right Sidebar Panel */}
-          <div className={`mt-6 lg:mt-0 flex-shrink-0 ${sidebarOpen ? '' : 'hidden'}`} style={{ width: `${sidebarWidth}px` }}>
-            {sidebarOpen && (
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 h-full overflow-hidden">
-                {sidebarView === 'create' && (
-                  <ItemCreateForm
-                    isOpen={true}
-                    onClose={() => { setSidebarOpen(false); setSidebarView('none') }}
-                    onSuccess={fetchItems}
-                    variant="panel"
-                  />
-                )}
-                {sidebarView === 'edit' && selectedItem && (
-                  <ItemEditForm
-                    isOpen={true}
-                    onClose={() => { setSidebarOpen(false); setSidebarView('none') }}
-                    onSuccess={fetchItems}
-                    item={selectedItem}
-                    variant="panel"
-                  />
-                )}
-                {sidebarView === 'view' && selectedItem && (
-                  <div className="bg-white rounded-lg w-full h-full overflow-y-auto flex flex-col">
-                    <div className="bg-white border-b px-6 py-4 flex justify-between items-center">
-                      <h2 className="text-xl font-semibold text-gray-800">Item Details</h2>
-                      <button onClick={() => { setSidebarOpen(false); setSidebarView('none') }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Item Code</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.item_code}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Item Name</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.item_name}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Item Type</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.item_type}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Category</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.category_name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Sub-Category</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.sub_category_name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Division</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.division_name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Class</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.class_name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Sub-Class</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.sub_class_name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Brand</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.brand || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Model</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.model || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Size</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.size || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Color</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.color || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Unit</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.unit || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">GST Rate</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.gst_rate || 0}%</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Purchase Price</label>
-                          <p className="text-gray-900 mt-1">₹{selectedItem.purchase_price?.toFixed(2) || '0.00'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Selling Price</label>
-                          <p className="text-gray-900 mt-1">₹{selectedItem.selling_price?.toFixed(2) || '0.00'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">MRP</label>
-                          <p className="text-gray-900 mt-1">₹{selectedItem.mrp?.toFixed(2) || '0.00'}</p>
-                        </div>
+        {/* Right Panel: Sidebar Form */}
+        {sidebarOpen && (
+          <div className="w-1/2 border-l bg-gray-50 overflow-auto p-4 transition-all duration-300 shadow-xl z-20">
+            <div className="bg-white rounded-lg shadow-md border border-gray-200 h-full overflow-hidden">
+              {sidebarView === 'create' && (
+                <ItemCreateForm
+                  isOpen={true}
+                  onClose={() => { setSidebarOpen(false); setSidebarView('none') }}
+                  onSuccess={fetchItems}
+                  variant="panel"
+                />
+              )}
+              {sidebarView === 'edit' && selectedItem && (
+                <ItemEditForm
+                  isOpen={true}
+                  onClose={() => { setSidebarOpen(false); setSidebarView('none') }}
+                  onSuccess={fetchItems}
+                  item={selectedItem}
+                  variant="panel"
+                />
+              )}
+              {sidebarView === 'view' && selectedItem && (
+                <div className="bg-white rounded-lg w-full h-full overflow-y-auto flex flex-col">
+                  <div className="bg-white border-b px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-800">Item Details</h2>
+                    <button onClick={() => { setSidebarOpen(false); setSidebarView('none') }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Item Code</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.item_code}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Item Name</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.item_name}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Item Type</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.item_type}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Category</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.category_name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Sub-Category</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.sub_category_name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Division</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.division_name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Class</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.class_name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Sub-Class</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.sub_class_name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Brand</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.brand || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Model</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.model || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Size</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.size || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Color</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.color || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Unit</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.unit || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">GST Rate</label>
+                        <p className="text-gray-900 mt-1">{selectedItem.gst_rate || 0}%</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Purchase Price</label>
+                        <p className="text-gray-900 mt-1">₹{selectedItem.purchase_price?.toFixed(2) || '0.00'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Selling Price</label>
+                        <p className="text-gray-900 mt-1">₹{selectedItem.selling_price?.toFixed(2) || '0.00'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">MRP</label>
+                        <p className="text-gray-900 mt-1">₹{selectedItem.mrp?.toFixed(2) || '0.00'}</p>
+                      </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">HSN/SAC</label>
                           <p className="text-gray-900 mt-1">{selectedItem.hsn_sac || 'N/A'}</p>
