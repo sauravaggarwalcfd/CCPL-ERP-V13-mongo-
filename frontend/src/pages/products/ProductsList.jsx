@@ -5,7 +5,7 @@ export default function ProductsList() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 p-6">
+    <div className="flex-1 overflow-auto min-h-[80vh] flex items-center justify-center bg-gray-50 p-6">
       <div className="max-w-lg w-full text-center">
         {/* Animated Icon */}
         <div className="relative mx-auto w-32 h-32 mb-8">

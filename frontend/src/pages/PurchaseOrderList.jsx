@@ -5,9 +5,11 @@ import {
   FileText, CheckCircle, XCircle, Clock, Package
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useLayout } from '../context/LayoutContext'
 import { purchaseOrders } from '../services/api'
 
 const PurchaseOrderList = () => {
+  const { setTitle } = useLayout()
   const navigate = useNavigate()
 
   // State
@@ -71,8 +73,9 @@ const PurchaseOrderList = () => {
   }
 
   useEffect(() => {
+    setTitle('Purchase Orders')
     fetchPOs()
-  }, [pagination.skip, filterStatus])
+  }, [pagination.skip, filterStatus, setTitle])
 
   // Status badge component
   const StatusBadge = ({ status }) => {
@@ -164,50 +167,25 @@ const PurchaseOrderList = () => {
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Purchase Orders</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage and track all purchase orders
-          </p>
-        </div>
-        <button
-          onClick={() => navigate('/purchase-orders/create')}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-        >
-          <Plus size={20} />
-          Create New PO
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="flex flex-col h-full">
+      {/* Sticky Top Bar */}
+      <div className="bg-white p-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+        <div className="flex flex-wrap items-center gap-4 flex-1">
           {/* Search */}
-          <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search PO Number
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && fetchPOs()}
-                placeholder="Search by PO number..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+          <div className="relative min-w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && fetchPOs()}
+              placeholder="Search by PO number..."
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
 
           {/* Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
+          <div className="min-w-48">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -225,26 +203,42 @@ const PurchaseOrderList = () => {
               <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
+        </div>
 
-          {/* From Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              From Date
-            </label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+        {/* Actions */}
+        <button
+          onClick={() => navigate('/purchase-orders/create')}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+        >
+          <Plus size={20} />
+          Create New PO
+        </button>
+      </div>
 
-          {/* To Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              To Date
-            </label>
-            <input
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6">
+        {/* Advanced Filters */}
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* From Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                From Date
+              </label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* To Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                To Date
+              </label>
+              <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
@@ -447,6 +441,7 @@ const PurchaseOrderList = () => {
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }

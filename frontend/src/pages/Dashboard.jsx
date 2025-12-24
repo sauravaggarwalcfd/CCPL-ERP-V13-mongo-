@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react'
+import { useLayout } from '../context/LayoutContext'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { DollarSign, Package, ShoppingCart, TrendingUp } from 'lucide-react'
 import { reports, inventory } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
+  const { setTitle } = useLayout()
   const [salesData, setSalesData] = useState(null)
   const [stockData, setStockData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setTitle('Dashboard')
     fetchDashboardData()
-  }, [])
+  }, [setTitle])
 
   const fetchDashboardData = async () => {
     try {
@@ -62,11 +65,10 @@ export default function Dashboard() {
   const items = stockData?.items || []
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="flex-1 overflow-auto p-6">
+      <div className="space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={ShoppingCart}
           label="Total Orders"
@@ -160,6 +162,7 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  </div>
   )
 }
 

@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useLayout } from '../context/LayoutContext'
 import {
   Plus, Trash2, Save, X, Calculator, Package, User, MapPin,
-  CreditCard, FileText, Calendar
+  CreditCard, FileText, Calendar, ArrowLeft
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { purchaseOrders, suppliers, items as itemsAPI } from '../services/api'
 
 const PurchaseOrderForm = () => {
+  const { setTitle } = useLayout()
   const navigate = useNavigate()
   const { poNumber } = useParams()
   const isEditMode = !!poNumber
+
+  useEffect(() => {
+    setTitle(isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order')
+  }, [setTitle, isEditMode])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -276,54 +282,85 @@ const PurchaseOrderForm = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {isEditMode ? 'Edit Purchase Order' : 'Create New Purchase Order'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {isEditMode ? `Editing PO: ${poNumber}` : 'Fill in the details below to create a new PO'}
-          </p>
+    <div className="flex flex-col h-full">
+      {/* Sticky Top Bar */}
+      <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-4">
+           <button 
+             onClick={() => navigate('/purchase-orders')}
+             className="p-2 hover:bg-gray-100 rounded-full transition"
+           >
+              <ArrowLeft size={20} className="text-gray-600" />
+           </button>
+           <div>
+             <h1 className="text-xl font-bold text-gray-900">
+               {isEditMode ? `Edit PO #${poNumber}` : 'New Purchase Order'}
+             </h1>
+             <p className="text-xs text-gray-500">
+               {isEditMode ? 'Update purchase order details' : 'Create a new purchase order'}
+             </p>
+           </div>
         </div>
-        <button
-          onClick={() => navigate('/purchase-orders')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition"
-        >
-          <X size={20} />
-          Cancel
-        </button>
+
+        <div className="flex items-center gap-2">
+           <button 
+             type="button"
+             onClick={() => navigate('/purchase-orders')}
+             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
+           >
+             Cancel
+           </button>
+           <button
+             onClick={handleSubmit}
+             disabled={saving || lineItems.length === 0}
+             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium shadow-sm"
+           >
+             {saving ? (
+               <>
+                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                 Saving...
+               </>
+             ) : (
+               <>
+                 <Save size={18} />
+                 {isEditMode ? 'Update PO' : 'Create PO'}
+               </>
+             )}
+           </button>
+        </div>
       </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <X size={20} />
-            <span>{error}</span>
-          </div>
-          <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
-            <X size={18} />
-          </button>
-        </div>
-      )}
-
-      {/* Load Error Display */}
-      {loadError && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Package size={20} />
-            <div>
-              <p className="font-medium">Unable to load required data</p>
-              <p className="text-sm mt-1">{loadError}</p>
-              <p className="text-sm mt-1">Please ensure the backend server is running on port 8000.</p>
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <X size={20} />
+                <span>{error}</span>
+              </div>
+              <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
+                <X size={18} />
+              </button>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Load Error Display */}
+          {loadError && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Package size={20} />
+                <div>
+                  <p className="font-medium">Unable to load required data</p>
+                  <p className="text-sm mt-1">{loadError}</p>
+                  <p className="text-sm mt-1">Please ensure the backend server is running on port 8000.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
         {/* PO Header Information */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -811,34 +848,9 @@ const PurchaseOrderForm = () => {
           </div>
         </div>
 
-        {/* Form Actions */}
-        <div className="flex items-center justify-end gap-3 bg-white rounded-lg shadow-sm p-6">
-          <button
-            type="button"
-            onClick={() => navigate('/purchase-orders')}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving || lineItems.length === 0}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save size={18} />
-                {isEditMode ? 'Update PO' : 'Create PO'}
-              </>
-            )}
-          </button>
-        </div>
       </form>
+        </div>
+      </div>
     </div>
   )
 }

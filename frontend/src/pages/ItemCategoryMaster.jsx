@@ -5,6 +5,7 @@ import {
   FolderTree, Settings, X, Check, AlertCircle, Filter, GripVertical
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useLayout } from '../context/LayoutContext'
 import { categoryHierarchy, itemTypes } from '../services/api'
 import { specificationApi } from '../services/specificationApi'
 
@@ -61,6 +62,7 @@ const DEFAULT_ITEM_TYPE_FORM = {
 }
 
 export default function ItemCategoryMaster() {
+  const { setTitle } = useLayout()
   // Data state
   const [treeData, setTreeData] = useState([])
   const [listData, setListData] = useState([])
@@ -256,11 +258,12 @@ export default function ItemCategoryMaster() {
   }, [])
 
   useEffect(() => {
+    setTitle('Item Category Master')
     fetchTree()
     fetchList()
     fetchItemTypes()
     fetchVariantGroups()
-  }, [fetchTree, fetchList, fetchItemTypes, fetchVariantGroups])
+  }, [fetchTree, fetchList, fetchItemTypes, fetchVariantGroups, setTitle])
 
   useEffect(() => {
     fetchList()
@@ -1103,65 +1106,51 @@ export default function ItemCategoryMaster() {
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Item Category Master</h1>
-            <p className="text-emerald-100 mt-1">5-Level Hierarchy: Category → Sub-Category → Division → Class → Sub-Class</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* View Mode Toggle */}
-            <div className="flex bg-white/20 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('tree')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
-                  viewMode === 'tree' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
-                }`}
-                title="Tree View"
-              >
-                <FolderTree size={18} /> Tree
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
-                  viewMode === 'list' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
-                }`}
-                title="List View"
-              >
-                <List size={18} /> List
-              </button>
-              <button
-                onClick={() => setViewMode('types')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer hover:bg-white/20 ${
-                  viewMode === 'types' ? 'bg-white text-emerald-700' : 'text-white hover:bg-white/10'
-                }`}
-                title="Item Types"
-              >
-                <Settings size={18} /> Item Types
-              </button>
-            </div>
-            
-            <button
-              onClick={() => openCreateModal()}
-              className="bg-white text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition"
-            >
-              <Plus size={20} /> Add New
-            </button>
-          </div>
+    <div className="flex flex-col h-full">
+      {/* Sticky Top Bar */}
+      <div className="bg-white p-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+        {/* View Switcher */}
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('tree')}
+            className={`px-4 py-2 rounded-md flex items-center gap-2 transition text-sm font-medium ${
+              viewMode === 'tree' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <FolderTree size={18} /> Tree
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-md flex items-center gap-2 transition text-sm font-medium ${
+              viewMode === 'list' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <List size={18} /> List
+          </button>
+          <button
+            onClick={() => setViewMode('types')}
+            className={`px-4 py-2 rounded-md flex items-center gap-2 transition text-sm font-medium ${
+              viewMode === 'types' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Settings size={18} /> Item Types
+          </button>
         </div>
+
+        {/* Actions */}
+        <button
+          onClick={() => openCreateModal()}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition shadow-sm"
+        >
+          <Plus size={20} />
+          Add Category
+        </button>
       </div>
 
-      {/* Main Content - Side by Side Layout */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Left Panel - Views */}
-        <div
-          className="p-6 overflow-auto transition-all duration-300"
-          style={{
-            width: (showPanel || showItemTypePanel || showPreviewPanel) ? `${leftPanelWidth}%` : '100%'
-          }}
-        >
+      {/* Main Content - Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel: Content */}
+        <div className={`flex-1 overflow-auto p-6 transition-all duration-300 ${showPanel || showItemTypePanel || showPreviewPanel ? 'w-1/2' : 'w-full'}`}>
         {/* Tree View */}
         {viewMode === 'tree' && (
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -1422,27 +1411,11 @@ export default function ItemCategoryMaster() {
         </div>
         {/* End Left Panel */}
 
-        {/* Resize Handle */}
-        {(showPanel || showItemTypePanel || showPreviewPanel) && (
-          <div
-            className={`w-1 bg-gray-300 hover:bg-emerald-500 cursor-col-resize flex-shrink-0 transition-colors ${
-              isResizing ? 'bg-emerald-500' : ''
-            }`}
-            onMouseDown={handleMouseDown}
-            style={{ cursor: 'col-resize' }}
-          >
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-0.5 h-8 bg-white rounded-full opacity-70"></div>
-            </div>
-          </div>
-        )}
+
 
         {/* Right Panel - Form (Side Panel) */}
         {showPanel && (
-          <div
-            className="border-l bg-white overflow-auto"
-            style={{ width: `${100 - leftPanelWidth}%` }}
-          >
+          <div className="w-1/2 border-l bg-white overflow-auto">
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">
               <div className="flex items-center justify-between">
@@ -2011,10 +1984,7 @@ export default function ItemCategoryMaster() {
 
         {/* Right Panel - Item Type Form (Side Panel) */}
         {showItemTypePanel && (
-          <div
-            className="border-l bg-white overflow-auto"
-            style={{ width: `${100 - leftPanelWidth}%` }}
-          >
+          <div className="w-1/2 border-l bg-white overflow-auto">
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 sticky top-0 z-10">
               <div className="flex items-center justify-between">
@@ -2199,10 +2169,7 @@ export default function ItemCategoryMaster() {
 
         {/* Preview Panel */}
         {showPreviewPanel && (
-          <div
-            className="border-l bg-white overflow-auto"
-            style={{ width: `${100 - leftPanelWidth}%` }}
-          >
+          <div className="w-1/2 border-l bg-white overflow-auto">
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">
               <div className="flex items-center justify-between">

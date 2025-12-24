@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, ChevronRight, ChevronDown, Trash2, FolderTree, FolderOpen, Folder, AlertTriangle, Trash, RefreshCw, X, Edit } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useLayout } from '../context/LayoutContext'
 import { categoryHierarchy } from '../services/api'
 
 const LEVEL_CONFIG = {
@@ -14,6 +15,7 @@ const LEVEL_CONFIG = {
 const ICONS = ['Package', 'Box', 'Layers', 'Tag', 'Hash', 'Circle', 'Square', 'Star', 'Heart', 'Shield']
 
 export default function ItemCategoryHierarchy() {
+  const { setTitle } = useLayout()
   const [tree, setTree] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -46,8 +48,9 @@ export default function ItemCategoryHierarchy() {
   })
 
   useEffect(() => {
+    setTitle('Category Hierarchy')
     fetchTree()
-  }, [])
+  }, [setTitle])
 
   const fetchTree = async () => {
     try {
@@ -407,50 +410,41 @@ export default function ItemCategoryHierarchy() {
   const filteredTree = filterTree(tree)
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <FolderTree size={32} />
-              <div>
-                <h1 className="text-2xl font-bold">5-Level Category Hierarchy</h1>
-                <p className="text-sm text-green-100">
-                  {tree.length} root categories • Manage your complete item hierarchy
-                </p>
-              </div>
-            </div>
-          </div>
+    <div className="flex flex-col h-full">
+      {/* Sticky Top Bar */}
+      <div className="bg-white p-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+        {/* Search */}
+        <div className="flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleAddRoot}
-              className="bg-white text-green-700 px-4 py-2 rounded-lg flex items-center gap-2 font-medium hover:bg-green-50 transition"
-            >
-              <Plus size={20} /> New Category
-            </button>
-
-            <button
-              onClick={handleOpenBin}
-              className="bg-red-100 text-red-700 px-4 py-2 rounded-lg flex items-center gap-2 font-medium hover:bg-red-200 transition"
-            >
-              <Trash size={20} /> Bin
-            </button>
-          </div>
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleAddRoot}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition shadow-sm"
+          >
+            <Plus size={20} />
+            New Category
+          </button>
+          <button
+            onClick={handleOpenBin}
+            className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition"
+          >
+            <Trash size={20} />
+            Bin
+          </button>
         </div>
       </div>
 
-      <div className="p-4 border-b bg-white">
-        <input
-          type="text"
-          placeholder="Search categories..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
-      </div>
-
-      <div className="flex-1 overflow-y-auto bg-white">
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto bg-white p-6">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading hierarchy...</div>
         ) : filteredTree.length === 0 ? (

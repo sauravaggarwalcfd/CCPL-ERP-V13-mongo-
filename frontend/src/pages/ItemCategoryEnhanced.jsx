@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Plus, ChevronRight, ChevronDown, Trash2, FolderTree, FolderOpen, Folder, Package, Settings, X, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useLayout } from '../context/LayoutContext'
 
 export default function ItemCategoryEnhanced() {
+  const { setTitle } = useLayout()
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -47,9 +49,10 @@ export default function ItemCategoryEnhanced() {
   })
 
   useEffect(() => {
+    setTitle('Enhanced Category Master')
     fetchCategories()
     fetchEnums()
-  }, [])
+  }, [setTitle])
 
   const getToken = () => localStorage.getItem('access_token')
 
@@ -417,62 +420,61 @@ export default function ItemCategoryEnhanced() {
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="bg-white">
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-800 text-white p-6 shadow-lg">
-          <h1 className="text-3xl font-bold">Enhanced Item Category</h1>
-          <p className="text-green-100 mt-1">Multi-level hierarchy for apparel manufacturing</p>
+    <div className="flex flex-col h-full">
+      {/* Sticky Top Bar */}
+      <div className="bg-white p-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+        {/* Search */}
+        <div className="flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
         </div>
 
-        {/* Main Content */}
-        <div className="p-6">
-          {/* Tabs */}
-          <div className="flex gap-2 mb-4 border-b">
-            {[
-              { key: 'all', label: 'All Categories', icon: Package },
-              { key: 'level1', label: 'Level 1 - Inventory Class', icon: Package },
-              { key: 'level2', label: 'Level 2 - Material Type', icon: Settings },
-              { key: 'level3', label: 'Level 3 - Sub-Category', icon: ChevronRight },
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActiveTab(tab.key)
-                  handleTabPreview(tab.key)
-                }}
-                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition cursor-pointer hover:bg-green-50 ${
-                  activeTab === tab.key
-                    ? 'border-green-600 text-green-600 font-medium'
-                    : 'border-transparent text-gray-600 hover:text-green-600'
-                }`}
-                title={`Click to preview ${tab.label.toLowerCase()}`}
-              >
-                <tab.icon size={18} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        {/* Actions */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition shadow-sm"
+        >
+          <Plus size={20} />
+          Add Category
+        </button>
+      </div>
 
-          {/* Filter & Add Section */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6 flex gap-4">
-            <input
-              type="text"
-              placeholder="Search categories..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4 border-b">
+          {[
+            { key: 'all', label: 'All Categories', icon: Package },
+            { key: 'level1', label: 'Level 1 - Inventory Class', icon: Package },
+            { key: 'level2', label: 'Level 2 - Material Type', icon: Settings },
+            { key: 'level3', label: 'Level 3 - Sub-Category', icon: ChevronRight },
+          ].map(tab => (
             <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 font-medium transition"
+              key={tab.key}
+              onClick={() => {
+                setActiveTab(tab.key)
+                handleTabPreview(tab.key)
+              }}
+              className={`flex items-center gap-2 px-4 py-2 border-b-2 transition cursor-pointer hover:bg-green-50 ${
+                activeTab === tab.key
+                  ? 'border-green-600 text-green-600 font-medium'
+                  : 'border-transparent text-gray-600 hover:text-green-600'
+              }`}
+              title={`Click to preview ${tab.label.toLowerCase()}`}
             >
-              <Plus size={20} /> Add Category
+              <tab.icon size={18} />
+              {tab.label}
             </button>
-          </div>
+          ))}
+        </div>
 
-          {/* Categories Table */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {/* Categories Table */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
             {loading ? (
               <div className="p-8 text-center text-gray-500">Loading categories...</div>
             ) : filteredCategories.length === 0 ? (
@@ -570,7 +572,6 @@ export default function ItemCategoryEnhanced() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Add Modal */}
       {showAddModal && (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useLayout } from '../context/LayoutContext'
 import {
   ArrowLeft, Edit2, Download, FileText, User, MapPin,
   Calendar, Package, CreditCard, CheckCircle, XCircle
@@ -8,12 +9,17 @@ import toast from 'react-hot-toast'
 import { purchaseOrders } from '../services/api'
 
 const PurchaseOrderDetail = () => {
+  const { setTitle } = useLayout()
   const navigate = useNavigate()
   const { poNumber } = useParams()
 
   const [po, setPO] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    setTitle('Purchase Order Details')
+  }, [setTitle])
 
   // Fetch PO details
   useEffect(() => {
@@ -131,45 +137,50 @@ const PurchaseOrderDetail = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+    <div className="flex flex-col h-full">
+      {/* Sticky Top Bar */}
+      <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/purchase-orders')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition"
+            className="p-2 hover:bg-gray-100 rounded-full transition"
           >
-            <ArrowLeft size={20} />
-            Back
+            <ArrowLeft size={20} className="text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Purchase Order Details</h1>
-            <p className="text-sm text-gray-500 mt-1">PO Number: {po.po_number}</p>
+            <h1 className="text-xl font-bold text-gray-900">PO #{po.po_number}</h1>
+            <div className="flex items-center gap-2 mt-1">
+               <StatusBadge status={po.po_status} />
+               <span className="text-xs text-gray-500">Created on {new Date(po.po_date).toLocaleDateString('en-IN')}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <StatusBadge status={po.po_status} />
+
+        <div className="flex items-center gap-2">
           {po.po_status === 'DRAFT' && (
             <button
               onClick={() => navigate(`/purchase-orders/${po.po_number}/edit`)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium shadow-sm"
             >
-              <Edit2 size={18} />
+              <Edit2 size={16} />
               Edit
             </button>
           )}
           <button
             onClick={() => toast.info('PDF download coming soon')}
-            className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition"
+            className="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg transition text-sm font-medium"
           >
-            <Download size={18} />
+            <Download size={16} />
             Download PDF
           </button>
         </div>
       </div>
 
-      {/* PO Information */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+          {/* PO Information */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Supplier Info */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -354,6 +365,8 @@ const PurchaseOrderDetail = () => {
           )}
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }

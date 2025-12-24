@@ -883,10 +883,11 @@ export default function ItemMaster() {
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
+    )}
 
       {/* Sidebar replaces Add Item Modal */}
 
