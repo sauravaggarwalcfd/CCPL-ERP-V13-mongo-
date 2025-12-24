@@ -1,96 +1,88 @@
-import { useState, useEffect } from 'react'
-import { productService } from '../../services/productService'
+import { Construction, ArrowLeft, Clock, ShoppingBag } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export default function ProductsList() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-
-  useEffect(() => {
-    fetchProducts()
-  }, [page, search])
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true)
-      const data = await productService.list({
-        page,
-        limit: 20,
-        search: search || undefined
-      })
-      setProducts(data.items)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const navigate = useNavigate()
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-        <a href="/products/new" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          Add Product
-        </a>
+    <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 p-6">
+      <div className="max-w-lg w-full text-center">
+        {/* Animated Icon */}
+        <div className="relative mx-auto w-32 h-32 mb-8">
+          <div className="absolute inset-0 bg-purple-100 rounded-full animate-pulse"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ShoppingBag className="w-16 h-16 text-purple-600 animate-bounce" />
+          </div>
+        </div>
+
+        {/* Title */}
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          Products
+        </h1>
+
+        {/* Status Badge */}
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full mb-6">
+          <Clock className="w-4 h-4" />
+          <span className="font-medium">Work in Progress</span>
+        </div>
+
+        {/* Description */}
+        <p className="text-gray-600 mb-8 leading-relaxed">
+          We're building a powerful product management module with advanced features for 
+          product catalogs, variants, and pricing. Coming soon!
+        </p>
+
+        {/* Features Coming */}
+        <div className="bg-white rounded-lg shadow p-6 mb-8 text-left">
+          <h3 className="font-semibold text-gray-900 mb-4">Features Coming Soon:</h3>
+          <ul className="space-y-2 text-sm text-gray-600">
+            <li className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              Product catalog management
+            </li>
+            <li className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              Multi-variant support (size, color, etc.)
+            </li>
+            <li className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              Pricing and discount management
+            </li>
+            <li className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              Product images and media gallery
+            </li>
+          </ul>
+        </div>
+
+        {/* Progress Indicator */}
+        <div className="mb-8">
+          <div className="flex justify-between text-sm text-gray-500 mb-2">
+            <span>Development Progress</span>
+            <span>Coming Soon</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full w-1/4 animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Go Back
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+          >
+            Go to Dashboard
+          </button>
+        </div>
       </div>
-
-      <div>
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-12">Loading...</div>
-      ) : products.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg">
-          <p className="text-gray-500">No products found</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Style Number</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {products.map(product => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{product.style_number}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{product.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{product.category?.name || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">${product.base_price}</td>
-                  <td className="px-6 py-4 text-sm space-x-2">
-                    <a href={`/products/${product.id}`} className="text-blue-600 hover:underline">View</a>
-                    <a href={`/products/${product.id}/edit`} className="text-blue-600 hover:underline">Edit</a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   )
 }

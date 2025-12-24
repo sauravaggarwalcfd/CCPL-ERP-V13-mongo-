@@ -1,23 +1,32 @@
-import { Construction, ArrowLeft, Clock, Package } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Construction, ArrowLeft, Clock } from 'lucide-react'
+import { useNavigate, useLocation } from 'react-router-dom'
 
-export default function InventoryList() {
+export default function WorkInProgress({ title, description }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Extract page title from path if not provided
+  const pageTitle = title || location.pathname
+    .split('/')
+    .pop()
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 p-6">
       <div className="max-w-lg w-full text-center">
-        {/* Animated Icon */}
+        {/* Animated Construction Icon */}
         <div className="relative mx-auto w-32 h-32 mb-8">
-          <div className="absolute inset-0 bg-blue-100 rounded-full animate-pulse"></div>
+          <div className="absolute inset-0 bg-yellow-100 rounded-full animate-pulse"></div>
           <div className="absolute inset-0 flex items-center justify-center">
-            <Package className="w-16 h-16 text-blue-600 animate-bounce" />
+            <Construction className="w-16 h-16 text-yellow-600 animate-bounce" />
           </div>
         </div>
 
         {/* Title */}
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Inventory Management
+          {pageTitle}
         </h1>
 
         {/* Status Badge */}
@@ -28,32 +37,8 @@ export default function InventoryList() {
 
         {/* Description */}
         <p className="text-gray-600 mb-8 leading-relaxed">
-          We're building a comprehensive inventory management system with real-time stock tracking, 
-          multi-warehouse support, and advanced analytics. Stay tuned!
+          {description || "We're actively working on this feature. It will be available soon. Thank you for your patience!"}
         </p>
-
-        {/* Features Coming */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8 text-left">
-          <h3 className="font-semibold text-gray-900 mb-4">Features Coming Soon:</h3>
-          <ul className="space-y-2 text-sm text-gray-600">
-            <li className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Real-time stock level tracking
-            </li>
-            <li className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Multi-warehouse management
-            </li>
-            <li className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Batch and serial number tracking
-            </li>
-            <li className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Low stock alerts and reorder points
-            </li>
-          </ul>
-        </div>
 
         {/* Progress Indicator */}
         <div className="mb-8">
@@ -62,7 +47,7 @@ export default function InventoryList() {
             <span>Coming Soon</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full w-1/3 animate-pulse"></div>
+            <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 h-2 rounded-full w-1/4 animate-pulse"></div>
           </div>
         </div>
 
@@ -82,6 +67,11 @@ export default function InventoryList() {
             Go to Dashboard
           </button>
         </div>
+
+        {/* Footer Note */}
+        <p className="mt-8 text-sm text-gray-400">
+          Need this feature urgently? Contact the development team.
+        </p>
       </div>
     </div>
   )

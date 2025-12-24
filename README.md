@@ -73,11 +73,29 @@ mongod --dbpath /path/to/data
 # Or: docker run -p 27017:27017 mongo:latest
 ```
 
-### With Docker
+### Use MongoDB Atlas (Recommended)
 
-```bash
-docker-compose up
-```
+1. **Configure MongoDB Connection:**
+   - Set the connection string in `.env` (root) or `backend/.env`:
+     ```
+     MONGODB_URL=mongodb+srv://tech_db_user:Tech3112@cluster0.empai1t.mongodb.net/?appName=Cluster0
+     ```
+   - If your password contains special characters like `@` or `/`, URL-encode them (e.g., `Tech@3112` → `Tech%403112`)
+   - Ensure your IP address is allowed in MongoDB Atlas Network Access (or use `0.0.0.0/0` for testing)
+
+2. **Start with Docker:**
+   ```bash
+   ./start.sh
+   # Or manually:
+   docker-compose up -d
+   ```
+
+3. **Automatic Setup:**
+   - The backend automatically initializes the database on startup
+   - Creates admin user, sample warehouse, supplier, and customer if they don't exist
+   - No manual database setup required!
+
+This setup uses MongoDB Atlas (cloud) instead of local MongoDB. The database initialization runs automatically every time you start the containers.
 
 ## API Documentation
 
@@ -89,12 +107,16 @@ docker-compose up
 - Login: http://localhost:5173/login
 - Dashboard: http://localhost:5173/dashboard
 
-## Demo Credentials
+## Default Login Credentials
+
+After starting the application, use these credentials to log in:
 
 ```
-Email: admin@confidence.com
+Email: admin@inventoryerp.com
 Password: Admin@123
 ```
+
+**Note:** These credentials are automatically created when you first start the application. The admin user is created by the `init_db.py` script that runs on container startup.
 
 ## Features
 

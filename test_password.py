@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Test password verification"""
 import asyncio
+import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from bcrypt import checkpw
 
 async def test_password():
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
-    db = client["inventory_erp"]
+    mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    db_name = os.getenv("DATABASE_NAME", "inventory_erp")
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
     
     # Get the user
     user = await db["users"].find_one({"email": "demo@example.com"})

@@ -9,22 +9,31 @@ echo ""
 if command -v docker &> /dev/null; then
     echo "✓ Docker found"
     echo ""
-    echo "Starting with Docker Compose..."
+    echo "Starting with Docker Compose (Atlas)..."
     echo ""
     
     # Start services
     docker-compose up -d
-    
+
+    echo ""
+    echo "Initializing database (creating admin user if not exists)..."
+    sleep 3
+    docker-compose exec -T backend python init_db.py
+
     echo ""
     echo "================================"
     echo "Services Started!"
     echo "================================"
     echo ""
-    echo "MongoDB:     mongodb://localhost:27017"
+    echo "MongoDB:     Atlas (MONGODB_URL from environment)"
     echo "Backend API: http://localhost:8000"
     echo "Frontend:    http://localhost:5173"
     echo ""
     echo "API Docs:    http://localhost:8000/docs"
+    echo ""
+    echo "Default Login Credentials:"
+    echo "  Email:    admin@inventoryerp.com"
+    echo "  Password: Admin@123"
     echo ""
     echo "View logs:   docker-compose logs -f"
     echo "Stop:        docker-compose down"

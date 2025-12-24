@@ -5,9 +5,9 @@ Run this once to populate the database with sample data
 
 import asyncio
 from app.database import connect_to_mongo, close_mongo_connection
-from app.models.user import User
+from app.models.user import User, EmbeddedRole
 from app.models.warehouse import Warehouse
-from app.models.supplier import Supplier, Address, BankDetails
+from app.models.supplier import Supplier, BankDetails
 from app.models.customer import Customer
 from app.models.role import Role
 from app.core.security import get_password_hash
@@ -39,9 +39,13 @@ async def init_data():
                 email="admin@inventoryerp.com",
                 full_name="System Administrator",
                 password_hash=get_password_hash("Admin@123"),
-                role=admin_role,
+                role=EmbeddedRole(
+                    id=str(admin_role.id),
+                    name=admin_role.name,
+                    slug=admin_role.slug,
+                    level=admin_role.level
+                ),
                 status="active",
-                is_active=True,
             )
             await admin_user.insert()
             print("✓ Admin user created (Email: admin@inventoryerp.com, Password: Admin@123)")
@@ -75,13 +79,13 @@ async def init_data():
                 email="supplier@example.com",
                 phone="+91-9876543210",
                 gst_number="18AABCT1234H1Z0",
-                address=Address(
-                    line1="456 Supplier Road",
-                    city="Delhi",
-                    state="Delhi",
-                    pincode="110001",
-                    country="India"
-                ),
+                address={
+                    "line1": "456 Supplier Road",
+                    "city": "Delhi",
+                    "state": "Delhi",
+                    "pincode": "110001",
+                    "country": "India"
+                },
                 bank_details=BankDetails(
                     bank_name="Sample Bank",
                     account_number="123456789",

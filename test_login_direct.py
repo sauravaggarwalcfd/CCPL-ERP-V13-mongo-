@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Simple direct MongoDB test of login"""
 import asyncio
+import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from bcrypt import checkpw
 
@@ -9,10 +10,12 @@ async def test_login_direct():
     print("DIRECT MONGODB LOGIN TEST")
     print("=" * 60)
     
-    # Connect to MongoDB directly
+    # Connect to MongoDB (uses env if set)
     print("\n1️⃣  Connecting to MongoDB...")
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
-    db = client["inventory_erp"]
+    mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    db_name = os.getenv("DATABASE_NAME", "inventory_erp")
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
     users_collection = db["user"]
     
     # Find the demo user

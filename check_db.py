@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check what's in MongoDB"""
 import asyncio
+import os
 from motor.motor_asyncio import AsyncIOMotorClient
 
 async def check_database():
@@ -8,8 +9,10 @@ async def check_database():
     print("CHECKING MONGODB CONTENTS")
     print("=" * 60)
     
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
-    db = client["inventory_erp"]
+    mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    db_name = os.getenv("DATABASE_NAME", "inventory_erp")
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
     
     # List all collections
     print("\n📂 Collections in 'inventory_erp' database:")

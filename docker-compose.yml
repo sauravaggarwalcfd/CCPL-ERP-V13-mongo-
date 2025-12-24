@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - inventory-net
-
   backend:
     build:
       context: ./backend
@@ -19,14 +10,12 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      MONGODB_URL: mongodb://mongodb:27017
+      MONGODB_URL: mongodb+srv://tech_db_user:Tech3112@cluster0.empai1t.mongodb.net/?appName=Cluster0
       DATABASE_NAME: inventory_erp
       SECRET_KEY: your-super-secret-key-change-in-production
-    depends_on:
-      - mongodb
     networks:
       - inventory-net
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: bash -c "python init_db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
@@ -42,9 +31,6 @@ services:
     networks:
       - inventory-net
     command: npm run dev -- --host
-
-volumes:
-  mongodb_data:
 
 networks:
   inventory-net:
