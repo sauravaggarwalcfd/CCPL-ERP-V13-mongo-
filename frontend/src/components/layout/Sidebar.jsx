@@ -82,6 +82,7 @@ export default function Sidebar() {
       subItems: [
         { to: '/users', label: 'User Management' },
         { to: '/roles', label: 'Role Management' },
+        { to: '/file-manager', label: 'File Manager' },
         { to: '/company', label: 'Company Settings' },
         { to: '/email-config', label: 'Email Configuration' },
         { to: '/general-settings', label: 'General Settings' },

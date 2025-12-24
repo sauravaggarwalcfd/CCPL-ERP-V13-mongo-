@@ -274,4 +274,68 @@ export const suppliers = {
   getDropdown: () => api.get('/suppliers/dropdown/list/'),
 }
 
+// File Management API
+export const files = {
+  // Upload file (with FormData)
+  upload: (formData, onUploadProgress) => {
+    const token = localStorage.getItem('access_token')
+    return axios.post(`${API_BASE_URL}/files/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
+      },
+      onUploadProgress
+    })
+  },
+
+  // List all files with pagination and filters
+  list: (params = {}) => api.get('/files/', { params }),
+
+  // Get file details
+  get: (fileId) => api.get(`/files/${fileId}`),
+
+  // Download/serve file
+  download: (fileId) => api.get(`/files/${fileId}/download`, { responseType: 'blob' }),
+
+  // Update file metadata
+  update: (fileId, data) => api.put(`/files/${fileId}`, data),
+
+  // Delete file (soft delete by default)
+  delete: (fileId, permanent = false) => api.delete(`/files/${fileId}`, {
+    params: { permanent }
+  }),
+
+  // Search files
+  search: (query, params = {}) => api.get('/files/search/files', {
+    params: { q: query, ...params }
+  }),
+
+  // Get recent files
+  getRecent: (limit = 10) => api.get('/files/recent/files', { params: { limit } }),
+
+  // Get category statistics
+  getStats: () => api.get('/files/stats/categories'),
+
+  // Get file URL for display
+  getFileUrl: (fileUrl) => {
+    // If it's already a full URL, return as is
+    if (fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
+      return fileUrl
+    }
+    // Otherwise, construct the full URL
+    return `http://localhost:8000${fileUrl}`
+  },
+
+  // Get thumbnail URL
+  getThumbnailUrl: (thumbnailUrl) => {
+    if (!thumbnailUrl) return null
+    // If it's already a full URL, return as is
+    if (thumbnailUrl.startsWith('http://') || thumbnailUrl.startsWith('https://')) {
+      return thumbnailUrl
+    }
+    // Otherwise, construct the full URL
+    return `http://localhost:8000${thumbnailUrl}`
+  }
+}
+
 export default api

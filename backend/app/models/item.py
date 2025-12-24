@@ -90,7 +90,13 @@ class ItemMaster(Document):
     barcode: Optional[str] = None
     serial_tracked: bool = False
     batch_tracked: bool = True
-    
+
+    # Image Information (linked to FileMaster)
+    image_id: Optional[str] = None  # FILE-YYYYMMDD-XXXX
+    image_url: Optional[str] = None  # /uploads/images/filename.jpg
+    image_name: Optional[str] = None  # Original filename
+    thumbnail_url: Optional[str] = None  # /uploads/thumbnails/thumb_filename.jpg
+
     # Status
     is_active: bool = True
     discontinued: bool = False
@@ -148,6 +154,10 @@ class ItemMasterCreate(BaseModel):
     warehouse_id: Optional[str] = None
     warehouse_name: Optional[str] = None
     barcode: Optional[str] = None
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
+    image_name: Optional[str] = None
+    thumbnail_url: Optional[str] = None
 
 
 class ItemMasterUpdate(BaseModel):
@@ -169,6 +179,10 @@ class ItemMasterUpdate(BaseModel):
     warehouse_id: Optional[str] = None
     warehouse_name: Optional[str] = None
     barcode: Optional[str] = None
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
+    image_name: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -196,4 +210,8 @@ class ItemMasterResponse(BaseModel):
     hsn_code: Optional[str]
     gst_rate: float
     current_stock: int
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
+    image_name: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     is_active: bool

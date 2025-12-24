@@ -59,7 +59,7 @@ async def upload_file(
         file_id = await generate_file_id()
 
         # Create database record
-        file_record = await FileMaster(
+        file_record = FileMaster(
             file_id=file_id,
             file_name=file_info["file_name"],
             original_name=file_info["original_name"],
@@ -76,7 +76,8 @@ async def upload_file(
             height=file_info["height"],
             uploaded_by=str(current_user.id) if current_user else None,
             uploaded_by_name=current_user.full_name if current_user else None,
-        ).insert()
+        )
+        await file_record.insert()
 
         logger.info(f"File uploaded: {file_id} - {file_info['original_name']}")
 
@@ -128,27 +129,23 @@ async def list_files(
     - Sort by upload_date, file_name, file_size
     """
     # Build query
-    query_conditions = [FileMaster.is_deleted == False]
+    query_filters = {"is_deleted": False}
 
     if category:
-        query_conditions.append(FileMaster.category == category)
+        query_filters["category"] = category
 
     # Apply conditions
-    query = FileMaster.find(*query_conditions)
+    query = FileMaster.find(query_filters)
 
     # Apply search
     if search:
         # Use $or for searching multiple fields
-        query = FileMaster.find(
-            *query_conditions,
-            {
-                "$or": [
-                    {"file_name": {"$regex": search, "$options": "i"}},
-                    {"original_name": {"$regex": search, "$options": "i"}},
-                    {"description": {"$regex": search, "$options": "i"}},
-                ]
-            }
-        )
+        query_filters["$or"] = [
+            {"file_name": {"$regex": search, "$options": "i"}},
+            {"original_name": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}},
+        ]
+        query = FileMaster.find(query_filters)
 
     # Get total count
     total = await query.count()
@@ -201,10 +198,10 @@ async def get_file(
 ):
     """Get file details by file_id"""
 
-    file = await FileMaster.find_one(
-        FileMaster.file_id == file_id,
-        FileMaster.is_deleted == False
-    )
+    file = await FileMaster.find_one({
+        "file_id": file_id,
+        "is_deleted": False
+    })
 
     if not file:
         raise HTTPException(
@@ -247,10 +244,10 @@ async def download_file(
 ):
     """Download/serve a file by file_id"""
 
-    file = await FileMaster.find_one(
-        FileMaster.file_id == file_id,
-        FileMaster.is_deleted == False
-    )
+    file = await FileMaster.find_one({
+        "file_id": file_id,
+        "is_deleted": False
+    })
 
     if not file:
         raise HTTPException(
@@ -284,10 +281,10 @@ async def update_file(
 ):
     """Update file metadata (category, description, tags)"""
 
-    file = await FileMaster.find_one(
-        FileMaster.file_id == file_id,
-        FileMaster.is_deleted == False
-    )
+    file = await FileMaster.find_one({
+        "file_id": file_id,
+        "is_deleted": False
+    })
 
     if not file:
         raise HTTPException(
@@ -327,10 +324,10 @@ async def delete_file_endpoint(
     - Use permanent=True to permanently delete file from database and disk
     """
 
-    file = await FileMaster.find_one(
-        FileMaster.file_id == file_id,
-        FileMaster.is_deleted == False
-    )
+    file = await FileMaster.find_one({
+        "file_id": file_id,
+        "is_deleted": False
+    })
 
     if not file:
         raise HTTPException(
@@ -366,21 +363,19 @@ async def search_files(
 ):
     """Search files by name or description"""
 
-    query_conditions = [
-        FileMaster.is_deleted == False,
-        {
-            "$or": [
-                {"file_name": {"$regex": q, "$options": "i"}},
-                {"original_name": {"$regex": q, "$options": "i"}},
-                {"description": {"$regex": q, "$options": "i"}},
-            ]
-        }
-    ]
+    query_filters = {
+        "is_deleted": False,
+        "$or": [
+            {"file_name": {"$regex": q, "$options": "i"}},
+            {"original_name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+        ]
+    }
 
     if category:
-        query_conditions.append(FileMaster.category == category)
+        query_filters["category"] = category
 
-    files = await FileMaster.find(*query_conditions).limit(limit).to_list()
+    files = await FileMaster.find(query_filters).limit(limit).to_list()
 
     return [
         {
@@ -409,10 +404,10 @@ async def get_category_stats(
     stats = []
 
     for category in FileCategory:
-        files = await FileMaster.find(
-            FileMaster.category == category,
-            FileMaster.is_deleted == False
-        ).to_list()
+        files = await FileMaster.find({
+            "category": category,
+            "is_deleted": False
+        }).to_list()
 
         total_size = sum(f.file_size for f in files)
 
@@ -424,7 +419,7 @@ async def get_category_stats(
         })
 
     # Get overall stats
-    all_files = await FileMaster.find(FileMaster.is_deleted == False).to_list()
+    all_files = await FileMaster.find({"is_deleted": False}).to_list()
     total_size = sum(f.file_size for f in all_files)
 
     return {
@@ -446,9 +441,9 @@ async def get_recent_files(
 ):
     """Get most recently uploaded files"""
 
-    files = await FileMaster.find(
-        FileMaster.is_deleted == False
-    ).sort("-upload_date").limit(limit).to_list()
+    files = await FileMaster.find({
+        "is_deleted": False
+    }).sort("-upload_date").limit(limit).to_list()
 
     return [
         {

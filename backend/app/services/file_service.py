@@ -284,13 +284,13 @@ async def generate_file_id() -> str:
 
     # Find the latest file ID for today
     latest_file = await FileMaster.find(
-        FileMaster.file_id.startswith(prefix)  # type: ignore
-    ).sort("-file_id").first_or_none()
+        {"file_id": {"$regex": f"^{re.escape(prefix)}"}}
+    ).sort("-file_id").limit(1).to_list()
 
-    if latest_file:
+    if latest_file and len(latest_file) > 0:
         # Extract sequence number and increment
         try:
-            seq = int(latest_file.file_id.split("-")[-1])
+            seq = int(latest_file[0].file_id.split("-")[-1])
             next_seq = seq + 1
         except (ValueError, IndexError):
             next_seq = 1

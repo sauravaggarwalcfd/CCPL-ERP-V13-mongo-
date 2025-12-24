@@ -23,6 +23,7 @@ from .models.variant_groups import VariantGroup
 from .models.specifications import CategorySpecifications, ItemSpecifications
 from .models.brand_master import BrandMaster
 from .models.supplier_master import SupplierMaster
+from .models.file_master import FileMaster
 
 
 class Database:
@@ -71,6 +72,7 @@ async def connect_to_mongo():
             ItemSpecifications,
             BrandMaster,            # Masters
             SupplierMaster,
+            FileMaster,             # File Management
         ],
     )
 

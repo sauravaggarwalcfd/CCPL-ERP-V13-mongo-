@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from pathlib import Path
 import logging
 from .database import connect_to_mongo, close_mongo_connection
 from .routes import (
@@ -28,6 +30,7 @@ from .routes import (
     variant_groups,
     specifications,
     brands,
+    files,
 )
 from .models.item_type import ItemType
 
@@ -100,6 +103,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(item_types.router, prefix="/api/item-types", tags=["Item Types"])
 app.include_router(category_hierarchy.router, prefix="/api/hierarchy", tags=["Category Hierarchy"])
 app.include_router(brands.router, prefix="/api/brands", tags=["Brand Master"])
+app.include_router(files.router, prefix="/api/files", tags=["File Management"])
 
 # Variant Master routes
 app.include_router(colours.router, prefix="/api", tags=["Colour Master"])
@@ -109,6 +113,11 @@ app.include_router(variant_groups.router, prefix="/api", tags=["Variant Groups"]
 
 # Specifications routes
 app.include_router(specifications.router, prefix="/api", tags=["Specifications"])
+
+# Serve uploaded files statically
+UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 @app.get("/")

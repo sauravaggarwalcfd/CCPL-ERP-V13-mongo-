@@ -18,6 +18,7 @@ import PurchaseOrderForm from './pages/PurchaseOrderForm'
 import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
 import BrandMaster from './pages/Masters/BrandMaster'
 import SupplierMaster from './pages/Masters/SupplierMaster'
+import FileManager from './pages/FileManager'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -94,6 +95,11 @@ function App() {
             <Route path="/specifications" element={
               <ProtectedRoute>
                 <SpecificationsManager />
+              </ProtectedRoute>
+            } />
+            <Route path="/file-manager" element={
+              <ProtectedRoute>
+                <FileManager />
               </ProtectedRoute>
             } />
             <Route path="/purchase-orders" element={

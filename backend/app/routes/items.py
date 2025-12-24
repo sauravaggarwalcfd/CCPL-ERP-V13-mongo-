@@ -77,6 +77,10 @@ async def create_item(
         warehouse_id=data.warehouse_id,
         warehouse_name=data.warehouse_name,
         barcode=data.barcode,
+        image_id=data.image_id,
+        image_url=data.image_url,
+        image_name=data.image_name,
+        thumbnail_url=data.thumbnail_url,
         created_by=str(current_user.id) if current_user else None,
     ).insert()
     
@@ -161,6 +165,10 @@ async def list_items(
             "selling_price": i.selling_price,
             "mrp": i.mrp,
             "current_stock": i.current_stock,
+            "image_id": i.image_id,
+            "image_url": i.image_url,
+            "image_name": i.image_name,
+            "thumbnail_url": i.thumbnail_url,
             "is_active": i.is_active,
         }
         for i in items
@@ -222,6 +230,10 @@ async def get_item(
         "barcode": item.barcode,
         "serial_tracked": item.serial_tracked,
         "batch_tracked": item.batch_tracked,
+        "image_id": item.image_id,
+        "image_url": item.image_url,
+        "image_name": item.image_name,
+        "thumbnail_url": item.thumbnail_url,
         "is_active": item.is_active,
         "created_at": item.created_at,
         "updated_at": item.updated_at,
