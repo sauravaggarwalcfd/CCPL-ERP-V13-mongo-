@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Eye } from 'lucide-react'
+import { Plus, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ItemCategory() {
@@ -7,7 +7,6 @@ export default function ItemCategory() {
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(null)
 
@@ -88,15 +87,7 @@ export default function ItemCategory() {
     setShowViewModal(true)
   }
 
-  const handleEditCategory = (category) => {
-    setSelectedCategory(category)
-    setFormData({
-      category_name: category.category_name,
-      category_code: category.category_code,
-      description: category.description || '',
-    })
-    setShowEditModal(true)
-  }
+  // Editing handled in ItemCategoryMaster; remove separate edit modal here
 
   const handleUpdateCategory = async (e) => {
     e.preventDefault()
@@ -237,13 +228,7 @@ export default function ItemCategory() {
                             >
                               <Eye size={16} />
                             </button>
-                            <button 
-                              onClick={() => handleEditCategory(category)}
-                              className="p-2 hover:bg-orange-100 rounded text-orange-600 transition" 
-                              title="Edit"
-                            >
-                              <Edit2 size={16} />
-                            </button>
+                            {/* Edit moved to ItemCategoryMaster - removed duplicate edit option */}
                             <button 
                               onClick={() => handleDeleteCategory(category)}
                               className="p-2 hover:bg-red-100 rounded text-red-600 transition" 
@@ -388,64 +373,7 @@ export default function ItemCategory() {
         </div>
       )}
 
-      {/* Edit Category Modal */}
-      {showEditModal && selectedCategory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
-            <div className="bg-gradient-to-r from-orange-600 to-orange-800 text-white p-6">
-              <h2 className="text-2xl font-bold">Edit Category</h2>
-            </div>
-
-            <form onSubmit={handleUpdateCategory} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category Code</label>
-                <input
-                  type="text"
-                  value={formData.category_code}
-                  onChange={(e) => setFormData({...formData, category_code: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
-                <input
-                  type="text"
-                  value={formData.category_name}
-                  onChange={(e) => setFormData({...formData, category_name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-6 border-t">
-                <button
-                  type="submit"
-                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition"
-                >
-                  Update Category
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg font-medium transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Edit moved to ItemCategoryMaster L1 form; removed duplicate Edit modal */}
     </div>
   )
 }

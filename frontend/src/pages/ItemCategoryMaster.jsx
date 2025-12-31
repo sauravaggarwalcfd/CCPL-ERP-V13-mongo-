@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus, Search, ChevronRight, ChevronDown, Edit2, Edit3, Trash2, Eye,
   Package, Users, Layers, Tag, Hash, Shirt, RefreshCw, List,
@@ -69,7 +69,35 @@ export default function ItemCategoryMaster() {
   const [listData, setListData] = useState([])
   const [itemTypesList, setItemTypesList] = useState([])
   const [loading, setLoading] = useState(true)
-  
+  // Which level name is being edited inline
+  const [editingLevel, setEditingLevel] = useState(null)
+  // refs for inline inputs so we can focus after enabling edit
+  const inputRefs = useRef({})
+
+  // Auto-focus the inline input when editingLevel changes
+  useEffect(() => {
+    if (!editingLevel) return
+    const el = inputRefs.current[editingLevel]
+    if (el) {
+      try { el.focus(); el.select && el.select() } catch (e) {}
+    }
+  }, [editingLevel])
+
+  // Save level names to server when editing an existing Level 1 category
+  const saveLevelNames = async () => {
+    // Only persist when editing an existing category (panelMode === 'edit') and it's a Level 1 item
+    if (panelMode === 'edit' && formData.level === 1 && formData.code) {
+      try {
+        await categoryHierarchy.update('categories', formData.code, {
+          level_names: formData.level_names
+        })
+        toast.success('Level names updated')
+      } catch (err) {
+        console.error('Failed to save level names:', err)
+        toast.error('Failed to save level names')
+      }
+    }
+  }
   // View state
   const [viewMode, setViewMode] = useState('tree') // 'tree', 'list', 'types'
   const [expandedNodes, setExpandedNodes] = useState(new Set())
@@ -108,6 +136,7 @@ export default function ItemCategoryMaster() {
 
   // Parent category level names (for inheritance)
   const [parentLevelNames, setParentLevelNames] = useState(null)
+  
 
   // Specifications configuration state
   const [variantGroups, setVariantGroups] = useState({
@@ -1544,8 +1573,42 @@ export default function ItemCategoryMaster() {
                           <IconComponent size={20} className="text-white" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">
-                            L{level.level} {customLevelName && `- ${customLevelName}`}
+                          <div className="font-medium flex items-center gap-2">
+                            <span>{`L${level.level}`}</span>
+                            {editingLevel === level.level ? (
+                              <input
+                                ref={(el) => { inputRefs.current[level.level] = el }}
+                                type="text"
+                                value={formData.level_names?.[`l${level.level}`] || ''}
+                                onChange={(e) => setFormData(prev => ({
+                                  ...prev,
+                                  level_names: {
+                                    ...prev.level_names,
+                                    [`l${level.level}`]: e.target.value
+                                  }
+                                }))}
+                                onBlur={async () => {
+                                  setEditingLevel(null)
+                                  // persist only when editing an existing Level 1 category
+                                  if (panelMode === 'edit' && formData.level === 1 && formData.code) {
+                                    await saveLevelNames()
+                                  }
+                                }}
+                                className="px-2 py-1 border rounded text-sm"
+                              />
+                            ) : (
+                              <>
+                                <span>{customLevelName && `- ${customLevelName}`}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setEditingLevel(level.level) }}
+                                  className="ml-2 text-gray-400 hover:text-gray-600"
+                                  title={`Edit Level ${level.level} name`}
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                              </>
+                            )}
                           </div>
                           {!customLevelName && (
                             <div className="text-xs text-gray-500">{level.name}</div>
@@ -1560,37 +1623,7 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
 
-              {/* Level Names Configuration - Always Visible */}
-              <div className="mb-6 p-4 bg-purple-50 rounded-lg">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Custom Level Names (Optional)
-                </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  Define custom names for each level in this category hierarchy. These will be displayed throughout the system.
-                </p>
-                <div className="grid grid-cols-1 gap-3">
-                  {[1, 2, 3, 4, 5].map((level) => (
-                    <div key={level} className="flex items-center gap-3">
-                      <label className="text-sm text-gray-600 w-20">Level {level}:</label>
-                      <input
-                        type="text"
-                        value={formData.level_names?.[`l${level}`] || ''}
-                        onChange={(e) => {
-                          setFormData(prev => ({
-                            ...prev,
-                            level_names: {
-                              ...prev.level_names,
-                              [`l${level}`]: e.target.value
-                            }
-                          }))
-                        }}
-                        placeholder={`e.g., ${level === 1 ? 'Category' : level === 2 ? 'Gender' : level === 3 ? 'Occasion' : level === 4 ? 'Product Type' : 'Style'}`}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Level Names removed from form as requested */}
 
               {/* Step 3: Select Parent Hierarchy */}
               {formData.level > 1 && (
