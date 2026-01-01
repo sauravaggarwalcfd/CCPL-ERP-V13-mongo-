@@ -53,7 +53,7 @@ if %errorlevel% equ 0 (
     pip install -r requirements.txt
     
     echo Starting backend server...
-    start "" python -m uvicorn app.main:app --reload --port 8000
+    start "" python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     
     cd ..\frontend
     

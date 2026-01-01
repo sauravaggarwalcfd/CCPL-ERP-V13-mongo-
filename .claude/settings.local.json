@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ipconfig:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c \"taskkill /PID 47452 /F /T\")",
+      "Bash(cmd //c \"for /f \"\"tokens=5\"\" %a in \\(''netstat -ano ^| findstr :8000 ^| findstr LISTENING''\\) do taskkill /PID %a /F\")",
+      "Bash(cmd //c \"taskkill /IM python.exe /F\")",
+      "Bash(start //b cmd //c \"venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\")",
+      "Bash(start //b cmd //c \"npm run dev\")",
+      "Bash(cmd //c:*)",
+      "Bash(where:*)"
+    ]
+  }
+}
