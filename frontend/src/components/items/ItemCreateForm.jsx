@@ -75,6 +75,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     stockUom: 'PCS',
     purchaseUom: 'PCS',
     conversionFactor: 1,
+    opening_stock: 0,
     image_id: null,
     image_url: null,
     image_name: null,
@@ -116,6 +117,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           stockUom: item.uom || 'PCS',
           purchaseUom: 'PCS',
           conversionFactor: 1,
+          opening_stock: item.opening_stock || 0,
           image_id: item.image_id,
           image_url: item.image_url,
           image_name: item.image_name,
@@ -682,6 +684,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         cost_price: 0,
         selling_price: 0,
         mrp: 0,
+        opening_stock: parseFloat(formData.opening_stock) || 0,
         // BASE64 image data (preferred approach)
         image_base64: formData.image_base64,
         image_type: formData.image_type,
@@ -768,6 +771,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
       stockUom: 'PCS',
       purchaseUom: 'PCS',
       conversionFactor: 1,
+      opening_stock: 0,
       image_id: null,
       image_url: null,
       image_name: null,
@@ -815,7 +819,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         </div>
 
         {/* Form Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm">
 
           {/* Full Screen Search Overlay */}
           {showSearch && (
@@ -826,7 +830,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Search className="w-6 h-6" />
-                      <h3 className="text-lg font-semibold">Quick Search Categories</h3>
+                      <h3 className="text-base font-semibold">Quick Search Categories</h3>
                     </div>
                     <button
                       onClick={() => {
@@ -852,7 +856,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                           if (searchResults.length > 0) setShowSearchResults(true)
                         }}
                         placeholder="Search categories by name or code (Level 1-5)..."
-                        className="w-full pl-12 pr-4 py-3.5 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full pl-12 pr-4 py-3.5 text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         autoFocus
                       />
                     </div>
@@ -863,14 +867,14 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                         {searching && (
                           <div className="p-6 text-center text-gray-500">
                             <div className="animate-spin inline-block w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
-                            <span className="ml-3 text-lg">Searching...</span>
+                            <span className="ml-3 text-base">Searching...</span>
                           </div>
                         )}
 
                         {!searching && searchResults.length === 0 && (
                           <div className="p-6 text-center text-gray-500">
                             <AlertCircle className="w-6 h-6 inline-block mb-2" />
-                            <div className="text-lg">No categories found</div>
+                            <div className="text-base">No categories found</div>
                             <p className="text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
@@ -926,13 +930,13 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           {/* We simply continue rendering the exact content as in modal variant */}
           {/* Step 1: Category Hierarchy */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">1</span>
-              SELECT CATEGORY HIERARCHY <span className="text-red-500">*</span>
+              Select item category <span className="text-red-500">*</span>
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* Level 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+              {/* Level 1 - always visible */}
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Level 1</label>
                 <select
@@ -952,91 +956,97 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </select>
               </div>
 
-              {/* Level 2 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
-                <select
-                  value={selectedSubCategory?.code || ''}
-                  onChange={(e) => {
-                    const subCat = subCategories.find(c => c.code === e.target.value)
-                    setSelectedSubCategory(subCat || null)
-                  }}
-                  disabled={!selectedCategory}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 2</option>
-                  {subCategories.map(subCat => (
-                    <option key={subCat.code} value={subCat.code}>
-                      {subCat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Level 2 - visible only when sub-categories exist */}
+              {subCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
+                  <select
+                    value={selectedSubCategory?.code || ''}
+                    onChange={(e) => {
+                      const subCat = subCategories.find(c => c.code === e.target.value)
+                      setSelectedSubCategory(subCat || null)
+                    }}
+                    disabled={!selectedCategory}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 2</option>
+                    {subCategories.map(subCat => (
+                      <option key={subCat.code} value={subCat.code}>
+                        {subCat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* Level 3 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
-                <select
-                  value={selectedDivision?.code || ''}
-                  onChange={(e) => {
-                    const div = divisions.find(d => d.code === e.target.value)
-                    setSelectedDivision(div || null)
-                  }}
-                  disabled={!selectedSubCategory}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 3</option>
-                  {divisions.map(div => (
-                    <option key={div.code} value={div.code}>
-                      {div.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              {/* Level 3 - visible only when divisions exist */}
+              {divisions.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
+                  <select
+                    value={selectedDivision?.code || ''}
+                    onChange={(e) => {
+                      const div = divisions.find(d => d.code === e.target.value)
+                      setSelectedDivision(div || null)
+                    }}
+                    disabled={!selectedSubCategory}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 3</option>
+                    {divisions.map(div => (
+                      <option key={div.code} value={div.code}>
+                        {div.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Level 4 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
-                <select
-                  value={selectedClass?.code || ''}
-                  onChange={(e) => {
-                    const cls = classes.find(c => c.code === e.target.value)
-                    setSelectedClass(cls || null)
-                  }}
-                  disabled={!selectedDivision}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 4</option>
-                  {classes.map(cls => (
-                    <option key={cls.code} value={cls.code}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Level 4 - visible only when classes exist */}
+              {classes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
+                  <select
+                    value={selectedClass?.code || ''}
+                    onChange={(e) => {
+                      const cls = classes.find(c => c.code === e.target.value)
+                      setSelectedClass(cls || null)
+                    }}
+                    disabled={!selectedDivision}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 4</option>
+                    {classes.map(cls => (
+                      <option key={cls.code} value={cls.code}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* Level 5 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
-                <select
-                  value={selectedSubClass?.code || ''}
-                  onChange={(e) => {
-                    const subCls = subClasses.find(c => c.code === e.target.value)
-                    setSelectedSubClass(subCls || null)
-                  }}
-                  disabled={!selectedClass}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 5</option>
-                  {subClasses.map(subCls => (
-                    <option key={subCls.code} value={subCls.code}>
-                      {subCls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Level 5 - visible only when sub-classes exist */}
+              {subClasses.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
+                  <select
+                    value={selectedSubClass?.code || ''}
+                    onChange={(e) => {
+                      const subCls = subClasses.find(c => c.code === e.target.value)
+                      setSelectedSubClass(subCls || null)
+                    }}
+                    disabled={!selectedClass}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 5</option>
+                    {subClasses.map(subCls => (
+                      <option key={subCls.code} value={subCls.code}>
+                        {subCls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Path Display */}
@@ -1103,7 +1113,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
           {/* Step 2: Item Details */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">2</span>
               ITEM DETAILS
             </h3>
@@ -1133,7 +1143,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                       type="text"
                       value={formData.sku}
                       readOnly
-                      className="w-full px-4 py-3 pr-10 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-mono text-lg font-semibold cursor-not-allowed"
+                      className="w-full px-4 py-3 pr-10 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-mono text-base font-semibold cursor-not-allowed"
                     />
                     <Lock className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
                   </div>
@@ -1149,7 +1159,26 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     value={formData.itemName}
                     onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                     placeholder="e.g., Men's Round Neck Cotton T-Shirt"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                  />
+                </div>
+
+                {/* Opening Stock */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    {isEditMode ? 'Current Stock' : 'Opening Stock'}
+                    <span className="text-xs text-gray-500 ml-2">
+                      {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.opening_stock}
+                    onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   />
                 </div>
               </div>
@@ -1161,7 +1190,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
           {/* Step 3: Specifications */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">3</span>
               SPECIFICATIONS
               <span className="text-sm text-gray-500 font-normal">(Based on Category Configuration)</span>
@@ -1235,7 +1264,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         </div>
 
         {/* Form Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm">
 
           {/* Full Screen Search Overlay */}
           {showSearch && (
@@ -1246,7 +1275,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Search className="w-6 h-6" />
-                      <h3 className="text-lg font-semibold">Quick Search Categories</h3>
+                      <h3 className="text-base font-semibold">Quick Search Categories</h3>
                     </div>
                     <button
                       onClick={() => {
@@ -1272,7 +1301,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                           if (searchResults.length > 0) setShowSearchResults(true)
                         }}
                         placeholder="Search categories by name or code (Level 1-5)..."
-                        className="w-full pl-12 pr-4 py-3.5 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full pl-12 pr-4 py-3.5 text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         autoFocus
                       />
                     </div>
@@ -1283,14 +1312,14 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                         {searching && (
                           <div className="p-6 text-center text-gray-500">
                             <div className="animate-spin inline-block w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
-                            <span className="ml-3 text-lg">Searching...</span>
+                            <span className="ml-3 text-base">Searching...</span>
                           </div>
                         )}
 
                         {!searching && searchResults.length === 0 && (
                           <div className="p-6 text-center text-gray-500">
                             <AlertCircle className="w-6 h-6 inline-block mb-2" />
-                            <div className="text-lg">No categories found</div>
+                            <div className="text-base">No categories found</div>
                             <p className="text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
@@ -1341,13 +1370,13 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
           {/* Step 1: Category Hierarchy */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">1</span>
-              SELECT CATEGORY HIERARCHY <span className="text-red-500">*</span>
+              Select item category <span className="text-red-500">*</span>
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* Level 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+              {/* Level 1 - always visible */}
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Level 1</label>
                 <select
@@ -1367,91 +1396,97 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </select>
               </div>
 
-              {/* Level 2 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
-                <select
-                  value={selectedSubCategory?.code || ''}
-                  onChange={(e) => {
-                    const subCat = subCategories.find(c => c.code === e.target.value)
-                    setSelectedSubCategory(subCat || null)
-                  }}
-                  disabled={!selectedCategory}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 2</option>
-                  {subCategories.map(subCat => (
-                    <option key={subCat.code} value={subCat.code}>
-                      {subCat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Level 2 - visible only when sub-categories exist */}
+              {subCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
+                  <select
+                    value={selectedSubCategory?.code || ''}
+                    onChange={(e) => {
+                      const subCat = subCategories.find(c => c.code === e.target.value)
+                      setSelectedSubCategory(subCat || null)
+                    }}
+                    disabled={!selectedCategory}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 2</option>
+                    {subCategories.map(subCat => (
+                      <option key={subCat.code} value={subCat.code}>
+                        {subCat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* Level 3 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
-                <select
-                  value={selectedDivision?.code || ''}
-                  onChange={(e) => {
-                    const div = divisions.find(d => d.code === e.target.value)
-                    setSelectedDivision(div || null)
-                  }}
-                  disabled={!selectedSubCategory}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 3</option>
-                  {divisions.map(div => (
-                    <option key={div.code} value={div.code}>
-                      {div.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              {/* Level 3 - visible only when divisions exist */}
+              {divisions.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
+                  <select
+                    value={selectedDivision?.code || ''}
+                    onChange={(e) => {
+                      const div = divisions.find(d => d.code === e.target.value)
+                      setSelectedDivision(div || null)
+                    }}
+                    disabled={!selectedSubCategory}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 3</option>
+                    {divisions.map(div => (
+                      <option key={div.code} value={div.code}>
+                        {div.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Level 4 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
-                <select
-                  value={selectedClass?.code || ''}
-                  onChange={(e) => {
-                    const cls = classes.find(c => c.code === e.target.value)
-                    setSelectedClass(cls || null)
-                  }}
-                  disabled={!selectedDivision}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 4</option>
-                  {classes.map(cls => (
-                    <option key={cls.code} value={cls.code}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Level 4 - visible only when classes exist */}
+              {classes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
+                  <select
+                    value={selectedClass?.code || ''}
+                    onChange={(e) => {
+                      const cls = classes.find(c => c.code === e.target.value)
+                      setSelectedClass(cls || null)
+                    }}
+                    disabled={!selectedDivision}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 4</option>
+                    {classes.map(cls => (
+                      <option key={cls.code} value={cls.code}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* Level 5 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
-                <select
-                  value={selectedSubClass?.code || ''}
-                  onChange={(e) => {
-                    const subCls = subClasses.find(c => c.code === e.target.value)
-                    setSelectedSubClass(subCls || null)
-                  }}
-                  disabled={!selectedClass}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Level 5</option>
-                  {subClasses.map(subCls => (
-                    <option key={subCls.code} value={subCls.code}>
-                      {subCls.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Level 5 - visible only when sub-classes exist */}
+              {subClasses.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
+                  <select
+                    value={selectedSubClass?.code || ''}
+                    onChange={(e) => {
+                      const subCls = subClasses.find(c => c.code === e.target.value)
+                      setSelectedSubClass(subCls || null)
+                    }}
+                    disabled={!selectedClass}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Level 5</option>
+                    {subClasses.map(subCls => (
+                      <option key={subCls.code} value={subCls.code}>
+                        {subCls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Path Display */}
@@ -1518,7 +1553,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
           {/* Step 2: Item Details */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">2</span>
               ITEM DETAILS
             </h3>
@@ -1548,7 +1583,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                       type="text"
                       value={formData.sku}
                       readOnly
-                      className="w-full px-4 py-3 pr-10 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-mono text-lg font-semibold cursor-not-allowed"
+                      className="w-full px-4 py-3 pr-10 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-mono text-base font-semibold cursor-not-allowed"
                     />
                     <Lock className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
                   </div>
@@ -1564,7 +1599,26 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     value={formData.itemName}
                     onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                     placeholder="e.g., Men's Round Neck Cotton T-Shirt"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                  />
+                </div>
+
+                {/* Opening Stock */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    {isEditMode ? 'Current Stock' : 'Opening Stock'}
+                    <span className="text-xs text-gray-500 ml-2">
+                      {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.opening_stock}
+                    onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   />
                 </div>
               </div>
@@ -1576,7 +1630,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
           {/* Step 3: Specifications */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">3</span>
               SPECIFICATIONS
               <span className="text-sm text-gray-500 font-normal">(Based on Category Configuration)</span>

@@ -24,6 +24,14 @@ from .models.specifications import CategorySpecifications, ItemSpecifications
 from .models.brand_master import BrandMaster
 from .models.supplier_master import SupplierMaster
 from .models.file_master import FileMaster
+from .models.inventory_management import (
+    InventoryStock,
+    StockMovement as InventoryStockMovement,
+    StockAdjustment as InventoryStockAdjustment,
+    StockTransfer as InventoryStockTransfer,
+    StockLevel,
+    StockIssue
+)
 
 
 class Database:
@@ -73,6 +81,12 @@ async def connect_to_mongo():
             BrandMaster,            # Masters
             SupplierMaster,
             FileMaster,             # File Management
+            InventoryStock,         # Inventory Management
+            InventoryStockMovement,
+            InventoryStockAdjustment,
+            InventoryStockTransfer,
+            StockLevel,
+            StockIssue,
         ],
     )
 

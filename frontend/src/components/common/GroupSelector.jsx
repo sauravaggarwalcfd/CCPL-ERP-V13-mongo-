@@ -1,21 +1,44 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Check, Search } from 'lucide-react';
 
 const GroupSelector = ({ groups = [], selected = [], onChange, placeholder = "Select groups..." }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+      const insideWrapper = wrapperRef.current && wrapperRef.current.contains(event.target);
+      const insideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+      if (!insideWrapper && !insideDropdown) {
         setIsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Compute dropdown position when opened and on resize/scroll
+  useEffect(() => {
+    const updatePos = () => {
+      if (!wrapperRef.current) return;
+      const r = wrapperRef.current.getBoundingClientRect();
+      setDropdownPos({ top: r.bottom + window.scrollY, left: r.left + window.scrollX, width: r.width });
+    };
+    if (isOpen) {
+      updatePos();
+      window.addEventListener('resize', updatePos);
+      window.addEventListener('scroll', updatePos, true);
+    }
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [isOpen]);
 
   const handleToggle = (groupCode) => {
     const newSelected = selected.includes(groupCode)
@@ -72,9 +95,13 @@ const GroupSelector = ({ groups = [], selected = [], onChange, placeholder = "Se
         />
       </div>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+      {/* Dropdown (rendered via portal to avoid clipping/overlay issues) */}
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+        >
           {filteredGroups.length > 0 ? (
             <div className="py-1">
               {filteredGroups.map(group => {
@@ -101,7 +128,8 @@ const GroupSelector = ({ groups = [], selected = [], onChange, placeholder = "Se
               No groups found
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

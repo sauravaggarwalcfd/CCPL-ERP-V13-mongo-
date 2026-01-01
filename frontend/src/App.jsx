@@ -21,6 +21,14 @@ import BrandMaster from './pages/Masters/BrandMaster'
 import SupplierMaster from './pages/Masters/SupplierMaster'
 import FileManager from './pages/FileManager'
 import WorkInProgress from './components/common/WorkInProgress'
+import {
+  InventoryDashboard,
+  StockMovements,
+  StockAdjustments,
+  StockTransfers,
+  StockLevels,
+  StockIssue
+} from './pages/Inventory'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -192,30 +200,35 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* Inventory Transactions - Work in Progress */}
-            <Route path="/stock-movements" element={
+            {/* Inventory Management */}
+            <Route path="/inventory/dashboard" element={
               <ProtectedRoute>
-                <WorkInProgress title="Stock Movements" description="Track all stock movements across warehouses and locations." />
+                <InventoryDashboard />
               </ProtectedRoute>
             } />
-            <Route path="/stock-adjustments" element={
+            <Route path="/inventory/stock-movements" element={
               <ProtectedRoute>
-                <WorkInProgress title="Stock Adjustments" description="Make inventory adjustments for discrepancies and corrections." />
+                <StockMovements />
               </ProtectedRoute>
             } />
-            <Route path="/stock-transfers" element={
+            <Route path="/inventory/stock-adjustments" element={
               <ProtectedRoute>
-                <WorkInProgress title="Stock Transfers" description="Transfer inventory between warehouses and locations." />
+                <StockAdjustments />
               </ProtectedRoute>
             } />
-            <Route path="/stock-issue" element={
+            <Route path="/inventory/stock-transfers" element={
               <ProtectedRoute>
-                <WorkInProgress title="Stock Issue" description="Issue stock for production or internal consumption." />
+                <StockTransfers />
               </ProtectedRoute>
             } />
-            <Route path="/stock-levels" element={
+            <Route path="/inventory/stock-issue" element={
               <ProtectedRoute>
-                <WorkInProgress title="Stock Levels" description="View current stock levels across all locations." />
+                <StockIssue />
+              </ProtectedRoute>
+            } />
+            <Route path="/inventory/stock-levels" element={
+              <ProtectedRoute>
+                <StockLevels />
               </ProtectedRoute>
             } />
 

@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from ..models.item import ItemMaster, ItemMasterCreate, ItemMasterUpdate, InventoryType
 from ..models.category_hierarchy import ItemSubClass
+from ..models.inventory_management import InventoryStock, StockLevel, StockMovement, MovementType
 from ..core.dependencies import get_current_user
 
 router = APIRouter()
@@ -45,6 +46,9 @@ async def create_item(
             hierarchy_path = sub_class.path
             hierarchy_path_name = sub_class.path_name
     
+    # Get opening stock value
+    opening_stock = getattr(data, 'opening_stock', 0) or 0
+
     item = await ItemMaster(
         item_code=data.item_code,
         item_name=data.item_name,
@@ -77,6 +81,8 @@ async def create_item(
         warehouse_id=data.warehouse_id,
         warehouse_name=data.warehouse_name,
         barcode=data.barcode,
+        opening_stock=opening_stock,
+        current_stock=int(opening_stock),
         # File server fields (legacy)
         image_id=data.image_id,
         image_url=data.image_url,
@@ -88,13 +94,64 @@ async def create_item(
         image_size=data.image_size,
         created_by=str(current_user.id) if current_user else None,
     ).insert()
-    
+
+    # Initialize inventory stock record
+    if opening_stock > 0:
+        try:
+            # Create InventoryStock record
+            inventory_stock = InventoryStock(
+                item_code=data.item_code,
+                item_name=data.item_name,
+                opening_stock=opening_stock,
+                current_stock=opening_stock,
+                reserved_stock=0,
+                available_stock=opening_stock,
+                warehouse_id=data.warehouse_id,
+                warehouse_name=data.warehouse_name,
+            )
+            await inventory_stock.save()
+
+            # Create StockLevel record with defaults
+            stock_level = StockLevel(
+                item_code=data.item_code,
+                item_name=data.item_name,
+                minimum_stock=10,
+                maximum_stock=1000,
+                reorder_point=20,
+                reorder_quantity=100,
+            )
+            await stock_level.save()
+
+            # Create opening stock movement record
+            today = datetime.utcnow().strftime("%Y%m%d")
+            movement_id = f"MOV-{today}-{data.item_code[:8]}"
+
+            movement = StockMovement(
+                movement_id=movement_id,
+                item_code=data.item_code,
+                item_name=data.item_name,
+                movement_type=MovementType.OPENING,
+                quantity=opening_stock,
+                balance_before=0,
+                balance_after=opening_stock,
+                reference_type="OPENING",
+                reference_number=data.item_code,
+                remarks=f"Opening stock for new item {data.item_code}",
+                created_by=str(current_user.id) if current_user else None
+            )
+            await movement.save()
+
+            logger.info(f"Initialized inventory for item {data.item_code} with opening stock {opening_stock}")
+        except Exception as inv_error:
+            logger.warning(f"Failed to initialize inventory for {data.item_code}: {inv_error}")
+
     logger.info(f"Created Item: {data.item_code} - {data.item_name}")
-    
+
     return {
         "id": str(item.id),
         "item_code": item.item_code,
         "item_name": item.item_name,
+        "opening_stock": opening_stock,
         "message": "Item created successfully"
     }
 
@@ -174,6 +231,8 @@ async def list_items(
             "image_url": i.image_url,
             "image_name": i.image_name,
             "thumbnail_url": i.thumbnail_url,
+            "image_base64": i.image_base64,
+            "image_type": i.image_type,
             "is_active": i.is_active,
         }
         for i in items
@@ -239,6 +298,9 @@ async def get_item(
         "image_url": item.image_url,
         "image_name": item.image_name,
         "thumbnail_url": item.thumbnail_url,
+        "image_base64": item.image_base64,
+        "image_type": item.image_type,
+        "image_size": item.image_size,
         "is_active": item.is_active,
         "created_at": item.created_at,
         "updated_at": item.updated_at,

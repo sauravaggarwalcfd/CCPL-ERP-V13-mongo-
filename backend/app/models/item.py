@@ -81,6 +81,7 @@ class ItemMaster(Document):
     reorder_point: int = 10
     reorder_quantity: int = 20
     current_stock: int = 0
+    opening_stock: float = 0  # Opening stock when item is created
     
     # Additional Details
     material: Optional[str] = None
@@ -159,6 +160,7 @@ class ItemMasterCreate(BaseModel):
     warehouse_id: Optional[str] = None
     warehouse_name: Optional[str] = None
     barcode: Optional[str] = None
+    opening_stock: float = 0
     image_id: Optional[str] = None
     image_url: Optional[str] = None
     image_name: Optional[str] = None
@@ -187,6 +189,7 @@ class ItemMasterUpdate(BaseModel):
     warehouse_id: Optional[str] = None
     warehouse_name: Optional[str] = None
     barcode: Optional[str] = None
+    opening_stock: Optional[float] = None
     image_id: Optional[str] = None
     image_url: Optional[str] = None
     image_name: Optional[str] = None

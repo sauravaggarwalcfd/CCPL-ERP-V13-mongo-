@@ -54,15 +54,16 @@ export default function Sidebar() {
         { to: '/quality-reports', label: 'Quality Reports' },
       ]
     },
-    { 
+    {
       icon: TrendingUp,
-      label: 'Inventory Transactions',
+      label: 'Inventory Management',
       subItems: [
-        { to: '/stock-movements', label: 'Stock Movements' },
-        { to: '/stock-adjustments', label: 'Stock Adjustments' },
-        { to: '/stock-transfers', label: 'Stock Transfers' },
-        { to: '/stock-issue', label: 'Stock Issue' },
-        { to: '/stock-levels', label: 'Stock Levels' },
+        { to: '/inventory/dashboard', label: 'Dashboard' },
+        { to: '/inventory/stock-movements', label: 'Stock Movements' },
+        { to: '/inventory/stock-adjustments', label: 'Stock Adjustments' },
+        { to: '/inventory/stock-transfers', label: 'Stock Transfers' },
+        { to: '/inventory/stock-issue', label: 'Stock Issue' },
+        { to: '/inventory/stock-levels', label: 'Stock Levels' },
       ]
     },
     { 

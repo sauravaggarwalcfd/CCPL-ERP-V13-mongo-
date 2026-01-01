@@ -1484,9 +1484,9 @@ export default function ItemCategoryMaster() {
         {showPanel && (
           <div className="w-1/2 border-l bg-white overflow-auto">
             {/* Panel Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 sticky top-0 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">
+                <h2 className="text-lg font-bold">
                   {panelMode === 'create' ? 'Create New Category' : 'Edit Category'}
                 </h2>
                 <button
@@ -1499,17 +1499,17 @@ export default function ItemCategoryMaster() {
             </div>
 
             {/* Panel Body */}
-            <form onSubmit={handleSubmit} className="p-6">
+            <form onSubmit={handleSubmit} className="p-4 text-sm">
               {/* Step 1: Select Item Type */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <div className="mb-6 p-3 bg-blue-50 rounded-lg">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Step 1: Select Item Type <span className="text-red-500">*</span>
                 </label>
-                <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                   {itemTypesList.map((type) => (
                     <label
                       key={type.value}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition ${
+                      className={`flex items-center gap-2 px-3 py-1 text-sm rounded-lg border-2 cursor-pointer transition ${
                         formData.item_type === type.value
                           ? 'border-blue-500 bg-blue-100'
                           : 'border-gray-200 bg-white hover:border-gray-300'
@@ -1567,13 +1567,13 @@ export default function ItemCategoryMaster() {
                           className="sr-only"
                         />
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center"
                           style={{ backgroundColor: level.color }}
                         >
-                          <IconComponent size={20} className="text-white" />
+                          <IconComponent size={16} className="text-white" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium flex items-center gap-2">
+                          <div className="font-medium flex items-center gap-2 text-sm">
                             <span>{`L${level.level}`}</span>
                             {editingLevel === level.level ? (
                               <input
@@ -1601,7 +1601,7 @@ export default function ItemCategoryMaster() {
                                 <span>{customLevelName && `- ${customLevelName}`}</span>
                                 <button
                                   type="button"
-                                  onClick={(e) => { e.stopPropagation(); setEditingLevel(level.level) }}
+                                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditingLevel(level.level) }}
                                   className="ml-2 text-gray-400 hover:text-gray-600"
                                   title={`Edit Level ${level.level} name`}
                                 >
@@ -1627,7 +1627,7 @@ export default function ItemCategoryMaster() {
 
               {/* Step 3: Select Parent Hierarchy */}
               {formData.level > 1 && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
                     Step 3: Select Parent Hierarchy
                   </label>
@@ -1642,7 +1642,7 @@ export default function ItemCategoryMaster() {
                         <select
                           value={formData.category_code}
                           onChange={(e) => handleParentChange('category_code', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                          className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.category_code ? 'border-red-500' : 'border-gray-300'
                           }`}
                         >
@@ -1667,7 +1667,7 @@ export default function ItemCategoryMaster() {
                           value={formData.sub_category_code}
                           onChange={(e) => handleParentChange('sub_category_code', e.target.value)}
                           disabled={!formData.category_code}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                          className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.sub_category_code ? 'border-red-500' : 'border-gray-300'
                           }`}
                         >
@@ -1689,7 +1689,7 @@ export default function ItemCategoryMaster() {
                           value={formData.division_code}
                           onChange={(e) => handleParentChange('division_code', e.target.value)}
                           disabled={!formData.sub_category_code}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                          className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.division_code ? 'border-red-500' : 'border-gray-300'
                           }`}
                         >
@@ -1711,7 +1711,7 @@ export default function ItemCategoryMaster() {
                           value={formData.class_code}
                           onChange={(e) => handleParentChange('class_code', e.target.value)}
                           disabled={!formData.division_code}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                          className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             formErrors.class_code ? 'border-red-500' : 'border-gray-300'
                           }`}
                         >
@@ -1732,7 +1732,7 @@ export default function ItemCategoryMaster() {
                   Step {formData.level > 1 ? '4' : '3'}: Basic Information
                 </label>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
                       Name <span className="text-red-500">*</span>
@@ -1742,7 +1742,7 @@ export default function ItemCategoryMaster() {
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="e.g., Apparel"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                      className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         formErrors.name ? 'border-red-500' : 'border-gray-300'
                       }`}
                     />
@@ -1763,7 +1763,7 @@ export default function ItemCategoryMaster() {
                       disabled={panelMode === 'edit'}
                       placeholder="e.g., APRL"
                       maxLength={4}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase ${
+                      className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase ${
                         formErrors.code ? 'border-red-500' : 'border-gray-300'
                       } ${panelMode === 'edit' ? 'bg-gray-100' : ''}`}
                     />
@@ -1774,11 +1774,11 @@ export default function ItemCategoryMaster() {
                 </div>
 
                 {/* SKU Code Preview - Always shows */}
-                <div className="mt-4 p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+                <div className="mt-4 p-2 bg-emerald-50 border border-emerald-300 rounded-lg">
                   <label className="block text-sm text-emerald-600 mb-1">
                     SKU Code <span className="text-emerald-400">(Auto-Generated)</span>
                   </label>
-                  <div className="font-mono text-xl font-bold text-emerald-700">
+                  <div className="font-mono text-lg font-bold text-emerald-700">
                     {formData.item_type}-{formData.code || '____'}
                   </div>
                   <p className="text-xs text-emerald-600 mt-1">
@@ -1793,13 +1793,13 @@ export default function ItemCategoryMaster() {
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     rows={2}
                     placeholder="Optional description..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
               {/* Settings */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Display Settings
                 </label>
@@ -1811,7 +1811,7 @@ export default function ItemCategoryMaster() {
                       type="color"
                       value={formData.color_code}
                       onChange={(e) => setFormData(prev => ({ ...prev, color_code: e.target.value }))}
-                      className="w-full h-10 rounded cursor-pointer"
+                      className="w-full h-8 rounded cursor-pointer"
                     />
                   </div>
                   
@@ -1822,7 +1822,7 @@ export default function ItemCategoryMaster() {
                       value={formData.sort_order}
                       onChange={(e) => setFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
                       min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                   
@@ -1832,7 +1832,7 @@ export default function ItemCategoryMaster() {
                       <select
                         value={formData.default_gst_rate}
                         onChange={(e) => setFormData(prev => ({ ...prev, default_gst_rate: parseFloat(e.target.value) }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value={0}>0%</option>
                         <option value={5}>5%</option>
@@ -1846,101 +1846,88 @@ export default function ItemCategoryMaster() {
               </div>
 
               {/* Specifications Configuration (Available for ALL Levels) */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Settings size={16} />
                     Specifications Configuration
                   </h3>
-                  <p className="text-xs text-blue-700 mt-1">
+                  <p className="text-xs text-gray-600 mt-1">
                     Configure which variant fields are available when creating items in this category hierarchy
                   </p>
                 </div>
 
                 {/* Variant Fields (Colour, Size, UOM, Vendor) */}
-                <div className="space-y-4">
-                    {['colour', 'size', 'uom', 'vendor'].map((field) => (
-                      <div key={field} className="bg-white p-3 rounded-lg border border-gray-200">
-                        <div className="flex items-start gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {['colour', 'size', 'uom', 'vendor'].map((field) => (
+                    <div key={field} className="bg-white px-3 py-2 rounded-lg border border-gray-200 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-50 border border-gray-100">
+                          {/* simple icon placeholder */}
+                          <span className="text-sm text-gray-600">{field === 'colour' ? '🎨' : field === 'size' ? '📏' : field === 'uom' ? '📦' : '🏷️'}</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <label className="text-sm font-medium text-gray-900 capitalize">{field === 'uom' ? 'UOM' : field}</label>
+                            <span className="text-xs text-gray-500">{field === 'vendor' ? 'Vendors from vendor list' : ''}</span>
+                          </div>
+                          {specifications[field]?.enabled && field !== 'vendor' && (
+                            <div className="mt-2 max-w-md">
+                              <label className="text-xs text-gray-600 block mb-1">Select Groups (leave empty for all)</label>
+                              <GroupSelector
+                                groups={variantGroups[field] || []}
+                                selected={specifications[field]?.groups || []}
+                                onChange={(newGroups) => setSpecifications(prev => ({ ...prev, [field]: { ...prev[field], groups: newGroups } }))}
+                                placeholder={`Select ${field} groups...`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {/* Required toggle when enabled */}
+                        {specifications[field]?.enabled && (
+                          <label className="flex items-center gap-2 text-xs text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={specifications[field]?.required || false}
+                              onChange={(e) => setSpecifications(prev => ({ ...prev, [field]: { ...prev[field], required: e.target.checked } }))}
+                              className="w-4 h-4 rounded border-gray-300"
+                            />
+                            <span>Required</span>
+                          </label>
+                        )}
+
+                        {/* Enable/Disable switch */}
+                        <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
                             checked={specifications[field]?.enabled || false}
-                            onChange={(e) => {
-                              setSpecifications(prev => ({
-                                ...prev,
-                                [field]: {
-                                  ...prev[field],
-                                  enabled: e.target.checked,
-                                  required: e.target.checked ? prev[field]?.required || false : false,
-                                  groups: e.target.checked ? prev[field]?.groups || [] : []
-                                }
-                              }))
-                            }}
-                            className="mt-1"
+                            onChange={(e) => setSpecifications(prev => ({
+                              ...prev,
+                              [field]: {
+                                ...prev[field],
+                                enabled: e.target.checked,
+                                required: e.target.checked ? prev[field]?.required || false : false,
+                                groups: e.target.checked ? prev[field]?.groups || [] : []
+                              }
+                            }))}
+                            className="sr-only"
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <label className="text-sm font-medium text-gray-900 capitalize">
-                                {field === 'uom' ? 'UOM' : field}
-                              </label>
-                              {specifications[field]?.enabled && (
-                                <label className="flex items-center gap-1 text-xs">
-                                  <input
-                                    type="checkbox"
-                                    checked={specifications[field]?.required || false}
-                                    onChange={(e) => {
-                                      setSpecifications(prev => ({
-                                        ...prev,
-                                        [field]: {
-                                          ...prev[field],
-                                          required: e.target.checked
-                                        }
-                                      }))
-                                    }}
-                                    className="scale-75"
-                                  />
-                                  <span className="text-gray-600">Required</span>
-                                </label>
-                              )}
-                            </div>
-
-                            {specifications[field]?.enabled && field !== 'vendor' && (
-                              <div className="mt-2">
-                                <label className="text-xs text-gray-600 block mb-1">
-                                  Select Groups (leave empty for all)
-                                </label>
-                                <GroupSelector
-                                  groups={variantGroups[field] || []}
-                                  selected={specifications[field]?.groups || []}
-                                  onChange={(newGroups) => {
-                                    setSpecifications(prev => ({
-                                      ...prev,
-                                      [field]: {
-                                        ...prev[field],
-                                        groups: newGroups
-                                      }
-                                    }))
-                                  }}
-                                  placeholder={`Select ${field} groups...`}
-                                />
-                              </div>
-                            )}
-
-                            {specifications[field]?.enabled && field === 'vendor' && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                All active vendors will be available
-                              </p>
-                            )}
+                          <div className={`w-10 h-6 rounded-full p-0.5 flex items-center ${specifications[field]?.enabled ? 'bg-emerald-500' : 'bg-gray-200'}`}>
+                            <div className={`bg-white w-4 h-4 rounded-full transform transition ${specifications[field]?.enabled ? 'translate-x-4' : ''}`}></div>
                           </div>
-                        </div>
+                        </label>
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Custom Fields */}
                 <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-900">Custom Fields</label>
+                      <label className="text-sm font-medium text-gray-700">Custom Fields</label>
                       <button
                         type="button"
                         onClick={() => {
@@ -2044,9 +2031,9 @@ export default function ItemCategoryMaster() {
         {showItemTypePanel && (
           <div className="w-1/2 border-l bg-white overflow-auto">
             {/* Panel Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 sticky top-0 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">
+                <h2 className="text-lg font-bold">
                   {itemTypeMode === 'create' ? 'Create New Item Type' : 'Edit Item Type'}
                 </h2>
                 <button
@@ -2059,7 +2046,7 @@ export default function ItemCategoryMaster() {
             </div>
 
             {/* Panel Body */}
-            <form onSubmit={handleItemTypeSubmit} className="p-6">
+            <form onSubmit={handleItemTypeSubmit} className="p-4 text-sm">
               {/* Basic Information */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -2079,7 +2066,7 @@ export default function ItemCategoryMaster() {
                       disabled={itemTypeMode === 'edit'}
                       placeholder="e.g., FG"
                       maxLength={2}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono uppercase ${
+                      className={`w-full px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono uppercase ${
                         itemTypeMode === 'edit' ? 'bg-gray-100' : 'border-gray-300'
                       }`}
                     />
@@ -2094,7 +2081,7 @@ export default function ItemCategoryMaster() {
                       value={itemTypeFormData.type_name}
                       onChange={(e) => setItemTypeFormData(prev => ({ ...prev, type_name: e.target.value }))}
                       placeholder="e.g., Finished Goods"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -2106,13 +2093,13 @@ export default function ItemCategoryMaster() {
                     onChange={(e) => setItemTypeFormData(prev => ({ ...prev, description: e.target.value }))}
                     rows={2}
                     placeholder="Optional description..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               {/* Settings */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Settings
                 </label>
@@ -2159,14 +2146,14 @@ export default function ItemCategoryMaster() {
                   </label>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="mt-4 grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">Color</label>
                     <input
                       type="color"
                       value={itemTypeFormData.color_code}
                       onChange={(e) => setItemTypeFormData(prev => ({ ...prev, color_code: e.target.value }))}
-                      className="w-full h-10 rounded cursor-pointer"
+                      className="w-full h-8 rounded cursor-pointer"
                     />
                   </div>
                   <div>
@@ -2174,7 +2161,7 @@ export default function ItemCategoryMaster() {
                     <select
                       value={itemTypeFormData.default_uom}
                       onChange={(e) => setItemTypeFormData(prev => ({ ...prev, default_uom: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="PCS">PCS - Pieces</option>
                       <option value="KG">KG - Kilograms</option>
