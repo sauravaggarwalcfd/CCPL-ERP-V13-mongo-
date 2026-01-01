@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Plus, Filter, Download, Edit2, Trash2, Eye, X, Archive, RotateCcw, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLayout } from '../context/LayoutContext'
@@ -126,6 +126,16 @@ export default function ItemMaster() {
       document.removeEventListener('mouseup', onMouseUp)
     }
   }, [isResizing, lastX])
+
+  // Refresh items list when the sidebar/panel closes (so quantities reflect recent edits)
+  const prevSidebarOpenRef = useRef(sidebarOpen)
+  useEffect(() => {
+    if (prevSidebarOpenRef.current && !sidebarOpen) {
+      // panel just closed
+      fetchItems()
+    }
+    prevSidebarOpenRef.current = sidebarOpen
+  }, [sidebarOpen])
 
   const startResize = (e) => {
     setIsResizing(true)
@@ -368,8 +378,8 @@ export default function ItemMaster() {
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Item Name</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Sub-Category</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Size | Color</th>
-                      <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Selling Price</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Inventory Quantity</th>
+                      {/* Selling Price column removed per request */}
                       <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
@@ -409,7 +419,11 @@ export default function ItemMaster() {
                         <td className="px-6 py-4">
                           <div>
                             <p className="font-medium text-gray-900">{item.item_name}</p>
-                            <p className="text-xs text-gray-500 mt-1">{item.material && `${item.material} • ${item.weight}g`}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {item.color_name ? item.color_name : ''}
+                              {item.material ? (item.color_name ? ` • ${item.material}` : item.material) : ''}
+                              {item.weight ? (item.material ? ` • ${item.weight}g` : ` • ${item.weight}g`) : ''}
+                            </p>
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -422,16 +436,11 @@ export default function ItemMaster() {
                             {item.sub_category_name}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            {item.size_name && <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">{item.size_name}</span>}
-                            {item.color_name && <span className="bg-pink-100 text-pink-700 px-2 py-1 rounded">{item.color_name}</span>}
-                          </div>
+                        <td className="px-6 py-4 text-sm text-center">
+                          <div className="font-medium text-gray-900">{(item.quantity ?? item.inventory_quantity ?? 0).toString()}</div>
+                          <p className="text-xs text-gray-500">Available</p>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="font-semibold text-gray-900">₹{item.selling_price.toFixed(2)}</div>
-                          <p className="text-xs text-gray-500">MRP: ₹{item.mrp.toFixed(2)}</p>
-                        </td>
+                        {/* Selling Price cell removed */}
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button 

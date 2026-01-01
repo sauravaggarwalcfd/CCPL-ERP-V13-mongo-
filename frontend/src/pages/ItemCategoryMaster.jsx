@@ -1846,13 +1846,13 @@ export default function ItemCategoryMaster() {
               </div>
 
               {/* Specifications Configuration (Available for ALL Levels) */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
                     <Settings size={16} />
                     Specifications Configuration
                   </h3>
-                  <p className="text-xs text-gray-600 mt-1">
+                  <p className="text-xs text-blue-700 mt-1">
                     Configure which variant fields are available when creating items in this category hierarchy
                   </p>
                 </div>
@@ -1860,51 +1860,13 @@ export default function ItemCategoryMaster() {
                 {/* Variant Fields (Colour, Size, UOM, Vendor) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {['colour', 'size', 'uom', 'vendor'].map((field) => (
-                    <div key={field} className="bg-white px-3 py-2 rounded-lg border border-gray-200 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-50 border border-gray-100">
-                          {/* simple icon placeholder */}
-                          <span className="text-sm text-gray-600">{field === 'colour' ? '🎨' : field === 'size' ? '📏' : field === 'uom' ? '📦' : '🏷️'}</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-3">
-                            <label className="text-sm font-medium text-gray-900 capitalize">{field === 'uom' ? 'UOM' : field}</label>
-                            <span className="text-xs text-gray-500">{field === 'vendor' ? 'Vendors from vendor list' : ''}</span>
-                          </div>
-                          {specifications[field]?.enabled && field !== 'vendor' && (
-                            <div className="mt-2 max-w-md">
-                              <label className="text-xs text-gray-600 block mb-1">Select Groups (leave empty for all)</label>
-                              <GroupSelector
-                                groups={variantGroups[field] || []}
-                                selected={specifications[field]?.groups || []}
-                                onChange={(newGroups) => setSpecifications(prev => ({ ...prev, [field]: { ...prev[field], groups: newGroups } }))}
-                                placeholder={`Select ${field} groups...`}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Required toggle when enabled */}
-                        {specifications[field]?.enabled && (
-                          <label className="flex items-center gap-2 text-xs text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={specifications[field]?.required || false}
-                              onChange={(e) => setSpecifications(prev => ({ ...prev, [field]: { ...prev[field], required: e.target.checked } }))}
-                              className="w-4 h-4 rounded border-gray-300"
-                            />
-                            <span>Required</span>
-                          </label>
-                        )}
-
-                        {/* Enable/Disable switch */}
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={specifications[field]?.enabled || false}
-                            onChange={(e) => setSpecifications(prev => ({
+                    <div key={field} className="bg-white p-3 rounded-lg border border-gray-200">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={specifications[field]?.enabled || false}
+                          onChange={(e) => {
+                            setSpecifications(prev => ({
                               ...prev,
                               [field]: {
                                 ...prev[field],
@@ -1912,13 +1874,64 @@ export default function ItemCategoryMaster() {
                                 required: e.target.checked ? prev[field]?.required || false : false,
                                 groups: e.target.checked ? prev[field]?.groups || [] : []
                               }
-                            }))}
-                            className="sr-only"
-                          />
-                          <div className={`w-10 h-6 rounded-full p-0.5 flex items-center ${specifications[field]?.enabled ? 'bg-emerald-500' : 'bg-gray-200'}`}>
-                            <div className={`bg-white w-4 h-4 rounded-full transform transition ${specifications[field]?.enabled ? 'translate-x-4' : ''}`}></div>
+                            }))
+                          }}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-gray-900 capitalize">
+                              {field === 'uom' ? 'UOM' : field}
+                            </label>
+                            {specifications[field]?.enabled && (
+                              <label className="flex items-center gap-1 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={specifications[field]?.required || false}
+                                  onChange={(e) => {
+                                    setSpecifications(prev => ({
+                                      ...prev,
+                                      [field]: {
+                                        ...prev[field],
+                                        required: e.target.checked
+                                      }
+                                    }))
+                                  }}
+                                  className="scale-75"
+                                />
+                                <span className="text-gray-600">Required</span>
+                              </label>
+                            )}
                           </div>
-                        </label>
+
+                          {specifications[field]?.enabled && field !== 'vendor' && (
+                            <div className="mt-2">
+                              <label className="text-xs text-gray-600 block mb-1">
+                                Select Groups (leave empty for all)
+                              </label>
+                              <GroupSelector
+                                groups={variantGroups[field] || []}
+                                selected={specifications[field]?.groups || []}
+                                onChange={(newGroups) => {
+                                  setSpecifications(prev => ({
+                                    ...prev,
+                                    [field]: {
+                                      ...prev[field],
+                                      groups: newGroups
+                                    }
+                                  }))
+                                }}
+                                placeholder={`Select ${field} groups...`}
+                              />
+                            </div>
+                          )}
+
+                          {specifications[field]?.enabled && field === 'vendor' && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              All active vendors will be available
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
