@@ -31,6 +31,10 @@ class ItemType(Document):
     type_name: str
     description: Optional[str] = None
     
+    # SKU Components (Part 1: Item Type Code - 2 letters)
+    sku_type_code: Optional[str] = None  # e.g., FM, RM, AC - generated from type_name
+    next_item_sequence: int = 0  # Counter for generating item sequence codes
+    
     allow_purchase: bool = True
     allow_sale: bool = False
     track_inventory: bool = True

@@ -211,6 +211,14 @@ export const items = {
     params: { search: itemCode, limit: 1 }
   }),
   getNextSku: (prefix) => api.get(`/items/next-sku/${prefix}`),
+  generateFullSku: (itemTypeCode, categoryCode, color, size) => api.get('/items/generate-full-sku', {
+    params: {
+      item_type_code: itemTypeCode,
+      category_code: categoryCode,
+      color: color || undefined,
+      size: size || undefined
+    }
+  }),
 
   // Bin management
   bin: {

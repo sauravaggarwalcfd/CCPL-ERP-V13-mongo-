@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLayout } from '../context/LayoutContext'
-import { categoryHierarchy, itemTypes } from '../services/api'
+import { categoryHierarchy, itemTypes, suppliers } from '../services/api'
 import { specificationApi } from '../services/specificationApi'
 import GroupSelector from '../components/common/GroupSelector'
 
@@ -171,14 +171,30 @@ export default function ItemCategoryMaster() {
     try {
       setLoading(true)
       const response = await categoryHierarchy.getTree()
-      setTreeData(response.data || [])
       
-      // Auto-expand first level
-      const firstLevelCodes = (response.data || []).map(c => c.code)
-      setExpandedNodes(new Set(firstLevelCodes))
+      if (response.data) {
+        setTreeData(response.data)
+        
+        // Auto-expand first level
+        const firstLevelCodes = response.data.map(c => c.code)
+        setExpandedNodes(new Set(firstLevelCodes))
+      } else {
+        setTreeData([])
+      }
     } catch (error) {
       console.error('Fetch tree error:', error)
-      toast.error('Failed to load categories')
+      
+      // Only show error toast if it's a real network/server error, not client-side
+      if (error.response?.status >= 500 || !error.response) {
+        toast.error('Failed to load categories - Backend server issue')
+      } else if (error.response?.status === 404) {
+        toast.error('Category endpoints not found')
+      } else {
+        toast.error('Failed to load categories')
+      }
+      
+      // Keep existing data to avoid blank state
+      setTreeData([])
     } finally {
       setLoading(false)
     }
@@ -188,22 +204,28 @@ export default function ItemCategoryMaster() {
     try {
       let allItems = []
       
-      // Fetch all levels
-      const [cats, subCats, divs, classes, subClasses] = await Promise.all([
-        categoryHierarchy.getCategories(),
-        categoryHierarchy.getSubCategories(),
-        categoryHierarchy.getDivisions(),
-        categoryHierarchy.getClasses(),
-        categoryHierarchy.getSubClasses(),
-      ])
-      
-      allItems = [
-        ...(cats.data || []),
-        ...(subCats.data || []),
-        ...(divs.data || []),
-        ...(classes.data || []),
-        ...(subClasses.data || []),
-      ]
+      // Fetch all levels with better error handling
+      try {
+        const [cats, subCats, divs, classes, subClasses] = await Promise.all([
+          categoryHierarchy.getCategories().catch(err => ({ data: [] })),
+          categoryHierarchy.getSubCategories().catch(err => ({ data: [] })),
+          categoryHierarchy.getDivisions().catch(err => ({ data: [] })),
+          categoryHierarchy.getClasses().catch(err => ({ data: [] })),
+          categoryHierarchy.getSubClasses().catch(err => ({ data: [] })),
+        ])
+        
+        allItems = [
+          ...(cats.data || []),
+          ...(subCats.data || []),
+          ...(divs.data || []),
+          ...(classes.data || []),
+          ...(subClasses.data || []),
+        ]
+      } catch (error) {
+        console.error('Error fetching category levels:', error)
+        // If all levels fail, keep empty list
+        allItems = []
+      }
       
       // Filter by search
       if (searchTerm) {
@@ -223,6 +245,7 @@ export default function ItemCategoryMaster() {
       setListData(allItems)
     } catch (error) {
       console.error('Fetch list error:', error)
+      // Don't show error toast here - fetchTree already handles it
     }
   }, [searchTerm, filterLevel])
 
@@ -237,15 +260,28 @@ export default function ItemCategoryMaster() {
 
   const fetchVariantGroups = useCallback(async () => {
     try {
-      const response = await categoryHierarchy.getVariantGroups()
-      const groups = response.data || []
+      // Fetch variant groups and suppliers in parallel
+      const [variantResponse, supplierResponse] = await Promise.all([
+        categoryHierarchy.getVariantGroups(),
+        suppliers.list({ is_active: true })
+      ])
+      
+      const groups = variantResponse.data || []
+      const supplierList = supplierResponse.data?.items || supplierResponse.data || []
 
       // Organize groups by variant type
       const organized = {
         colour: groups.filter(g => g.variant_type === 'COLOUR'),
         size: groups.filter(g => g.variant_type === 'SIZE'),
         uom: groups.filter(g => g.variant_type === 'UOM'),
-        vendor: [] // Vendors don't have groups
+        // Map suppliers to group format for GroupSelector
+        vendor: supplierList.map(s => ({
+          id: s.id || s._id,
+          code: s.supplier_code || s.code,
+          name: s.supplier_name || s.name,
+          group_code: s.supplier_code || s.code,
+          group_name: s.supplier_name || s.name
+        }))
       }
 
       setVariantGroups(organized)
@@ -1113,10 +1149,10 @@ export default function ItemCategoryMaster() {
               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-600">
                 {node.code}
               </span>
-              {/* SKU Prefix badge for Level 5 (Sub-Class) */}
-              {node.level === 5 && node.sku_prefix && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-mono">
-                  SKU: {node.sku_prefix}-XXXX-XXXX-XXXX
+              {/* SKU Category Code badge for Level 1-5 */}
+              {node.sku_category_code && (
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-mono font-bold" title="SKU Category Code">
+                  SKU: {node.sku_category_code}
                 </span>
               )}
             </div>
@@ -1847,94 +1883,179 @@ export default function ItemCategoryMaster() {
 
               {/* Specifications Configuration (Available for ALL Levels) */}
               <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-                    <Settings size={16} />
-                    Specifications Configuration
-                  </h3>
-                  <p className="text-xs text-blue-700 mt-1">
-                    Configure which variant fields are available when creating items in this category hierarchy
-                  </p>
-                </div>
+                {/* Variant 1: Colour */}
+                <div className="space-y-3">
+                  <div className="bg-white p-4 rounded-lg border-2 border-indigo-200">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-1 rounded">Variant 1</span>
+                      <span className="text-sm font-semibold text-gray-900">Colour Group</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={specifications.colour?.enabled || false}
+                        onChange={(e) => {
+                          setSpecifications(prev => ({
+                            ...prev,
+                            colour: {
+                              ...prev.colour,
+                              enabled: e.target.checked,
+                              required: true, // Always mandatory
+                              groups: e.target.checked ? prev.colour?.groups || [] : []
+                            }
+                          }))
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-600 mb-2">Select which colour groups are available for items in this category</p>
+                        {specifications.colour?.enabled && (
+                          <GroupSelector
+                            groups={variantGroups.colour || []}
+                            selected={specifications.colour?.groups || []}
+                            onChange={(newGroups) => {
+                              setSpecifications(prev => ({
+                                ...prev,
+                                colour: { ...prev.colour, groups: newGroups }
+                              }))
+                            }}
+                            placeholder="Select colour groups..."
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Variant Fields (Colour, Size, UOM, Vendor) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {['colour', 'size', 'uom', 'vendor'].map((field) => (
-                    <div key={field} className="bg-white p-3 rounded-lg border border-gray-200">
+                  {/* Variant 2: Size or UOM */}
+                  <div className="bg-white p-4 rounded-lg border-2 border-green-200">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-bold text-white bg-green-600 px-2 py-1 rounded">Variant 2</span>
+                      <span className="text-sm font-semibold text-gray-900">Size / UOM</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Size Option */}
                       <div className="flex items-start gap-3">
                         <input
                           type="checkbox"
-                          checked={specifications[field]?.enabled || false}
+                          checked={specifications.size?.enabled || false}
                           onChange={(e) => {
                             setSpecifications(prev => ({
                               ...prev,
-                              [field]: {
-                                ...prev[field],
+                              size: {
+                                ...prev.size,
                                 enabled: e.target.checked,
-                                required: e.target.checked ? prev[field]?.required || false : false,
-                                groups: e.target.checked ? prev[field]?.groups || [] : []
-                              }
+                                required: false,
+                                groups: e.target.checked ? prev.size?.groups || [] : []
+                              },
+                              // Disable UOM if Size is enabled
+                              uom: e.target.checked ? { enabled: false, required: false, groups: [] } : prev.uom
                             }))
                           }}
                           className="mt-1"
                         />
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-gray-900 capitalize">
-                              {field === 'uom' ? 'UOM' : field}
-                            </label>
-                            {specifications[field]?.enabled && (
-                              <label className="flex items-center gap-1 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={specifications[field]?.required || false}
-                                  onChange={(e) => {
-                                    setSpecifications(prev => ({
-                                      ...prev,
-                                      [field]: {
-                                        ...prev[field],
-                                        required: e.target.checked
-                                      }
-                                    }))
-                                  }}
-                                  className="scale-75"
-                                />
-                                <span className="text-gray-600">Required</span>
-                              </label>
-                            )}
-                          </div>
-
-                          {specifications[field]?.enabled && field !== 'vendor' && (
+                          <label className="text-sm font-medium text-gray-700">Size</label>
+                          {specifications.size?.enabled && (
                             <div className="mt-2">
-                              <label className="text-xs text-gray-600 block mb-1">
-                                Select Groups (leave empty for all)
-                              </label>
                               <GroupSelector
-                                groups={variantGroups[field] || []}
-                                selected={specifications[field]?.groups || []}
+                                groups={variantGroups.size || []}
+                                selected={specifications.size?.groups || []}
                                 onChange={(newGroups) => {
                                   setSpecifications(prev => ({
                                     ...prev,
-                                    [field]: {
-                                      ...prev[field],
-                                      groups: newGroups
-                                    }
+                                    size: { ...prev.size, groups: newGroups }
                                   }))
                                 }}
-                                placeholder={`Select ${field} groups...`}
+                                placeholder="Select size groups..."
                               />
                             </div>
                           )}
+                        </div>
+                      </div>
 
-                          {specifications[field]?.enabled && field === 'vendor' && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              All active vendors will be available
-                            </p>
+                      {/* UOM Option */}
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={specifications.uom?.enabled || false}
+                          onChange={(e) => {
+                            setSpecifications(prev => ({
+                              ...prev,
+                              uom: {
+                                ...prev.uom,
+                                enabled: e.target.checked,
+                                required: false,
+                                groups: e.target.checked ? prev.uom?.groups || [] : []
+                              },
+                              // Disable Size if UOM is enabled
+                              size: e.target.checked ? { enabled: false, required: false, groups: [] } : prev.size
+                            }))
+                          }}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <label className="text-sm font-medium text-gray-700">UOM</label>
+                          {specifications.uom?.enabled && (
+                            <div className="mt-2">
+                              <GroupSelector
+                                groups={variantGroups.uom || []}
+                                selected={specifications.uom?.groups || []}
+                                onChange={(newGroups) => {
+                                  setSpecifications(prev => ({
+                                    ...prev,
+                                    uom: { ...prev.uom, groups: newGroups }
+                                  }))
+                                }}
+                                placeholder="Select UOM groups..."
+                              />
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                </div>
+
+                {/* Supplier Selection */}
+                <div className="mt-3 bg-white p-4 rounded-lg border-2 border-orange-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-xs font-bold text-white bg-orange-600 px-2 py-1 rounded">Supplier</span>
+                    <span className="text-sm font-semibold text-gray-900">Supplier Group</span>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={specifications.vendor?.enabled || false}
+                      onChange={(e) => {
+                        setSpecifications(prev => ({
+                          ...prev,
+                          vendor: {
+                            ...prev.vendor,
+                            enabled: e.target.checked,
+                            required: true,
+                            groups: e.target.checked ? prev.vendor?.groups || [] : []
+                          }
+                        }))
+                      }}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-600 mb-2">Select which supplier groups are available for items in this category</p>
+                      {specifications.vendor?.enabled && (
+                        <GroupSelector
+                          groups={variantGroups.vendor || []}
+                          selected={specifications.vendor?.groups || []}
+                          onChange={(newGroups) => {
+                            setSpecifications(prev => ({
+                              ...prev,
+                              vendor: { ...prev.vendor, groups: newGroups }
+                            }))
+                          }}
+                          placeholder="Select supplier groups..."
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Custom Fields */}

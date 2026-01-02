@@ -111,8 +111,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           image_size: item.image_size
         })
 
+        // Check if item has old format SKU (no hyphens) - needs regeneration
+        const currentSku = item.sku || item.item_code
+        const hasOldSku = !currentSku.includes('-')
+        
         setFormData({
-          sku: item.item_code,
+          sku: currentSku,  // Will be regenerated below if old format
           itemName: item.item_name,
           stockUom: item.uom || 'PCS',
           purchaseUom: 'PCS',
@@ -142,6 +146,25 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
         const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
         if (subCls) setSelectedSubClass(subCls)
+        
+        // If old format SKU, regenerate it with proper format
+        if (hasOldSku) {
+          const typeCode = item.item_code.substring(0, 2).toUpperCase()
+          const deepestCat = item.sub_class_code || item.class_code || item.division_code || item.sub_category_code || item.category_code || 'GNRL'
+          const catCode = deepestCat.substring(0, 4).toUpperCase()
+          
+          // Extract sequence from old item_code
+          const numericPart = item.item_code.replace(/[^\d]/g, '')
+          const sequence = parseInt(numericPart) || 1
+          const sequenceLetter = String.fromCharCode(65 + Math.floor((sequence - 1) / 10000))
+          const sequenceNum = ((sequence - 1) % 10000) + 1
+          const sequenceCode = `${sequenceLetter}${String(sequenceNum).padStart(4, '0')}`
+          
+          const newSku = `${typeCode}-${catCode}-${sequenceCode}-0000-00`
+          console.log(`[EDIT] Regenerating old SKU: ${item.item_code} -> ${newSku}`)
+          
+          setFormData(prev => ({ ...prev, sku: newSku }))
+        }
       } else {
         // Create mode - fetch initial SKU
         fetchNextSku('FG')
@@ -149,21 +172,40 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     }
   }, [isOpen, isEditMode, item])
   
-  // Fetch next available SKU from backend
-  const fetchNextSku = async (itemTypePrefix) => {
+  // Fetch next available SKU - ALWAYS generates full hierarchical format
+  const fetchNextSku = async (itemTypeCode, categoryCode = null) => {
     try {
-      const prefix = itemTypePrefix.substring(0, 2).toUpperCase()
-      const response = await items.getNextSku(prefix)
+      const typeCode = itemTypeCode.substring(0, 2).toUpperCase()
+      const catCode = categoryCode ? categoryCode.substring(0, 4).toUpperCase() : 'GNRL'
+      
+      // Get the next sequence number from backend
+      const response = await items.getNextSku(typeCode)
+      const sequence = response.data.sequence || 1
+      
+      // Generate full SKU format: FM-ABCD-A0000-0000-00
+      const sequenceLetter = String.fromCharCode(65 + Math.floor((sequence - 1) / 10000)) // A, B, C, etc.
+      const sequenceNum = ((sequence - 1) % 10000) + 1
+      const sequenceCode = `${sequenceLetter}${String(sequenceNum).padStart(4, '0')}`
+      
+      // Build full SKU
+      const fullSku = `${typeCode}-${catCode}-${sequenceCode}-0000-00`
+      
+      console.log(`[SKU] Generated full SKU: ${fullSku} (type=${typeCode}, cat=${catCode}, seq=${sequence})`)
+      
       setFormData(prev => ({
         ...prev,
-        sku: response.data.next_sku
+        sku: fullSku
       }))
     } catch (error) {
-      console.error('Error fetching next SKU:', error)
-      // Fallback to simple generation if API fails
+      console.error(`[SKU] Error fetching next SKU: ${error.message}`)
+      // Fallback: still generate full format
+      const typeCode = itemTypeCode.substring(0, 2).toUpperCase()
+      const catCode = categoryCode ? categoryCode.substring(0, 4).toUpperCase() : 'GNRL'
+      const fallbackSku = `${typeCode}-${catCode}-A0001-0000-00`
+      console.log(`[SKU] Using fallback SKU: ${fallbackSku}`)
       setFormData(prev => ({
         ...prev,
-        sku: generateSKU(itemTypePrefix, 1)
+        sku: fallbackSku
       }))
     }
   }
@@ -590,7 +632,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
     // Fetch next available SKU for this item type (ONLY in create mode)
     if (!isEditMode) {
-      fetchNextSku(category.item_type || 'FG')
+      // Get the deepest level category code for SKU generation
+      const categoryCode = category.code
+      fetchNextSku(category.item_type || 'FG', categoryCode)
     }
 
     // Update stock UOM
@@ -621,6 +665,16 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     if (selectedCategory) return selectedCategory.code
     return null
   }, [selectedCategory, selectedSubCategory, selectedDivision, selectedClass, selectedSubClass])
+
+  // Regenerate full SKU whenever category hierarchy changes (not just sub-class)
+  useEffect(() => {
+    if (!isEditMode && effectiveCategoryCode && autoFilledData.itemType) {
+      // Use the deepest level category code for SKU generation
+      const itemTypeCode = autoFilledData.itemType
+      console.log(`[SKU] Category changed, regenerating SKU with code: ${effectiveCategoryCode}`)
+      fetchNextSku(itemTypeCode, effectiveCategoryCode)
+    }
+  }, [effectiveCategoryCode, isEditMode, autoFilledData.itemType])
 
   // Handle BASE64 image upload
   const handleImageChange = (file, base64Data, imageType) => {
@@ -667,6 +721,13 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         item_code: formData.sku,
         item_name: formData.itemName,
         item_description: '',
+        // SKU Fields (send the full SKU and its components)
+        sku: formData.sku,
+        sku_type_code: formData.sku ? formData.sku.split('-')[0] : null,
+        sku_category_code: formData.sku ? formData.sku.split('-')[1] : null,
+        sku_sequence: formData.sku ? formData.sku.split('-')[2] : null,
+        sku_variant1: formData.sku ? formData.sku.split('-')[3] : null,
+        sku_variant2: formData.sku ? formData.sku.split('-')[4] : null,
         category_code: selectedCategory?.code,
         category_name: selectedCategory?.name,
         sub_category_code: selectedSubCategory?.code || null,
@@ -1181,6 +1242,27 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   />
                 </div>
+
+                {/* SKU Breakdown Display */}
+                {formData.sku && formData.sku.includes('-') && (
+                  <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="text-xs font-semibold text-indigo-700 mb-2">SKU Structure Breakdown:</div>
+                    <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                      {formData.sku.split('-').map((part, idx) => (
+                        <div key={idx} className="bg-white border border-indigo-200 rounded p-1.5">
+                          <div className="font-mono font-bold text-indigo-700 text-sm">{part}</div>
+                          <div className="text-gray-600 text-xs mt-0.5">
+                            {idx === 0 && 'Item Type'}
+                            {idx === 1 && 'Category'}
+                            {idx === 2 && 'Sequence'}
+                            {idx === 3 && 'Variant 1'}
+                            {idx === 4 && 'Variant 2'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

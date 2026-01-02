@@ -53,6 +53,13 @@ async def create_item(
         item_code=data.item_code,
         item_name=data.item_name,
         item_description=data.item_description,
+        # SKU Fields
+        sku=data.sku,
+        sku_type_code=data.sku_type_code,
+        sku_category_code=data.sku_category_code,
+        sku_sequence=data.sku_sequence,
+        sku_variant1=data.sku_variant1,
+        sku_variant2=data.sku_variant2,
         category_code=data.category_code,
         category_name=data.category_name,
         sub_category_code=data.sub_category_code,
@@ -222,6 +229,13 @@ async def list_items(
             "item_code": i.item_code,
             "item_name": i.item_name,
             "item_description": i.item_description,
+            # SKU Fields
+            "sku": i.sku,
+            "sku_type_code": i.sku_type_code,
+            "sku_category_code": i.sku_category_code,
+            "sku_sequence": i.sku_sequence,
+            "sku_variant1": i.sku_variant1,
+            "sku_variant2": i.sku_variant2,
             "category_code": i.category_code,
             "category_name": i.category_name,
             "sub_category_code": i.sub_category_code,
@@ -234,6 +248,13 @@ async def list_items(
             "sub_class_name": i.sub_class_name,
             "hierarchy_path": i.hierarchy_path,
             "hierarchy_path_name": i.hierarchy_path_name,
+            # Variant fields
+            "color_id": i.color_id,
+            "color_name": i.color_name,
+            "size_id": i.size_id,
+            "size_name": i.size_name,
+            "supplier_id": getattr(i, 'supplier_id', None),
+            "supplier_name": getattr(i, 'supplier_name', None),
             "uom": i.uom,
             "cost_price": i.cost_price,
             "selling_price": i.selling_price,
@@ -272,6 +293,13 @@ async def get_item(
         "item_code": item.item_code,
         "item_name": item.item_name,
         "item_description": item.item_description,
+        # SKU Fields
+        "sku": item.sku,
+        "sku_type_code": item.sku_type_code,
+        "sku_category_code": item.sku_category_code,
+        "sku_sequence": item.sku_sequence,
+        "sku_variant1": item.sku_variant1,
+        "sku_variant2": item.sku_variant2,
         "category_code": item.category_code,
         "category_name": item.category_name,
         "sub_category_code": item.sub_category_code,
@@ -290,6 +318,8 @@ async def get_item(
         "size_name": item.size_name,
         "brand_id": item.brand_id,
         "brand_name": item.brand_name,
+        "supplier_id": getattr(item, 'supplier_id', None),
+        "supplier_name": getattr(item, 'supplier_name', None),
         "uom": item.uom,
         "inventory_type": item.inventory_type,
         "cost_price": item.cost_price,
@@ -386,6 +416,91 @@ async def get_next_sku(prefix: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate next SKU: {str(e)}"
+        )
+
+
+@router.get("/generate-full-sku")
+async def generate_full_sku(
+    item_type_code: str = Query(..., description="Item Type Code (e.g., FM, RM)"),
+    category_code: str = Query(..., description="Category Code from deepest level (e.g., RNCK)"),
+    color: Optional[str] = Query(None, description="Color name for variant (e.g., Navy, Red)"),
+    size: Optional[str] = Query(None, description="Size for variant (e.g., M, L, Medium)"),
+):
+    """
+    Generate a complete hierarchical SKU with all 5 components
+    Format: FM-ABCD-A0000-0000-00
+    
+    Components:
+    1. FM = Item Type Code (2 letters)
+    2. ABCD = Category Code (2-4 letters from deepest category level)
+    3. A0000 = Item Sequence (1 letter + 4 digits, auto-increment per type)
+    4. 0000 = Color/Variant 1 (4 characters)
+    5. 00 = Size/Variant 2 (2 characters)
+    """
+    try:
+        from ..services.sku_service import SKUService
+        from ..models.item_type import ItemType
+        
+        # Get or create ItemType to get next sequence
+        item_type_upper = item_type_code.upper()
+        item_type = await ItemType.find_one(ItemType.type_code == item_type_upper)
+        
+        if not item_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Item Type '{item_type_code}' not found"
+            )
+        
+        # Get current sequence and increment
+        current_sequence = max((item_type.next_item_sequence or 0) + 1, 1)
+        
+        # Generate all SKU components safely
+        try:
+            type_code = SKUService.generate_item_type_code(item_type.type_name)
+        except:
+            type_code = item_type_upper[:2]
+        
+        category_code_upper = category_code.upper()[:4]
+        
+        try:
+            sequence_code = SKUService.generate_item_sequence_code(current_sequence)
+        except:
+            # Fallback: simple sequence generation
+            sequence_code = f"A{str(current_sequence).zfill(4)}"
+        
+        # Generate variant codes with fallback
+        try:
+            variant1_code = SKUService.generate_variant_code(color, "color", 4) if color else "0000"
+        except:
+            variant1_code = "0000"
+        
+        try:
+            variant2_code = SKUService.generate_variant_code(size, "size", 2) if size else "00"
+        except:
+            variant2_code = "00"
+        
+        # Construct full SKU
+        full_sku = f"{type_code}-{category_code_upper}-{sequence_code}-{variant1_code}-{variant2_code}"
+        
+        return {
+            "sku": full_sku,
+            "components": {
+                "type_code": type_code,
+                "category_code": category_code_upper,
+                "sequence_code": sequence_code,
+                "variant1_code": variant1_code,
+                "variant2_code": variant2_code,
+            },
+            "next_sequence_number": current_sequence,
+            "display": f"{type_code}-{category_code_upper}-{sequence_code}-{variant1_code}-{variant2_code}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating full SKU: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate full SKU: {str(e)}"
         )
 
 

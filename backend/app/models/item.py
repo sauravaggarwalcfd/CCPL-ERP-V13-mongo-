@@ -27,6 +27,14 @@ class ItemMaster(Document):
     item_name: str  # Men's Basic Crew Neck T-Shirt - Blue (Medium)
     item_description: Optional[str] = None
     
+    # SKU (Stock Keeping Unit)
+    sku: Optional[str] = None  # Full SKU: FM-ABCD-A0000-0000-00
+    sku_type_code: Optional[str] = None  # Part 1: Item Type (FM)
+    sku_category_code: Optional[str] = None  # Part 2: Category (ABCD)
+    sku_sequence: Optional[str] = None  # Part 3: Item Sequence (A0000)
+    sku_variant1: Optional[str] = None  # Part 4: Primary Variant/Color (0000)
+    sku_variant2: Optional[str] = None  # Part 5: Secondary Variant/Size (00)
+    
     # 5-Level Hierarchy Links
     category_code: Indexed(str)  # Level 1 - e.g., CLOTH
     category_name: str  # Clothing - Denormalized
@@ -56,6 +64,10 @@ class ItemMaster(Document):
     
     brand_id: Optional[str] = None
     brand_name: Optional[str] = None
+    
+    # Supplier (Variant 3 - Mandatory)
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
     
     # UOM and Inventory
     uom: str = "PCS"
@@ -134,6 +146,13 @@ class ItemMasterCreate(BaseModel):
     item_code: str
     item_name: str
     item_description: Optional[str] = None
+    # SKU Fields
+    sku: Optional[str] = None
+    sku_type_code: Optional[str] = None
+    sku_category_code: Optional[str] = None
+    sku_sequence: Optional[str] = None
+    sku_variant1: Optional[str] = None
+    sku_variant2: Optional[str] = None
     category_code: str
     category_name: str
     sub_category_code: Optional[str] = None
@@ -150,6 +169,8 @@ class ItemMasterCreate(BaseModel):
     size_name: Optional[str] = None
     brand_id: Optional[str] = None
     brand_name: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
     uom: str = "PCS"
     inventory_type: InventoryType = InventoryType.STOCKED
     cost_price: float = 0.0
@@ -173,6 +194,15 @@ class ItemMasterCreate(BaseModel):
 class ItemMasterUpdate(BaseModel):
     item_name: Optional[str] = None
     item_description: Optional[str] = None
+    # SKU Fields
+    sku: Optional[str] = None
+    sku_type_code: Optional[str] = None
+    sku_category_code: Optional[str] = None
+    sku_sequence: Optional[str] = None
+    sku_variant1: Optional[str] = None
+    sku_variant2: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
     color_id: Optional[str] = None
     color_name: Optional[str] = None
     size_id: Optional[str] = None

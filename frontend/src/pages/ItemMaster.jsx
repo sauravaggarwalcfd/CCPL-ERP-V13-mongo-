@@ -374,13 +374,10 @@ export default function ItemMaster() {
                   <thead className="bg-gray-100 border-b">
                     <tr>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Image</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Item Code</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Item Name</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Item</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Sub-Category</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Inventory Quantity</th>
-                      {/* Selling Price column removed per request */}
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Inventory</th>
+                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -412,38 +409,27 @@ export default function ItemMaster() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-mono text-sm bg-blue-50 px-3 py-1 rounded text-blue-700">
-                            {item.item_code}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="font-medium text-gray-900">{item.item_name}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {item.color_name ? item.color_name : ''}
-                              {item.material ? (item.color_name ? ` • ${item.material}` : item.material) : ''}
-                              {item.weight ? (item.material ? ` • ${item.weight}g` : ` • ${item.weight}g`) : ''}
-                            </p>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded inline-block w-fit" title="Stock Keeping Unit">
+                              {item.sku || item.item_code}
+                            </span>
+                            <span className="font-bold text-gray-900">{item.item_name}</span>
+                            {item.color_name && <span className="text-xs text-gray-500">{item.color_name}</span>}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
-                            {item.category_name}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full">
-                            {item.sub_category_name}
-                          </span>
+                        <td className="px-6 py-4 text-sm">
+                          <div className="flex flex-col gap-1 text-gray-700">
+                            {item.category_name && <div>L1 - {item.category_name}</div>}
+                            {item.sub_category_name && <div>L2 - {item.sub_category_name}</div>}
+                            {item.division_name && <div>L3 - {item.division_name}</div>}
+                            {item.class_name && <div>L4 - {item.class_name}</div>}
+                            {item.sub_class_name && <div>L5 - {item.sub_class_name}</div>}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-center">
-                          <div className="font-semibold text-gray-900">{item.current_stock ?? 0}</div>
-                          <p className="text-xs text-green-600">{item.available_stock ?? item.current_stock ?? 0} Available</p>
-                          {item.reserved_stock > 0 && (
-                            <p className="text-xs text-orange-500">{item.reserved_stock} Reserved</p>
-                          )}
+                          <div className="font-semibold text-gray-900">{item.quantity ?? item.current_stock ?? 0}</div>
+                          <p className="text-xs text-gray-600">Available</p>
                         </td>
-                        {/* Selling Price cell removed */}
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button 
@@ -533,7 +519,7 @@ export default function ItemMaster() {
                   <div className="p-6 space-y-6">
                     {/* Header with Image and Basic Info */}
                     <div className="flex gap-6 items-start">
-                      <div className="w-32 h-32 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="w-28 h-28 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {selectedItem.image_base64 || selectedItem.image_url ? (
                           <img
                             src={
@@ -545,125 +531,91 @@ export default function ItemMaster() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Package className="w-12 h-12 text-gray-300" />
+                          <span className="text-gray-400 text-xs">image</span>
                         )}
                       </div>
-                      <div className="flex-1 pt-2">
-                        <h3 className="text-2xl font-bold text-gray-900">{selectedItem.item_code}</h3>
-                        <p className="text-xl text-gray-700 mt-1 font-medium">{selectedItem.item_name}</p>
-                        <div className="mt-3 flex gap-2">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${selectedItem.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {selectedItem.status?.toUpperCase() || 'ACTIVE'}
+                      <div className="flex-1">
+                        <p className="text-sm font-mono text-gray-700 tracking-wide">
+                          {selectedItem.sku || selectedItem.item_code}
+                        </p>
+                        <h3 className="text-xl font-bold text-gray-900 mt-1">{selectedItem.item_name}</h3>
+                        <div className="mt-2 flex items-center gap-3 text-sm">
+                          <span className="text-gray-600 font-medium">
+                            {selectedItem.is_active !== false ? 'Active' : 'Inactive'}
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {selectedItem.item_type || 'FG'}
+                          <span className="text-gray-600">
+                            {selectedItem.item_type_name || selectedItem.item_type || 'Finished Goods'}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                      {/* Category Hierarchy - Only show if filled */}
-                      {selectedItem.category_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Category</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.category_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.sub_category_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Sub-Category</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.sub_category_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.division_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Division</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.division_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.class_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Class</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.class_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.sub_class_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Sub-Class</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.sub_class_name}</p>
-                        </div>
-                      )}
-
-                      {/* Item Attributes - Only show if filled */}
-                      {selectedItem.size_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Size</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.size_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.color_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Color</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.color_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.brand_name && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Brand</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.brand_name}</p>
-                        </div>
-                      )}
-                      {selectedItem.uom && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">UOM</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.uom}</p>
-                        </div>
-                      )}
-
-                      {/* Pricing - Always show */}
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">Selling Price</label>
-                        <p className="text-gray-900 mt-1 font-semibold">₹{selectedItem.selling_price?.toFixed(2) || '0.00'}</p>
+                    {/* Two Column Layout */}
+                    <div className="flex gap-8 pt-4 border-t">
+                      {/* Left Column - Category Hierarchy */}
+                      <div className="flex-1 space-y-1">
+                        {selectedItem.category_name && (
+                          <p className="text-gray-800">L1- {selectedItem.category_name}</p>
+                        )}
+                        {selectedItem.sub_category_name && (
+                          <p className="text-gray-800">L2- {selectedItem.sub_category_name}</p>
+                        )}
+                        {selectedItem.division_name && (
+                          <p className="text-gray-800">L3- {selectedItem.division_name}</p>
+                        )}
+                        {selectedItem.class_name && (
+                          <p className="text-gray-800">L4- {selectedItem.class_name}</p>
+                        )}
+                        {selectedItem.sub_class_name && (
+                          <p className="text-gray-800">L5- {selectedItem.sub_class_name}</p>
+                        )}
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">MRP</label>
-                        <p className="text-gray-900 mt-1">₹{selectedItem.mrp?.toFixed(2) || '0.00'}</p>
-                      </div>
-                      {selectedItem.cost_price > 0 && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Cost Price</label>
-                          <p className="text-gray-900 mt-1">₹{selectedItem.cost_price?.toFixed(2)}</p>
-                        </div>
-                      )}
 
-                      {/* Tax Information - Only show if filled */}
-                      {selectedItem.hsn_code && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">HSN Code</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.hsn_code}</p>
+                      {/* Right Column - Specification (from Category Config) */}
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 mb-3">Specification</h4>
+                        <div className="space-y-2 text-sm">
+                          {/* Variant 1: Colour */}
+                          {selectedItem.color_name && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">V1</span>
+                              <span className="text-gray-600">Colour:</span>
+                              <span className="font-medium text-gray-900">{selectedItem.color_name}</span>
+                            </div>
+                          )}
+
+                          {/* Variant 2: Size or UOM */}
+                          {(selectedItem.size_name || selectedItem.uom) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">V2</span>
+                              <span className="text-gray-600">{selectedItem.size_name ? 'Size:' : 'UOM:'}</span>
+                              <span className="font-medium text-gray-900">{selectedItem.size_name || selectedItem.uom}</span>
+                            </div>
+                          )}
+
+                          {/* Variant 3: Supplier */}
+                          {selectedItem.supplier_name && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">V3</span>
+                              <span className="text-gray-600">Supplier:</span>
+                              <span className="font-medium text-gray-900">{selectedItem.supplier_name}</span>
+                            </div>
+                          )}
+
+                          {/* Show if no variants set */}
+                          {!selectedItem.color_name && !selectedItem.size_name && !selectedItem.uom && !selectedItem.supplier_name && (
+                            <p className="text-gray-400 italic">No specifications set</p>
+                          )}
                         </div>
-                      )}
-                      {selectedItem.gst_rate > 0 && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">GST Rate</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.gst_rate}%</p>
-                        </div>
-                      )}
                       </div>
-                      {selectedItem.description && (
-                        <div className="pt-4 border-t">
-                          <label className="text-sm font-medium text-gray-600">Description</label>
-                          <p className="text-gray-900 mt-1">{selectedItem.description}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="bg-gray-50 px-6 py-4 border-t flex justify-end">
-                      <button onClick={() => { setSidebarOpen(false); setSidebarView('none') }} className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
                     </div>
                   </div>
-                )}
-                {sidebarView === 'preview' && (
+                  <div className="bg-gray-50 px-6 py-4 border-t flex justify-end">
+                    <button onClick={() => { setSidebarOpen(false); setSidebarView('none') }} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Close</button>
+                  </div>
+                </div>
+              )}
+              {sidebarView === 'preview' && (
                   <div className="bg-white rounded-lg w-full h-full overflow-y-auto flex flex-col">
                     <div className="bg-white border-b px-4 py-3 flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -964,13 +916,15 @@ export default function ItemMaster() {
             
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Item Code</label>
-                  <p className="text-gray-900 mt-1">{selectedItem.item_code}</p>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-600">SKU</label>
+                  <p className="text-indigo-700 font-mono bg-indigo-50 px-3 py-1 rounded inline-block mt-1">
+                    {selectedItem.sku || selectedItem.item_code}
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Item Name</label>
-                  <p className="text-gray-900 mt-1">{selectedItem.item_name}</p>
+                  <p className="text-gray-900 mt-1 font-semibold">{selectedItem.item_name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Item Type</label>

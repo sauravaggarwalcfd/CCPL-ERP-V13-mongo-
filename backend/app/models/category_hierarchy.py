@@ -32,6 +32,9 @@ class ItemCategory(Document):
 
     item_type: str = "FG"
 
+    # SKU Components (Part 2: Category Code - 2-4 letters based on last level)
+    sku_category_code: Optional[str] = None  # e.g., ABCD - generated from deepest category level name
+
     # Custom Level Names for this category hierarchy
     level_names: Optional[dict] = Field(default=None)  # {"l1": "Category", "l2": "Gender", ...}
 
