@@ -33,15 +33,15 @@ export default function Sidebar() {
         { to: '/tax-hsn-master', label: 'Tax / HSN Master' },
       ]
     },
-    { 
+    {
       icon: ShoppingCart,
       label: 'Purchase',
       subItems: [
-        { to: '/purchase-orders', label: 'Purchase Orders' },
-        { to: '/goods-receipt', label: 'Goods Receipt' },
-        { to: '/purchase-returns', label: 'Purchase Returns' },
-        { to: '/vendor-bills', label: 'Vendor Bills' },
-        { to: '/purchase-reports', label: 'Purchase Reports' },
+        { to: '/purchase/purchase-orders', label: 'Purchase Orders' },
+        { to: '/purchase/goods-receipt', label: 'Goods Receipt' },
+        { to: '/purchase/purchase-returns', label: 'Purchase Returns' },
+        { to: '/purchase/vendor-bills', label: 'Vendor Bills' },
+        { to: '/purchase/purchase-reports', label: 'Purchase Reports' },
       ]
     },
     { 

@@ -31,6 +31,7 @@ from .routes import (
     specifications,
     brands,
     files,
+    purchase,
 )
 from .models.item_type import ItemType
 
@@ -105,6 +106,9 @@ app.include_router(variant_groups.router, prefix="/api", tags=["Variant Groups"]
 
 # Specifications routes
 app.include_router(specifications.router, prefix="/api", tags=["Specifications"])
+
+# Purchase Management routes (new)
+app.include_router(purchase.router, prefix="/api/purchase", tags=["Purchase Management"])
 
 # Serve uploaded files statically
 UPLOAD_DIR = Path(__file__).parent.parent / "uploads"

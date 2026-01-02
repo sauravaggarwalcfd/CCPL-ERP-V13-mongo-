@@ -32,6 +32,12 @@ from .models.inventory_management import (
     StockLevel,
     StockIssue
 )
+from .models.purchase import (
+    PurchaseOrder as PurchaseOrderNew,
+    GoodsReceipt,
+    PurchaseReturn,
+    VendorBill
+)
 
 
 class Database:
@@ -87,6 +93,10 @@ async def connect_to_mongo():
             InventoryStockTransfer,
             StockLevel,
             StockIssue,
+            PurchaseOrderNew,       # Purchase Management
+            GoodsReceipt,
+            PurchaseReturn,
+            VendorBill,
         ],
     )
 

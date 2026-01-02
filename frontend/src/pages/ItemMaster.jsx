@@ -437,8 +437,11 @@ export default function ItemMaster() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-center">
-                          <div className="font-medium text-gray-900">{(item.quantity ?? item.inventory_quantity ?? 0).toString()}</div>
-                          <p className="text-xs text-gray-500">Available</p>
+                          <div className="font-semibold text-gray-900">{item.current_stock ?? 0}</div>
+                          <p className="text-xs text-green-600">{item.available_stock ?? item.current_stock ?? 0} Available</p>
+                          {item.reserved_stock > 0 && (
+                            <p className="text-xs text-orange-500">{item.reserved_stock} Reserved</p>
+                          )}
                         </td>
                         {/* Selling Price cell removed */}
                         <td className="px-6 py-4 text-center">

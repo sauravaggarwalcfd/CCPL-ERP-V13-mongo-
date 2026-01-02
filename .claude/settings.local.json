@@ -11,7 +11,10 @@
       "Bash(start //b cmd //c \"venv\\\\Scripts\\\\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\")",
       "Bash(start //b cmd //c \"npm run dev\")",
       "Bash(cmd //c:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(dir:*)",
+      "Bash(python:*)",
+      "Bash(timeout 10 python:*)"
     ]
   }
 }

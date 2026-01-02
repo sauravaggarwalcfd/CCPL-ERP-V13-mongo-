@@ -29,6 +29,13 @@ import {
   StockLevels,
   StockIssue
 } from './pages/Inventory'
+import {
+  PurchaseOrders,
+  GoodsReceipt,
+  PurchaseReturns,
+  VendorBills,
+  PurchaseReports
+} from './pages/Purchase'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -156,25 +163,30 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* Purchase - Work in Progress */}
-            <Route path="/goods-receipt" element={
+            {/* Purchase Management */}
+            <Route path="/purchase/purchase-orders" element={
               <ProtectedRoute>
-                <WorkInProgress title="Goods Receipt" description="Record and track incoming goods from purchase orders." />
+                <PurchaseOrders />
               </ProtectedRoute>
             } />
-            <Route path="/purchase-returns" element={
+            <Route path="/purchase/goods-receipt" element={
               <ProtectedRoute>
-                <WorkInProgress title="Purchase Returns" description="Process returns to suppliers for defective or incorrect items." />
+                <GoodsReceipt />
               </ProtectedRoute>
             } />
-            <Route path="/vendor-bills" element={
+            <Route path="/purchase/purchase-returns" element={
               <ProtectedRoute>
-                <WorkInProgress title="Vendor Bills" description="Manage and track bills received from vendors." />
+                <PurchaseReturns />
               </ProtectedRoute>
             } />
-            <Route path="/purchase-reports" element={
+            <Route path="/purchase/vendor-bills" element={
               <ProtectedRoute>
-                <WorkInProgress title="Purchase Reports" description="View detailed analytics and reports on purchasing activities." />
+                <VendorBills />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase/purchase-reports" element={
+              <ProtectedRoute>
+                <PurchaseReports />
               </ProtectedRoute>
             } />
 

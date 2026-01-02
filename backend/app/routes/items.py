@@ -204,6 +204,18 @@ async def list_items(
                (i.barcode and search_lower in i.barcode.lower())
         ]
     
+    # Fetch inventory stock for all items
+    item_codes = [i.item_code for i in items]
+    if item_codes:
+        inventory_stocks = await InventoryStock.find(
+            {"item_code": {"$in": item_codes}}
+        ).to_list()
+    else:
+        inventory_stocks = []
+
+    # Create a lookup dict for inventory stock
+    stock_lookup = {s.item_code: s for s in inventory_stocks}
+
     return [
         {
             "id": str(i.id),
@@ -226,7 +238,9 @@ async def list_items(
             "cost_price": i.cost_price,
             "selling_price": i.selling_price,
             "mrp": i.mrp,
-            "current_stock": i.current_stock,
+            "current_stock": stock_lookup.get(i.item_code, None).current_stock if stock_lookup.get(i.item_code) else (i.current_stock or 0),
+            "available_stock": stock_lookup.get(i.item_code, None).available_stock if stock_lookup.get(i.item_code) else (i.current_stock or 0),
+            "reserved_stock": stock_lookup.get(i.item_code, None).reserved_stock if stock_lookup.get(i.item_code) else 0,
             "image_id": i.image_id,
             "image_url": i.image_url,
             "image_name": i.image_name,
