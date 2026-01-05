@@ -9,6 +9,7 @@ import { useLayout } from '../context/LayoutContext'
 import { categoryHierarchy, itemTypes, suppliers } from '../services/api'
 import { specificationApi } from '../services/specificationApi'
 import GroupSelector from '../components/common/GroupSelector'
+import SpecificationSection from '../components/Specifications/SpecificationSection'
 
 // Level Configuration
 const LEVELS = [
@@ -28,7 +29,7 @@ const DEFAULT_FORM = {
   sub_category_code: '',
   division_code: '',
   class_code: '',
-  item_type: 'FG',
+  item_type: '',
   level_names: {
     l1: 'Category',
     l2: 'Sub-Category',
@@ -466,7 +467,7 @@ export default function ItemCategoryMaster() {
       sub_category_code: subCategoryCode,
       division_code: divisionCode,
       class_code: classCode,
-      item_type: item.item_type || 'FG',
+      item_type: item.item_type || '',
       level_names: levelNames,
       has_color: item.has_color ?? true,
       has_size: item.has_size ?? true,
@@ -668,6 +669,10 @@ export default function ItemCategoryMaster() {
 
   const validateForm = () => {
     const errors = {}
+
+    if (!formData.item_type) {
+      errors.item_type = 'Item Type is required'
+    }
 
     if (!formData.code || formData.code.length < 2 || formData.code.length > 4) {
       errors.code = 'Code must be 2-4 characters'
@@ -1537,7 +1542,7 @@ export default function ItemCategoryMaster() {
             {/* Panel Body */}
             <form onSubmit={handleSubmit} className="p-4 text-sm">
               {/* Step 1: Select Item Type */}
-                <div className="mb-6 p-3 bg-blue-50 rounded-lg">
+                <div className={`mb-6 p-3 rounded-lg ${formErrors.item_type ? 'bg-red-50 border border-red-300' : 'bg-blue-50'}`}>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Step 1: Select Item Type <span className="text-red-500">*</span>
                 </label>
@@ -1558,6 +1563,7 @@ export default function ItemCategoryMaster() {
                         checked={formData.item_type === type.value}
                         onChange={(e) => {
                           setFormData(prev => ({ ...prev, item_type: e.target.value }))
+                          setFormErrors(prev => ({ ...prev, item_type: null }))
                         }}
                         className="sr-only"
                       />
@@ -1573,6 +1579,9 @@ export default function ItemCategoryMaster() {
                     </label>
                   ))}
                 </div>
+                {formErrors.item_type && (
+                  <p className="text-red-500 text-xs mt-2">{formErrors.item_type}</p>
+                )}
               </div>
 
               {/* Step 2: Select Level */}
@@ -1882,248 +1891,14 @@ export default function ItemCategoryMaster() {
               </div>
 
               {/* Specifications Configuration (Available for ALL Levels) */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                {/* Variant 1: Colour */}
-                <div className="space-y-3">
-                  <div className="bg-white p-4 rounded-lg border-2 border-indigo-200">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-1 rounded">Variant 1</span>
-                      <span className="text-sm font-semibold text-gray-900">Colour Group</span>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={specifications.colour?.enabled || false}
-                        onChange={(e) => {
-                          setSpecifications(prev => ({
-                            ...prev,
-                            colour: {
-                              ...prev.colour,
-                              enabled: e.target.checked,
-                              required: true, // Always mandatory
-                              groups: e.target.checked ? prev.colour?.groups || [] : []
-                            }
-                          }))
-                        }}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-600 mb-2">Select which colour groups are available for items in this category</p>
-                        {specifications.colour?.enabled && (
-                          <GroupSelector
-                            groups={variantGroups.colour || []}
-                            selected={specifications.colour?.groups || []}
-                            onChange={(newGroups) => {
-                              setSpecifications(prev => ({
-                                ...prev,
-                                colour: { ...prev.colour, groups: newGroups }
-                              }))
-                            }}
-                            placeholder="Select colour groups..."
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Variant 2: Size or UOM */}
-                  <div className="bg-white p-4 rounded-lg border-2 border-green-200">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-xs font-bold text-white bg-green-600 px-2 py-1 rounded">Variant 2</span>
-                      <span className="text-sm font-semibold text-gray-900">Size / UOM</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Size Option */}
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={specifications.size?.enabled || false}
-                          onChange={(e) => {
-                            setSpecifications(prev => ({
-                              ...prev,
-                              size: {
-                                ...prev.size,
-                                enabled: e.target.checked,
-                                required: false,
-                                groups: e.target.checked ? prev.size?.groups || [] : []
-                              },
-                              // Disable UOM if Size is enabled
-                              uom: e.target.checked ? { enabled: false, required: false, groups: [] } : prev.uom
-                            }))
-                          }}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <label className="text-sm font-medium text-gray-700">Size</label>
-                          {specifications.size?.enabled && (
-                            <div className="mt-2">
-                              <GroupSelector
-                                groups={variantGroups.size || []}
-                                selected={specifications.size?.groups || []}
-                                onChange={(newGroups) => {
-                                  setSpecifications(prev => ({
-                                    ...prev,
-                                    size: { ...prev.size, groups: newGroups }
-                                  }))
-                                }}
-                                placeholder="Select size groups..."
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* UOM Option */}
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={specifications.uom?.enabled || false}
-                          onChange={(e) => {
-                            setSpecifications(prev => ({
-                              ...prev,
-                              uom: {
-                                ...prev.uom,
-                                enabled: e.target.checked,
-                                required: false,
-                                groups: e.target.checked ? prev.uom?.groups || [] : []
-                              },
-                              // Disable Size if UOM is enabled
-                              size: e.target.checked ? { enabled: false, required: false, groups: [] } : prev.size
-                            }))
-                          }}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <label className="text-sm font-medium text-gray-700">UOM</label>
-                          {specifications.uom?.enabled && (
-                            <div className="mt-2">
-                              <GroupSelector
-                                groups={variantGroups.uom || []}
-                                selected={specifications.uom?.groups || []}
-                                onChange={(newGroups) => {
-                                  setSpecifications(prev => ({
-                                    ...prev,
-                                    uom: { ...prev.uom, groups: newGroups }
-                                  }))
-                                }}
-                                placeholder="Select UOM groups..."
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Supplier Selection */}
-                <div className="mt-3 bg-white p-4 rounded-lg border-2 border-orange-200">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs font-bold text-white bg-orange-600 px-2 py-1 rounded">Supplier</span>
-                    <span className="text-sm font-semibold text-gray-900">Supplier Group</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={specifications.vendor?.enabled || false}
-                      onChange={(e) => {
-                        setSpecifications(prev => ({
-                          ...prev,
-                          vendor: {
-                            ...prev.vendor,
-                            enabled: e.target.checked,
-                            required: true,
-                            groups: e.target.checked ? prev.vendor?.groups || [] : []
-                          }
-                        }))
-                      }}
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-600 mb-2">Select which supplier groups are available for items in this category</p>
-                      {specifications.vendor?.enabled && (
-                        <GroupSelector
-                          groups={variantGroups.vendor || []}
-                          selected={specifications.vendor?.groups || []}
-                          onChange={(newGroups) => {
-                            setSpecifications(prev => ({
-                              ...prev,
-                              vendor: { ...prev.vendor, groups: newGroups }
-                            }))
-                          }}
-                          placeholder="Select supplier groups..."
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Custom Fields */}
-                <div className="mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">Custom Fields</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCustomFields(prev => [...prev, {
-                            field_code: `CUSTOM_${Date.now()}`,
-                            field_name: 'New Field',
-                            field_type: 'TEXT',
-                            enabled: true,
-                            required: false,
-                            options: [],
-                            display_order: customFields.length
-                          }])
-                        }}
-                        className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        + Add Custom Field
-                      </button>
-                    </div>
-
-                    {customFields.length > 0 && (
-                      <div className="space-y-2">
-                        {customFields.map((field, idx) => (
-                          <div key={idx} className="bg-white p-2 rounded border border-gray-200 flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={field.field_name}
-                              onChange={(e) => {
-                                const updated = [...customFields]
-                                updated[idx].field_name = e.target.value
-                                setCustomFields(updated)
-                              }}
-                              placeholder="Field Name"
-                              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
-                            <select
-                              value={field.field_type}
-                              onChange={(e) => {
-                                const updated = [...customFields]
-                                updated[idx].field_type = e.target.value
-                                setCustomFields(updated)
-                              }}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded"
-                            >
-                              <option value="TEXT">Text</option>
-                              <option value="NUMBER">Number</option>
-                              <option value="SELECT">Select</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCustomFields(prev => prev.filter((_, i) => i !== idx))
-                              }}
-                              className="text-red-600 hover:text-red-800 text-xs px-2 py-1"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                </div>
-              </div>
+              <SpecificationSection
+                specifications={specifications}
+                setSpecifications={setSpecifications}
+                variantGroups={variantGroups}
+                customFields={customFields}
+                setCustomFields={setCustomFields}
+                categoryCode={formData.code}
+              />
 
               {/* Panel Footer */}
               <div className="border-t pt-4 mt-4 flex items-center justify-between">

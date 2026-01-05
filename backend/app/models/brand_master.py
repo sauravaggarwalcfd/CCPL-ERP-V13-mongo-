@@ -43,7 +43,7 @@ class BrandMaster(Document):
                 "contact_person": "John Doe",
                 "email": "john@abc.com",
                 "phone": "+91-9999999999",
-                "website": "www.abc.com",
+                "website": "https://www.abc.com",
                 "is_active": True
             }
         }
@@ -51,7 +51,7 @@ class BrandMaster(Document):
 
 class BrandMasterCreate(BaseModel):
     """Schema for creating a brand"""
-    brand_code: str = Field(..., min_length=2, max_length=20)
+    brand_code: str = Field(..., min_length=6, max_length=6, pattern=r'^[A-Z]{2}-\d{3}$')
     brand_name: str = Field(..., min_length=2, max_length=200)
     brand_category: Optional[str] = None
     country: Optional[str] = None

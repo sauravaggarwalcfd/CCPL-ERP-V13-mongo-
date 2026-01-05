@@ -20,6 +20,7 @@ import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
 import BrandMaster from './pages/Masters/BrandMaster'
 import SupplierMaster from './pages/Masters/SupplierMaster'
 import FileManager from './pages/FileManager'
+import SpecialAttributes from './pages/Settings/SpecialAttributes'
 import WorkInProgress from './components/common/WorkInProgress'
 import {
   InventoryDashboard,
@@ -266,7 +267,12 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* Settings - Work in Progress */}
+            {/* Settings */}
+            <Route path="/settings/special-attributes" element={
+              <ProtectedRoute>
+                <SpecialAttributes />
+              </ProtectedRoute>
+            } />
             <Route path="/users" element={
               <ProtectedRoute>
                 <WorkInProgress title="User Management" description="Manage user accounts, permissions, and access control." />

@@ -1,0 +1,445 @@
+/* SpecificationSection.css - Professional UI Styles */
+
+.specification-section {
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+/* Header */
+.spec-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.spec-header-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.spec-header-text h2 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.spec-header-text p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Spec Groups */
+.spec-group {
+  margin-bottom: 16px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.spec-group:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Variant-specific border colors */
+.spec-group.variant-colour {
+  border-left-color: #6366f1;
+}
+
+.spec-group.variant-size-uom {
+  border-left-color: #10b981;
+}
+
+.spec-group.supplier-group {
+  border-left-color: #f59e0b;
+}
+
+.spec-group.brand-group {
+  border-left-color: #ec4899;
+}
+
+.spec-group.custom-group {
+  border-left-color: #8b5cf6;
+}
+
+/* Group Header */
+.spec-group-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.spec-group-header:hover {
+  background: #f1f5f9;
+}
+
+/* Badge */
+.spec-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-right: 12px;
+  letter-spacing: 0.5px;
+}
+
+.spec-badge.variant-1 {
+  background: #6366f1;
+  color: white;
+}
+
+.spec-badge.variant-2 {
+  background: #10b981;
+  color: white;
+}
+
+.spec-badge.supplier {
+  background: #f59e0b;
+  color: white;
+}
+
+.spec-badge.brand {
+  background: #ec4899;
+  color: white;
+}
+
+.spec-badge.custom {
+  background: #8b5cf6;
+  color: white;
+}
+
+/* Title */
+.spec-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.spec-icon {
+  color: #64748b;
+}
+
+.mandatory-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.spec-expand-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+
+.spec-expand-btn:hover {
+  color: #1e293b;
+}
+
+/* Card Content */
+.spec-card {
+  padding: 16px;
+}
+
+.spec-description {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.spec-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.spec-content.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Toggle Switch */
+.spec-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.spec-toggle input {
+  display: none;
+}
+
+.toggle-slider {
+  width: 44px;
+  height: 24px;
+  background: #cbd5e1;
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.3s ease;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.spec-toggle input:checked + .toggle-slider {
+  background: #10b981;
+}
+
+.spec-toggle input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Option Card */
+.spec-option-card {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Groups Container */
+.spec-groups-container {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.spec-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Group Chips */
+.spec-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.spec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.spec-chip:hover {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.spec-chip.selected {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.chip-check {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* No Groups Message */
+.spec-no-groups {
+  padding: 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 2px dashed #e2e8f0;
+}
+
+/* Selected Count */
+.spec-selected-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  background: #10b981;
+  color: white;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+/* Coming Soon */
+.spec-coming-soon {
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 2px dashed #e2e8f0;
+}
+
+/* Custom Specs List */
+.custom-specs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.custom-spec-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 8px;
+  color: white;
+}
+
+.custom-spec-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-spec-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.custom-spec-type {
+  font-size: 11px;
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.custom-spec-remove {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.custom-spec-remove:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Add Custom Button */
+.btn-add-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-add-custom:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .spec-content.two-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .spec-group-header {
+    flex-wrap: wrap;
+  }
+
+  .spec-badge {
+    order: -1;
+    margin-bottom: 8px;
+  }
+}
