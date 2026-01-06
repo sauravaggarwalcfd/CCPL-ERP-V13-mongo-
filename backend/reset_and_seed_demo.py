@@ -37,7 +37,7 @@ async def seed_demo_data() -> None:
     from app.models.user import User
     from app.models.role import Role, Permission
 
-    from app.models.item_type import ItemType, SEED_ITEM_TYPES
+    from app.models.item_type import ItemType
     from app.models.category_hierarchy import (
         ItemCategory,
         ItemSubCategory,
@@ -48,6 +48,7 @@ async def seed_demo_data() -> None:
     from app.models.uom_master import UOMMaster
     from app.models.size_master import SizeMaster
     from app.models.colour_master import ColourMaster, hex_to_rgb
+    from app.models.variant_groups import VariantGroup, VARIANT_GROUPS_SEED
 
     from app.models.supplier_master import SupplierGroup, SupplierMaster
     from app.models.brand_master import BrandGroup, BrandMaster
@@ -114,8 +115,16 @@ async def seed_demo_data() -> None:
                     created_by={"seed": True},
                 ).insert()
 
-        # -------------------- Item Types --------------------
-        for it in SEED_ITEM_TYPES:
+        # -------------------- Item Types (Only 5 Required Types) --------------------
+        required_item_types = [
+            {"type_code": "FP", "type_name": "Finished Products", "description": "Finished Products", "color_code": "#10b981", "icon": "Package"},
+            {"type_code": "RM", "type_name": "Raw Material", "description": "Raw Material", "color_code": "#f59e0b", "icon": "Box"},
+            {"type_code": "SF", "type_name": "Semi Finished", "description": "Semi Finished", "color_code": "#3b82f6", "icon": "Layers"},
+            {"type_code": "CS", "type_name": "Consumables & Spares", "description": "Consumables and Spares", "color_code": "#8b5cf6", "icon": "Wrench"},
+            {"type_code": "FB", "type_name": "Fabric", "description": "Fabric", "color_code": "#ec4899", "icon": "Shirt"},
+        ]
+        
+        for it in required_item_types:
             existing = await ItemType.find_one(ItemType.type_code == it["type_code"])
             if not existing:
                 await ItemType(**it, created_by=requester_by).insert()
@@ -252,6 +261,18 @@ async def seed_demo_data() -> None:
                     display_order=order,
                     created_by=requester_by,
                 ).insert()
+
+        # -------------------- Variant Groups --------------------
+        # Seed variant groups for organizing colours, sizes, and UOMs
+        for vg_data in VARIANT_GROUPS_SEED:
+            existing_vg = await VariantGroup.find_one(
+                VariantGroup.group_code == vg_data["group_code"],
+                VariantGroup.variant_type == vg_data["variant_type"]
+            )
+            if not existing_vg:
+                await VariantGroup(**vg_data).insert()
+        
+        print(f"✓ Seeded {len(VARIANT_GROUPS_SEED)} variant groups")
 
         # -------------------- Supplier Groups & Suppliers --------------------
         sup_group = await SupplierGroup.find_one(SupplierGroup.group_code == "TEXTILE_SUPPLIERS")

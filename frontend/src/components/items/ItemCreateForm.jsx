@@ -149,6 +149,29 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
         if (subCls) setSelectedSubClass(subCls)
         
+        // Load existing specifications for the item
+        const loadSpecifications = async () => {
+          try {
+            const specsResponse = await itemSpecificationApi.get(item.item_code || item.sku)
+            if (specsResponse.data) {
+              console.log('[EDIT MODE] Loading specifications:', specsResponse.data)
+              setSpecifications({
+                colour_code: specsResponse.data.colour_code || '',
+                size_code: specsResponse.data.size_code || '',
+                uom_code: specsResponse.data.uom_code || '',
+                vendor_code: specsResponse.data.vendor_code || '',
+                brand_code: specsResponse.data.brand_code || '',
+                supplier_code: specsResponse.data.supplier_code || '',
+                custom_field_values: specsResponse.data.custom_field_values || {}
+              })
+            }
+          } catch (specError) {
+            console.log('[EDIT MODE] No existing specifications found:', specError.message)
+            // No specifications exist yet - that's ok
+          }
+        }
+        loadSpecifications()
+        
         // If old format SKU, regenerate it with proper format
         if (hasOldSku) {
           const typeCode = item.item_code.substring(0, 2).toUpperCase()
@@ -769,6 +792,30 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           has_image: !!payload.image_base64
         })
         response = await items.update(formData.sku, payload)
+        
+        // Save specifications on update as well
+        const hasSpecifications = specifications.colour_code ||
+                                  specifications.size_code ||
+                                  specifications.uom_code ||
+                                  specifications.vendor_code ||
+                                  specifications.brand_code ||
+                                  specifications.supplier_code ||
+                                  Object.keys(specifications.custom_field_values || {}).length > 0;
+
+        if (hasSpecifications && effectiveCategoryCode) {
+          try {
+            await itemSpecificationApi.createOrUpdate(
+              formData.sku,
+              effectiveCategoryCode,
+              specifications
+            );
+            console.log('[UPDATE] Specifications saved successfully')
+          } catch (specError) {
+            console.error('Error saving specifications:', specError);
+            toast.error('Item updated but specifications could not be saved', { duration: 4000 });
+          }
+        }
+        
         toast.success('Item updated successfully!')
       } else {
         response = await api.post('/items/', payload)
