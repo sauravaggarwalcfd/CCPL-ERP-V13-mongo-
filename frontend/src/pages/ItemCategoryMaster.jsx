@@ -6,10 +6,11 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLayout } from '../context/LayoutContext'
-import { categoryHierarchy, itemTypes, suppliers } from '../services/api'
+import { categoryHierarchy, itemTypes, suppliers, brands } from '../services/api'
+import { colourApi, sizeApi, uomApi } from '../services/variantApi'
 import { specificationApi } from '../services/specificationApi'
 import GroupSelector from '../components/common/GroupSelector'
-import SpecificationSection from '../components/Specifications/SpecificationSection'
+import SpecificationSection from '../components/specifications/SpecificationSection'
 
 // Level Configuration
 const LEVELS = [
@@ -68,6 +69,7 @@ export default function ItemCategoryMaster() {
   // Data state
   const [treeData, setTreeData] = useState([])
   const [listData, setListData] = useState([])
+  const [allItemsData, setAllItemsData] = useState([]) // Unfiltered data for counts
   const [itemTypesList, setItemTypesList] = useState([])
   const [loading, setLoading] = useState(true)
   // Which level name is being edited inline
@@ -138,19 +140,27 @@ export default function ItemCategoryMaster() {
   // Parent category level names (for inheritance)
   const [parentLevelNames, setParentLevelNames] = useState(null)
   
+  // Hierarchy path for displaying actual category names in form
+  const [hierarchyPath, setHierarchyPath] = useState([])
+  // e.g. [{ level: 1, code: 'TRM', name: 'Trims & Accessories' }, { level: 2, code: 'BTN', name: 'Buttons' }]
+  
 
   // Specifications configuration state
   const [variantGroups, setVariantGroups] = useState({
     colour: [],
     size: [],
     uom: [],
-    vendor: []
+    vendor: [],
+    brand: [],
+    supplier_group: []
   })
   const [specifications, setSpecifications] = useState({
     colour: { enabled: false, required: false, groups: [] },
     size: { enabled: false, required: false, groups: [] },
     uom: { enabled: false, required: false, groups: [] },
-    vendor: { enabled: false, required: false, groups: [] }
+    vendor: { enabled: false, required: false, groups: [] },
+    brand: { enabled: false, required: false, groups: [] },
+    supplier_group: { enabled: false, required: false, groups: [] }
   })
   const [customFields, setCustomFields] = useState([])
 
@@ -228,10 +238,27 @@ export default function ItemCategoryMaster() {
         allItems = []
       }
       
+      // Store unfiltered data for accurate counts
+      setAllItemsData(allItems)
+      
+      // Debug: Log the data to see what we're getting
+      console.log('All items fetched:', allItems.length)
+      console.log('Level breakdown:', {
+        'Level 1': allItems.filter(i => i.level === 1).length,
+        'Level 2': allItems.filter(i => i.level === 2).length,
+        'Level 3': allItems.filter(i => i.level === 3).length,
+        'Level 4': allItems.filter(i => i.level === 4).length,
+        'Level 5': allItems.filter(i => i.level === 5).length,
+      })
+      console.log('Sample item:', allItems[0])
+      
+      // Apply filters for display
+      let filteredItems = [...allItems]
+      
       // Filter by search
       if (searchTerm) {
         const term = searchTerm.toLowerCase()
-        allItems = allItems.filter(i => 
+        filteredItems = filteredItems.filter(i => 
           i.name?.toLowerCase().includes(term) || 
           i.code?.toLowerCase().includes(term) ||
           i.path_name?.toLowerCase().includes(term)
@@ -240,10 +267,10 @@ export default function ItemCategoryMaster() {
       
       // Filter by level
       if (filterLevel) {
-        allItems = allItems.filter(i => i.level === parseInt(filterLevel))
+        filteredItems = filteredItems.filter(i => i.level === parseInt(filterLevel))
       }
       
-      setListData(allItems)
+      setListData(filteredItems)
     } catch (error) {
       console.error('Fetch list error:', error)
       // Don't show error toast here - fetchTree already handles it
@@ -261,27 +288,70 @@ export default function ItemCategoryMaster() {
 
   const fetchVariantGroups = useCallback(async () => {
     try {
-      // Fetch variant groups and suppliers in parallel
-      const [variantResponse, supplierResponse] = await Promise.all([
-        categoryHierarchy.getVariantGroups(),
-        suppliers.list({ is_active: true })
+      // Fetch colour groups, size groups, UOM groups, brand groups, and supplier groups in parallel
+      const [colourGroupsRes, sizeGroupsRes, uomGroupsRes, brandGroupsRes, supplierGroupsRes] = await Promise.all([
+        colourApi.getGroups().catch(() => ({ data: [] })),
+        sizeApi.getGroups().catch(() => ({ data: [] })),
+        uomApi.getGroups().catch(() => ({ data: [] })),
+        brands.groups.list().catch(() => ({ data: [] })),
+        suppliers.groups.list().catch(() => ({ data: [] }))
       ])
-      
-      const groups = variantResponse.data || []
-      const supplierList = supplierResponse.data?.items || supplierResponse.data || []
+
+      const colourGroups = colourGroupsRes.data || []
+      const sizeGroups = sizeGroupsRes.data || []
+      const uomGroups = uomGroupsRes.data || []
+      const brandGroups = brandGroupsRes.data || []
+      const supplierGroups = supplierGroupsRes.data || []
 
       // Organize groups by variant type
       const organized = {
-        colour: groups.filter(g => g.variant_type === 'COLOUR'),
-        size: groups.filter(g => g.variant_type === 'SIZE'),
-        uom: groups.filter(g => g.variant_type === 'UOM'),
-        // Map suppliers to group format for GroupSelector
-        vendor: supplierList.map(s => ({
-          id: s.id || s._id,
-          code: s.supplier_code || s.code,
-          name: s.supplier_name || s.name,
-          group_code: s.supplier_code || s.code,
-          group_name: s.supplier_name || s.name
+        // Map colour groups to consistent format
+        colour: colourGroups.map(g => ({
+          id: g._id || g.id,
+          group_code: g.group_code || g.code || g,
+          group_name: g.group_name || g.name || g,
+          code: g.group_code || g.code || g,
+          name: g.group_name || g.name || g
+        })),
+        // Map size groups to consistent format
+        size: sizeGroups.map(g => ({
+          id: g._id || g.id,
+          group_code: g.group_code || g.code || g,
+          group_name: g.group_name || g.name || g,
+          code: g.group_code || g.code || g,
+          name: g.group_name || g.name || g
+        })),
+        // Map UOM groups to consistent format
+        uom: uomGroups.map(g => ({
+          id: g._id || g.id,
+          group_code: g.group_code || g.code || g,
+          group_name: g.group_name || g.name || g,
+          code: g.group_code || g.code || g,
+          name: g.group_name || g.name || g
+        })),
+        // Map brand groups to consistent format
+        brand: brandGroups.map(g => ({
+          id: g._id || g.id,
+          group_code: g.group_code || g.code,
+          group_name: g.group_name || g.name,
+          code: g.group_code || g.code,
+          name: g.group_name || g.name
+        })),
+        // Map supplier groups to consistent format
+        supplier_group: supplierGroups.map(g => ({
+          id: g._id || g.id,
+          group_code: g.group_code || g.code,
+          group_name: g.group_name || g.name,
+          code: g.group_code || g.code,
+          name: g.group_name || g.name
+        })),
+        // Legacy vendor mapping (also uses supplier groups now)
+        vendor: supplierGroups.map(g => ({
+          id: g._id || g.id,
+          group_code: g.group_code || g.code,
+          group_name: g.group_name || g.name,
+          code: g.group_code || g.code,
+          name: g.group_name || g.name
         }))
       }
 
@@ -363,11 +433,60 @@ export default function ItemCategoryMaster() {
     setExpandedNodes(new Set())
   }
 
+  // Helper function to find a node by code in tree data
+  const findNodeByCode = (code, nodes = treeData) => {
+    for (const node of nodes) {
+      if (node.code === code) return node
+      if (node.children?.length) {
+        const found = findNodeByCode(code, node.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  // Helper function to build hierarchy path from a node
+  const buildHierarchyPath = (node) => {
+    const path = []
+    if (node) {
+      const pathCodes = node.path?.split('/') || []
+      
+      for (let i = 0; i < pathCodes.length; i++) {
+        const code = pathCodes[i]
+        // For the last item (current node), use node.name directly
+        // For parent items, try to find them in tree data to get their names
+        const isCurrentNode = i === pathCodes.length - 1
+        let name = code // fallback to code
+        
+        if (isCurrentNode) {
+          name = node.name
+        } else {
+          // Look up parent node in tree data
+          const parentNode = findNodeByCode(code)
+          if (parentNode) {
+            name = parentNode.name
+          }
+        }
+        
+        path.push({
+          level: i + 1,
+          code: code,
+          name: name
+        })
+      }
+    }
+    return path
+  }
+
   // Modal handlers
   const openCreateModal = async (parentNode = null) => {
     const newForm = { ...DEFAULT_FORM }
+    let newHierarchyPath = []
 
     if (parentNode) {
+      // Build hierarchy path from parent node
+      newHierarchyPath = buildHierarchyPath(parentNode)
+      
       // Pre-fill parent info
       newForm.level = parentNode.level + 1
       if (parentNode.level >= 1) newForm.category_code = parentNode.code
@@ -395,6 +514,7 @@ export default function ItemCategoryMaster() {
       }
     }
 
+    setHierarchyPath(newHierarchyPath)
     setFormData(newForm)
     setFormErrors({})
     setPanelMode('create')
@@ -406,7 +526,9 @@ export default function ItemCategoryMaster() {
       colour: { enabled: false, required: false, groups: [] },
       size: { enabled: false, required: false, groups: [] },
       uom: { enabled: false, required: false, groups: [] },
-      vendor: { enabled: false, required: false, groups: [] }
+      vendor: { enabled: false, required: false, groups: [] },
+      brand: { enabled: false, required: false, groups: [] },
+      supplier_group: { enabled: false, required: false, groups: [] }
     })
     setCustomFields([])
 
@@ -480,6 +602,10 @@ export default function ItemCategoryMaster() {
       sort_order: item.sort_order || 0,
     }
 
+    // Build hierarchy path for editing - include current item
+    const editHierarchyPath = buildHierarchyPath(item)
+    setHierarchyPath(editHierarchyPath)
+
     setFormData(editFormData)
     setFormErrors({})
     setPanelMode('edit')
@@ -488,24 +614,67 @@ export default function ItemCategoryMaster() {
 
     // Load existing specifications for editing
     try {
-      const specsData = await specificationApi.get(item.code.toUpperCase())
+      const specsResponse = await specificationApi.get(item.code.toUpperCase())
+      const specsData = specsResponse.data
       if (specsData && specsData.specifications) {
+        // Map the API response to the local state format
+        const specs = specsData.specifications
         setSpecifications({
-          colour: specsData.specifications.colour || { enabled: false, required: false, groups: [] },
-          size: specsData.specifications.size || { enabled: false, required: false, groups: [] },
-          uom: specsData.specifications.uom || { enabled: false, required: false, groups: [] },
-          vendor: specsData.specifications.vendor || { enabled: false, required: false, groups: [] }
+          colour: specs.colour ? { 
+            enabled: specs.colour.enabled || false, 
+            required: specs.colour.required || false, 
+            groups: specs.colour.groups || [] 
+          } : { enabled: false, required: false, groups: [] },
+          size: specs.size ? { 
+            enabled: specs.size.enabled || false, 
+            required: specs.size.required || false, 
+            groups: specs.size.groups || [] 
+          } : { enabled: false, required: false, groups: [] },
+          uom: specs.uom ? { 
+            enabled: specs.uom.enabled || false, 
+            required: specs.uom.required || false, 
+            groups: specs.uom.groups || [] 
+          } : { enabled: false, required: false, groups: [] },
+          vendor: specs.vendor ? { 
+            enabled: specs.vendor.enabled || false, 
+            required: specs.vendor.required || false, 
+            groups: specs.vendor.groups || [] 
+          } : { enabled: false, required: false, groups: [] },
+          brand: specs.brand ? { 
+            enabled: specs.brand.enabled || false, 
+            required: specs.brand.required || false, 
+            groups: specs.brand.groups || [] 
+          } : { enabled: false, required: false, groups: [] },
+          supplier_group: specs.supplier_group || specs.supplier ? { 
+            enabled: (specs.supplier_group?.enabled || specs.supplier?.enabled) || false, 
+            required: (specs.supplier_group?.required || specs.supplier?.required) || false, 
+            groups: (specs.supplier_group?.groups || specs.supplier?.groups) || [] 
+          } : { enabled: false, required: false, groups: [] }
         })
         setCustomFields(specsData.custom_fields || [])
+        console.log('Loaded specifications for category:', item.code, specsData.specifications)
+      } else {
+        // Reset to defaults if no specifications data
+        setSpecifications({
+          colour: { enabled: false, required: false, groups: [] },
+          size: { enabled: false, required: false, groups: [] },
+          uom: { enabled: false, required: false, groups: [] },
+          vendor: { enabled: false, required: false, groups: [] },
+          brand: { enabled: false, required: false, groups: [] },
+          supplier_group: { enabled: false, required: false, groups: [] }
+        })
+        setCustomFields([])
       }
     } catch (error) {
       // If no specifications exist yet, reset to defaults
-      console.log('No existing specifications found for category:', item.code)
+      console.log('No existing specifications found for category:', item.code, error.message)
       setSpecifications({
         colour: { enabled: false, required: false, groups: [] },
         size: { enabled: false, required: false, groups: [] },
         uom: { enabled: false, required: false, groups: [] },
-        vendor: { enabled: false, required: false, groups: [] }
+        vendor: { enabled: false, required: false, groups: [] },
+        brand: { enabled: false, required: false, groups: [] },
+        supplier_group: { enabled: false, required: false, groups: [] }
       })
       setCustomFields([])
     }
@@ -632,6 +801,9 @@ export default function ItemCategoryMaster() {
       division_code: '',
       class_code: '',
     }))
+    
+    // Clear hierarchy path when level changes
+    setHierarchyPath([])
 
     await fetchDropdownOptions(level, {})
   }
@@ -645,22 +817,117 @@ export default function ItemCategoryMaster() {
       newData.division_code = ''
       newData.class_code = ''
 
-      // Fetch parent category's level_names
+      // Fetch parent category's level_names and update hierarchy path
       if (value) {
         try {
           const response = await categoryHierarchy.getOne('categories', value)
           if (response.data?.level_names) {
             setParentLevelNames(response.data.level_names)
           }
+          // Update hierarchy path with selected parent
+          if (response.data) {
+            const parentNode = response.data
+            setHierarchyPath([{
+              level: 1,
+              code: parentNode.code || value,
+              name: parentNode.name || value
+            }])
+          }
         } catch (error) {
           console.error('Failed to fetch category level names:', error)
+          // Still update hierarchy path with code as fallback
+          const foundNode = findNodeByCode(value)
+          if (foundNode) {
+            setHierarchyPath([{
+              level: 1,
+              code: value,
+              name: foundNode.name
+            }])
+          }
         }
+      } else {
+        setHierarchyPath([])
       }
     } else if (field === 'sub_category_code') {
       newData.division_code = ''
       newData.class_code = ''
+      
+      // Update hierarchy path for L3
+      if (value && newData.category_code) {
+        try {
+          // Get L1 parent name
+          const l1Node = findNodeByCode(newData.category_code)
+          // Get L2 parent name
+          const l2Node = findNodeByCode(value)
+          
+          const newPath = []
+          if (l1Node) {
+            newPath.push({ level: 1, code: newData.category_code, name: l1Node.name })
+          }
+          if (l2Node) {
+            newPath.push({ level: 2, code: value, name: l2Node.name })
+          }
+          setHierarchyPath(newPath)
+        } catch (error) {
+          console.error('Failed to build hierarchy path for L3:', error)
+        }
+      }
     } else if (field === 'division_code') {
       newData.class_code = ''
+      
+      // Update hierarchy path for L4
+      if (value && newData.category_code && newData.sub_category_code) {
+        try {
+          // Get L1 parent name
+          const l1Node = findNodeByCode(newData.category_code)
+          // Get L2 parent name
+          const l2Node = findNodeByCode(newData.sub_category_code)
+          // Get L3 parent name
+          const l3Node = findNodeByCode(value)
+          
+          const newPath = []
+          if (l1Node) {
+            newPath.push({ level: 1, code: newData.category_code, name: l1Node.name })
+          }
+          if (l2Node) {
+            newPath.push({ level: 2, code: newData.sub_category_code, name: l2Node.name })
+          }
+          if (l3Node) {
+            newPath.push({ level: 3, code: value, name: l3Node.name })
+          }
+          setHierarchyPath(newPath)
+        } catch (error) {
+          console.error('Failed to build hierarchy path for L4:', error)
+        }
+      }
+    } else if (field === 'class_code') {
+      // Update hierarchy path for L5
+      if (value && newData.category_code && newData.sub_category_code && newData.division_code) {
+        try {
+          // Get all parent names
+          const l1Node = findNodeByCode(newData.category_code)
+          const l2Node = findNodeByCode(newData.sub_category_code)
+          const l3Node = findNodeByCode(newData.division_code)
+          const l4Node = findNodeByCode(value)
+          
+          const newPath = []
+          if (l1Node) {
+            newPath.push({ level: 1, code: newData.category_code, name: l1Node.name })
+          }
+          if (l2Node) {
+            newPath.push({ level: 2, code: newData.sub_category_code, name: l2Node.name })
+          }
+          if (l3Node) {
+            newPath.push({ level: 3, code: newData.division_code, name: l3Node.name })
+          }
+          if (l4Node) {
+            newPath.push({ level: 4, code: value, name: l4Node.name })
+          }
+          setHierarchyPath(newPath)
+        } catch (error) {
+          console.error('Failed to build hierarchy path for L5:', error)
+        }
+      }
     }
 
     setFormData(newData)
@@ -786,6 +1053,16 @@ export default function ItemCategoryMaster() {
               enabled: specifications.vendor.enabled,
               required: specifications.vendor.required,
               groups: specifications.vendor.groups
+            } : undefined,
+            brand: specifications.brand.enabled ? {
+              enabled: specifications.brand.enabled,
+              required: specifications.brand.required,
+              groups: specifications.brand.groups
+            } : undefined,
+            supplier_group: specifications.supplier_group.enabled ? {
+              enabled: specifications.supplier_group.enabled,
+              required: specifications.supplier_group.required,
+              groups: specifications.supplier_group.groups
             } : undefined,
           },
           custom_fields: customFields
@@ -1062,13 +1339,10 @@ export default function ItemCategoryMaster() {
 
 
 
-  // Individual category preview
-  const handleCategoryPreview = (category) => {
-    setPreviewPanelData(category)
-    setShowPreviewPanel(true)
-    // Close other panels
-    setShowPanel(false)
-    setShowItemTypePanel(false)
+  // Individual category click - directly open edit
+  const handleCategoryClick = (category) => {
+    // Directly open edit modal instead of preview
+    openEditModal(category)
   }
 
   const closePreviewPanel = () => {
@@ -1146,8 +1420,8 @@ export default function ItemCategoryMaster() {
           {/* Name and Code */}
           <div 
             className="flex-1 min-w-0 cursor-pointer hover:bg-blue-50 rounded p-1 transition-colors"
-            onClick={() => handleCategoryPreview(node)}
-            title="Click to preview category details"
+            onClick={() => handleCategoryClick(node)}
+            title="Click to edit category"
           >
             <div className="flex items-center gap-2">
               <span className="font-medium text-gray-900">{node.name}</span>
@@ -1255,10 +1529,10 @@ export default function ItemCategoryMaster() {
         </button>
       </div>
 
-      {/* Main Content - Split View */}
+      {/* Main Content - Fixed Two Column Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel: Content */}
-        <div className={`flex-1 overflow-auto p-6 transition-all duration-300 ${showPanel || showItemTypePanel || showPreviewPanel ? 'w-1/2' : 'w-full'}`}>
+        {/* Left Panel: Tree/List/Types View */}
+        <div className="w-1/2 overflow-auto p-6 border-r bg-gray-50">
         {/* Tree View */}
         {viewMode === 'tree' && (
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -1358,7 +1632,11 @@ export default function ItemCategoryMaster() {
                     const IconComponent = levelConfig?.icon || Package
                     
                     return (
-                      <tr key={`${item.level}-${item.code}`} className="hover:bg-gray-50">
+                      <tr 
+                        key={`${item.level}-${item.code}`} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => openEditModal(item)}
+                      >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div 
@@ -1395,7 +1673,7 @@ export default function ItemCategoryMaster() {
                             {item.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => openEditModal(item)}
@@ -1493,24 +1771,27 @@ export default function ItemCategoryMaster() {
           </div>
         )}
 
-        {/* Level Legend */}
+        {/* Category Counts */}
         <div className="mt-6 bg-white rounded-xl shadow-md p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Hierarchy Levels</h3>
-          <div className="flex flex-wrap gap-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Category Statistics</h3>
+          <div className="grid grid-cols-5 gap-3">
             {LEVELS.map((level) => {
               const IconComponent = level.icon
+              // Count items at this level from unfiltered data
+              const count = allItemsData.filter(item => item.level === level.level).length
               return (
-                <div key={level.level} className="flex items-center gap-2">
+                <div 
+                  key={level.level} 
+                  className="flex flex-col items-center justify-center p-3 rounded-lg border-2 border-gray-100 hover:border-gray-200 transition"
+                >
                   <div 
-                    className="w-8 h-8 rounded flex items-center justify-center"
+                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-2"
                     style={{ backgroundColor: level.color }}
                   >
-                    <IconComponent size={14} className="text-white" />
+                    <IconComponent size={18} className="text-white" />
                   </div>
-                  <div>
-                    <div className="text-sm font-medium">{level.name}</div>
-                    <div className="text-xs text-gray-500">{level.example}</div>
-                  </div>
+                  <div className="text-xs text-gray-500 mb-1">{level.name}</div>
+                  <div className="text-2xl font-bold text-gray-800">{count}</div>
                 </div>
               )
             })}
@@ -1519,17 +1800,29 @@ export default function ItemCategoryMaster() {
         </div>
         {/* End Left Panel */}
 
-
-
-        {/* Right Panel - Form (Side Panel) */}
-        {showPanel && (
-          <div className="w-1/2 border-l bg-white overflow-auto">
+        {/* Right Panel - Always visible Edit/Add Area */}
+        <div className="w-1/2 bg-white overflow-auto">
+          {/* Show Form Panel when editing/creating category */}
+          {showPanel ? (
+            <>
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 sticky top-0 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold">
-                  {panelMode === 'create' ? 'Create New Category' : 'Edit Category'}
-                </h2>
+                <div>
+                  <h2 className="text-lg font-bold">
+                    {panelMode === 'create' 
+                      ? hierarchyPath.length > 0 
+                        ? `Add ${LEVELS[formData.level - 1]?.name || 'Category'} under ${hierarchyPath[hierarchyPath.length - 1]?.name}`
+                        : 'Create New Category'
+                      : `Edit: ${formData.name || 'Category'}`
+                    }
+                  </h2>
+                  {panelMode === 'edit' && (
+                    <p className="text-emerald-100 text-sm">
+                      {hierarchyPath.map(h => h.name).join(' > ')}
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowPanel(false)}
                   className="p-1 hover:bg-white/20 rounded transition"
@@ -1584,94 +1877,102 @@ export default function ItemCategoryMaster() {
                 )}
               </div>
 
-              {/* Step 2: Select Level */}
+              {/* Step 2: Category Hierarchy */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Step 2: Select Level
+                  Step 2: Category Hierarchy
                 </label>
-                <div className="grid grid-cols-1 gap-2">
-                  {LEVELS.map((level) => {
-                    const IconComponent = level.icon
-                    const customLevelName = parentLevelNames?.[`l${level.level}`] || formData.level_names?.[`l${level.level}`]
-                    return (
-                      <label
-                        key={level.level}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
-                          formData.level === level.level
-                            ? 'border-emerald-500 bg-emerald-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        } ${panelMode === 'edit' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <input
-                          type="radio"
-                          name="level"
-                          value={level.level}
-                          checked={formData.level === level.level}
-                          onChange={() => handleLevelChange(level.level)}
-                          disabled={panelMode === 'edit'}
-                          className="sr-only"
-                        />
+                
+                {/* Show existing hierarchy path (parent levels) */}
+                {hierarchyPath.length > 0 && (
+                  <div className="mb-3 space-y-1">
+                    {hierarchyPath.map((item, index) => {
+                      const levelConfig = LEVELS[item.level - 1]
+                      const IconComponent = levelConfig?.icon || Package
+                      // For editing, show all levels including current
+                      // For creating, show only parent levels (exclude current level being created)
+                      const isCurrentEditLevel = panelMode === 'edit' && item.level === formData.level
+                      
+                      return (
                         <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: level.color }}
+                          key={item.code}
+                          className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
+                            isCurrentEditLevel
+                              ? 'border-emerald-500 bg-emerald-50'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
                         >
-                          <IconComponent size={16} className="text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium flex items-center gap-2 text-sm">
-                            <span>{`L${level.level}`}</span>
-                            {editingLevel === level.level ? (
-                              <input
-                                ref={(el) => { inputRefs.current[level.level] = el }}
-                                type="text"
-                                value={formData.level_names?.[`l${level.level}`] || ''}
-                                onChange={(e) => setFormData(prev => ({
-                                  ...prev,
-                                  level_names: {
-                                    ...prev.level_names,
-                                    [`l${level.level}`]: e.target.value
-                                  }
-                                }))}
-                                onBlur={async () => {
-                                  setEditingLevel(null)
-                                  // persist only when editing an existing Level 1 category
-                                  if (panelMode === 'edit' && formData.level === 1 && formData.code) {
-                                    await saveLevelNames()
-                                  }
-                                }}
-                                className="px-2 py-1 border rounded text-sm"
-                              />
-                            ) : (
-                              <>
-                                <span>{customLevelName && `- ${customLevelName}`}</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditingLevel(level.level) }}
-                                  className="ml-2 text-gray-400 hover:text-gray-600"
-                                  title={`Edit Level ${level.level} name`}
-                                >
-                                  <Edit3 size={14} />
-                                </button>
-                              </>
-                            )}
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                            style={{ backgroundColor: levelConfig?.color }}
+                          >
+                            <IconComponent size={16} className="text-white" />
                           </div>
-                          {!customLevelName && (
-                            <div className="text-xs text-gray-500">{level.name}</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm flex items-center gap-2">
+                              <span className="text-gray-500">L{item.level}</span>
+                              <span className="text-gray-400">-</span>
+                              <span className="text-gray-900">{item.name}</span>
+                            </div>
+                          </div>
+                          {isCurrentEditLevel && (
+                            <Check size={20} className="text-emerald-600" />
                           )}
                         </div>
-                        {formData.level === level.level && (
-                          <Check size={20} className="text-emerald-600" />
-                        )}
-                      </label>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* For creating new category - show the level being created */}
+                {panelMode === 'create' && (
+                  <div className={`flex items-center gap-3 p-3 rounded-lg border-2 border-emerald-500 bg-emerald-50`}>
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: LEVELS[formData.level - 1]?.color }}
+                    >
+                      {(() => {
+                        const IconComponent = LEVELS[formData.level - 1]?.icon || Package
+                        return <IconComponent size={16} className="text-white" />
+                      })()}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm flex items-center gap-2">
+                        <span className="text-emerald-700">L{formData.level}</span>
+                        <span className="text-gray-400">-</span>
+                        <span className="text-emerald-700">{formData.name || <span className="italic text-gray-400">Enter name below...</span>}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-medium">Creating</span>
+                  </div>
+                )}
+
+                {/* Level selector - always shown when creating */}
+                {panelMode === 'create' && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">Select category level:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {LEVELS.map((level) => (
+                        <button
+                          key={level.level}
+                          type="button"
+                          onClick={() => handleLevelChange(level.level)}
+                          className={`px-3 py-1.5 text-sm rounded-lg border-2 transition ${
+                            formData.level === level.level
+                              ? 'border-emerald-500 bg-emerald-100 text-emerald-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                          }`}
+                        >
+                          L{level.level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Level Names removed from form as requested */}
-
-              {/* Step 3: Select Parent Hierarchy */}
-              {formData.level > 1 && (
+              {/* Step 3: Select Parent Hierarchy - Always shown when level > 1 */}
+              {panelMode === 'create' && formData.level > 1 && (
                 <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">
                     Step 3: Select Parent Hierarchy
@@ -1771,10 +2072,10 @@ export default function ItemCategoryMaster() {
                 </div>
               )}
 
-              {/* Step 4: Basic Information */}
+              {/* Step 3/4: Basic Information */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Step {formData.level > 1 ? '4' : '3'}: Basic Information
+                  {panelMode === 'create' && formData.level > 1 ? 'Step 4' : 'Step 3'}: Basic Information
                 </label>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1933,12 +2234,9 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
             </form>
-          </div>
-        )}
-
-        {/* Right Panel - Item Type Form (Side Panel) */}
-        {showItemTypePanel && (
-          <div className="w-1/2 border-l bg-white overflow-auto">
+            </>
+          ) : showItemTypePanel ? (
+            <>
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 sticky top-0 z-10">
               <div className="flex items-center justify-between">
@@ -2118,11 +2416,31 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
             </form>
-          </div>
-        )}
+            </>
+          ) : (
+            /* Default Empty State - No panel active */
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+              <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-6">
+                <FolderTree size={40} className="text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">No Category Selected</h3>
+              <p className="text-gray-500 mb-6 max-w-sm">
+                Click on a category from the tree or list view to edit it, or create a new category.
+              </p>
+              <button
+                onClick={() => openCreateModal()}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium transition shadow-sm"
+              >
+                <Plus size={20} />
+                Create New Category
+              </button>
+            </div>
+          )}
+        </div>
+        {/* End Right Panel */}
 
-        {/* Preview Panel */}
-        {showPreviewPanel && (
+        {/* Legacy Preview Panel - Hidden but kept for backwards compatibility */}
+        {false && showPreviewPanel && (
           <div className="w-1/2 border-l bg-white overflow-auto">
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 sticky top-0 z-10">

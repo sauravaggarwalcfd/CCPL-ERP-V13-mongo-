@@ -31,6 +31,7 @@ import {
   StockIssue
 } from './pages/Inventory'
 import {
+  PurchaseRequests,
   PurchaseOrders,
   GoodsReceipt,
   PurchaseReturns,
@@ -165,6 +166,11 @@ function App() {
             } />
 
             {/* Purchase Management */}
+            <Route path="/purchase/purchase-requests" element={
+              <ProtectedRoute>
+                <PurchaseRequests />
+              </ProtectedRoute>
+            } />
             <Route path="/purchase/purchase-orders" element={
               <ProtectedRoute>
                 <PurchaseOrders />

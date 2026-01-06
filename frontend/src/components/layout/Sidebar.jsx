@@ -37,6 +37,7 @@ export default function Sidebar() {
       icon: ShoppingCart,
       label: 'Purchase',
       subItems: [
+        { to: '/purchase/purchase-requests', label: 'Purchase Requests' },
         { to: '/purchase/purchase-orders', label: 'Purchase Orders' },
         { to: '/purchase/goods-receipt', label: 'Goods Receipt' },
         { to: '/purchase/purchase-returns', label: 'Purchase Returns' },

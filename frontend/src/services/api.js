@@ -280,6 +280,16 @@ export const brands = {
   update: (code, data) => api.put(`/brands/${code}/`, data),
   delete: (code) => api.delete(`/brands/${code}/`),
   getDropdown: () => api.get('/brands/dropdown/list/'),
+
+  // Brand Groups
+  groups: {
+    list: (params = {}) => api.get('/brands/groups/', { params }),
+    get: (code) => api.get(`/brands/groups/${code}/`),
+    create: (data) => api.post('/brands/groups/', data),
+    update: (code, data) => api.put(`/brands/groups/${code}/`, data),
+    delete: (code) => api.delete(`/brands/groups/${code}/`),
+    getDropdown: () => api.get('/brands/groups/dropdown/'),
+  }
 }
 
 // Supplier Master API
@@ -290,6 +300,16 @@ export const suppliers = {
   update: (code, data) => api.put(`/suppliers/${code}/`, data),
   delete: (code) => api.delete(`/suppliers/${code}/`),
   getDropdown: () => api.get('/suppliers/dropdown/list/'),
+
+  // Supplier Groups
+  groups: {
+    list: (params = {}) => api.get('/suppliers/groups/', { params }),
+    get: (code) => api.get(`/suppliers/groups/${code}/`),
+    create: (data) => api.post('/suppliers/groups/', data),
+    update: (code, data) => api.put(`/suppliers/groups/${code}/`, data),
+    delete: (code) => api.delete(`/suppliers/groups/${code}/`),
+    getDropdown: () => api.get('/suppliers/groups/dropdown/'),
+  }
 }
 
 // File Management API

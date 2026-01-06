@@ -12,13 +12,189 @@ from ..models.brand_master import (
     BrandMaster,
     BrandMasterCreate,
     BrandMasterUpdate,
-    BrandMasterResponse
+    BrandMasterResponse,
+    BrandGroup,
+    BrandGroupCreate,
+    BrandGroupUpdate,
+    BrandGroupResponse
 )
 from ..core.dependencies import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+# ==================== BRAND GROUPS ====================
+
+@router.get("/groups/", response_model=List[dict])
+async def list_brand_groups(
+    is_active: Optional[bool] = Query(None),
+    current_user = Depends(get_current_user)
+):
+    """List all brand groups"""
+    query = {BrandGroup.deleted_at: None}
+
+    if is_active is not None:
+        query[BrandGroup.is_active] = is_active
+
+    groups = await BrandGroup.find(query).sort("+group_name").to_list()
+
+    return [
+        {
+            "id": str(group.id),
+            "group_code": group.group_code,
+            "group_name": group.group_name,
+            "description": group.description,
+            "is_active": group.is_active,
+            "created_at": group.created_at,
+            "updated_at": group.updated_at
+        }
+        for group in groups
+    ]
+
+
+@router.get("/groups/{group_code}")
+async def get_brand_group(
+    group_code: str,
+    current_user = Depends(get_current_user)
+):
+    """Get a single brand group by code"""
+    group = await BrandGroup.find_one(
+        BrandGroup.group_code == group_code,
+        BrandGroup.deleted_at == None
+    )
+
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Brand group with code '{group_code}' not found"
+        )
+
+    return {
+        "id": str(group.id),
+        "group_code": group.group_code,
+        "group_name": group.group_name,
+        "description": group.description,
+        "is_active": group.is_active,
+        "created_at": group.created_at,
+        "updated_at": group.updated_at
+    }
+
+
+@router.post("/groups/", status_code=status.HTTP_201_CREATED)
+async def create_brand_group(
+    data: BrandGroupCreate,
+    current_user = Depends(get_current_user)
+):
+    """Create a new brand group"""
+    # Check if group code already exists
+    existing = await BrandGroup.find_one(
+        BrandGroup.group_code == data.group_code,
+        BrandGroup.deleted_at == None
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Brand group with code '{data.group_code}' already exists"
+        )
+
+    group = await BrandGroup(
+        **data.model_dump()
+    ).insert()
+
+    logger.info(f"Created Brand Group: {data.group_code} - {data.group_name}")
+
+    return {
+        "id": str(group.id),
+        "group_code": group.group_code,
+        "group_name": group.group_name,
+        "message": "Brand group created successfully"
+    }
+
+
+@router.put("/groups/{group_code}")
+async def update_brand_group(
+    group_code: str,
+    data: BrandGroupUpdate,
+    current_user = Depends(get_current_user)
+):
+    """Update a brand group"""
+    group = await BrandGroup.find_one(
+        BrandGroup.group_code == group_code,
+        BrandGroup.deleted_at == None
+    )
+
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Brand group with code '{group_code}' not found"
+        )
+
+    update_data = data.model_dump(exclude_unset=True)
+    if update_data:
+        update_data["updated_at"] = datetime.utcnow()
+        for field, value in update_data.items():
+            setattr(group, field, value)
+        await group.save()
+
+    logger.info(f"Updated Brand Group: {group_code}")
+
+    return {
+        "id": str(group.id),
+        "group_code": group.group_code,
+        "group_name": group.group_name,
+        "message": "Brand group updated successfully"
+    }
+
+
+@router.delete("/groups/{group_code}")
+async def delete_brand_group(
+    group_code: str,
+    current_user = Depends(get_current_user)
+):
+    """Soft delete a brand group"""
+    group = await BrandGroup.find_one(
+        BrandGroup.group_code == group_code,
+        BrandGroup.deleted_at == None
+    )
+
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Brand group with code '{group_code}' not found"
+        )
+
+    group.deleted_at = datetime.utcnow()
+    group.is_active = False
+    await group.save()
+
+    logger.info(f"Deleted Brand Group: {group_code}")
+
+    return {
+        "message": f"Brand group '{group_code}' deleted successfully"
+    }
+
+
+@router.get("/groups/dropdown/")
+async def get_brand_groups_dropdown(
+    current_user = Depends(get_current_user)
+):
+    """Get brand groups for dropdown (active only)"""
+    groups = await BrandGroup.find(
+        BrandGroup.is_active == True,
+        BrandGroup.deleted_at == None
+    ).sort("+group_name").to_list()
+
+    return [
+        {
+            "value": group.group_code,
+            "label": group.group_name
+        }
+        for group in groups
+    ]
+
+
+# ==================== BRANDS ====================
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_brand(
@@ -55,6 +231,7 @@ async def create_brand(
 @router.get("/", response_model=List[dict])
 async def list_brands(
     search: Optional[str] = Query(None),
+    brand_group: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -67,12 +244,26 @@ async def list_brands(
     if is_active is not None:
         query[BrandMaster.is_active] = is_active
 
-    if search:
+    if brand_group:
+        # Search in both brand_groups array and legacy brand_group
         query["$or"] = [
+            {"brand_groups": brand_group},
+            {"brand_group": brand_group}
+        ]
+
+    if search:
+        search_query = [
             {"brand_code": {"$regex": search, "$options": "i"}},
             {"brand_name": {"$regex": search, "$options": "i"}},
             {"brand_category": {"$regex": search, "$options": "i"}}
         ]
+        if "$or" in query:
+            # Combine with existing $or using $and
+            query = {"$and": [{"$or": query["$or"]}, {"$or": search_query}, {BrandMaster.deleted_at: None}]}
+            if is_active is not None:
+                query["$and"].append({BrandMaster.is_active: is_active})
+        else:
+            query["$or"] = search_query
 
     brands = await BrandMaster.find(query).skip(skip).limit(limit).to_list()
 
@@ -81,6 +272,8 @@ async def list_brands(
             "id": str(brand.id),
             "brand_code": brand.brand_code,
             "brand_name": brand.brand_name,
+            "brand_groups": getattr(brand, 'brand_groups', []) or [],
+            "brand_group": brand.brand_group,
             "brand_category": brand.brand_category,
             "country": brand.country,
             "contact_person": brand.contact_person,
@@ -117,6 +310,8 @@ async def get_brand(
         "id": str(brand.id),
         "brand_code": brand.brand_code,
         "brand_name": brand.brand_name,
+        "brand_groups": getattr(brand, 'brand_groups', []) or [],
+        "brand_group": brand.brand_group,
         "brand_category": brand.brand_category,
         "country": brand.country,
         "contact_person": brand.contact_person,

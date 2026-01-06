@@ -5,7 +5,7 @@ Manages colour variants with grouping system
 
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -32,7 +32,8 @@ class ColourMaster(Document):
     colour_name: str
     colour_hex: str  # #RRGGBB format
     rgb_value: RGBValue
-    colour_group: str  # Changed from Enum to str to allow dynamic groups
+    colour_groups: List[str] = Field(default_factory=list)  # Multiple groups
+    colour_group: str  # Legacy single group
     group_name: str  # Display name
     is_active: bool = True
     display_order: int = 0
@@ -48,6 +49,7 @@ class ColourMaster(Document):
         name = "colour_master"
         indexes = [
             "colour_code",
+            "colour_groups",
             "colour_group",
             "is_active",
             "display_order"
@@ -60,7 +62,8 @@ class ColourCreate(BaseModel):
     colour_code: str = Field(..., min_length=2, max_length=20)
     colour_name: str
     colour_hex: str  # Must be #RRGGBB format
-    colour_group: str
+    colour_groups: List[str] = Field(default_factory=list)  # Multiple groups
+    colour_group: str  # Legacy - primary group
     description: Optional[str] = None
     display_order: int = 0
 
@@ -88,7 +91,8 @@ class ColourCreate(BaseModel):
 class ColourUpdate(BaseModel):
     colour_name: Optional[str] = None
     colour_hex: Optional[str] = None
-    colour_group: Optional[str] = None
+    colour_groups: Optional[List[str]] = None  # Multiple groups
+    colour_group: Optional[str] = None  # Legacy
     description: Optional[str] = None
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
@@ -115,7 +119,8 @@ class ColourResponse(BaseModel):
     colour_name: str
     colour_hex: str
     rgb_value: RGBValue
-    colour_group: str
+    colour_groups: List[str] = Field(default_factory=list)  # Multiple groups
+    colour_group: str  # Legacy
     group_name: str
     is_active: bool
     display_order: int

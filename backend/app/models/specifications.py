@@ -26,6 +26,7 @@ class FieldSource(str, Enum):
     SIZE_MASTER = "SIZE_MASTER"
     UOM_MASTER = "UOM_MASTER"
     SUPPLIER_MASTER = "SUPPLIER_MASTER"
+    BRAND_MASTER = "BRAND_MASTER"
     CUSTOM = "CUSTOM"
 
 
@@ -68,6 +69,8 @@ class SpecificationsConfig(BaseModel):
     size: Optional[VariantFieldConfig] = None
     uom: Optional[VariantFieldConfig] = None
     vendor: Optional[VariantFieldConfig] = None
+    brand: Optional[VariantFieldConfig] = None
+    supplier: Optional[VariantFieldConfig] = None
 
 
 # ==================== DATABASE MODELS ====================
@@ -110,6 +113,8 @@ class ItemSpecifications(Document):
     size_code: Optional[str] = None
     uom_code: Optional[str] = None
     vendor_code: Optional[str] = None
+    brand_code: Optional[str] = None
+    supplier_code: Optional[str] = None
 
     # Custom field values (flexible dict)
     custom_field_values: Dict[str, Any] = {}
@@ -126,7 +131,9 @@ class ItemSpecifications(Document):
             "colour_code",
             "size_code",
             "uom_code",
-            "vendor_code"
+            "vendor_code",
+            "brand_code",
+            "supplier_code"
         ]
 
 
@@ -171,6 +178,8 @@ class ItemSpecificationsRequest(BaseModel):
     size_code: Optional[str] = None
     uom_code: Optional[str] = None
     vendor_code: Optional[str] = None
+    brand_code: Optional[str] = None
+    supplier_code: Optional[str] = None
     custom_field_values: Dict[str, Any] = {}
 
 
@@ -224,6 +233,8 @@ class ItemSpecificationsResponse(BaseModel):
     size_code: Optional[str]
     uom_code: Optional[str]
     vendor_code: Optional[str]
+    brand_code: Optional[str]
+    supplier_code: Optional[str]
     custom_field_values: Dict[str, Any]
     created_date: datetime
     last_modified_date: datetime
@@ -273,7 +284,17 @@ def create_default_specifications_config() -> SpecificationsConfig:
         ),
         vendor=create_default_variant_field_config(
             field_key="vendor_code",
-            field_name="Vendor/Brand",
+            field_name="Vendor",
+            source=FieldSource.SUPPLIER_MASTER
+        ),
+        brand=create_default_variant_field_config(
+            field_key="brand_code",
+            field_name="Brand",
+            source=FieldSource.BRAND_MASTER
+        ),
+        supplier=create_default_variant_field_config(
+            field_key="supplier_code",
+            field_name="Supplier",
             source=FieldSource.SUPPLIER_MASTER
         )
     )

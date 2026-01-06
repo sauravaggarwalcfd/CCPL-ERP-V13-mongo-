@@ -56,11 +56,17 @@ const DynamicSpecificationForm = ({
       const size_code = values.size_code || values.size || null;
       const uom_code = values.uom_code || values.uom || null;
       const vendor_code = values.vendor_code || values.vendor || null;
+      const brand_code = values.brand_code || values.brand || null;
+      const supplier_code = values.supplier_code || values.supplier || null;
 
       // Extract custom field values
       const custom_field_values = {};
+      const standardFields = [
+        'colour_code', 'size_code', 'uom_code', 'vendor_code', 'brand_code', 'supplier_code',
+        'colour', 'size', 'uom', 'vendor', 'brand', 'supplier'
+      ];
       Object.keys(values).forEach(key => {
-        if (!['colour_code', 'size_code', 'uom_code', 'vendor_code', 'colour', 'size', 'uom', 'vendor'].includes(key)) {
+        if (!standardFields.includes(key)) {
           custom_field_values[key] = values[key];
         }
       });
@@ -70,6 +76,8 @@ const DynamicSpecificationForm = ({
         size_code,
         uom_code,
         vendor_code,
+        brand_code,
+        supplier_code,
         custom_field_values
       });
     }

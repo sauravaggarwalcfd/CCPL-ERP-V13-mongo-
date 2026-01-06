@@ -14,6 +14,7 @@ from .routes import (
     suppliers,
     purchases,
     purchase_orders,
+    purchase_requests,
     customers,
     sales,
     warehouses,
@@ -109,6 +110,7 @@ app.include_router(specifications.router, prefix="/api", tags=["Specifications"]
 
 # Purchase Management routes (new)
 app.include_router(purchase.router, prefix="/api/purchase", tags=["Purchase Management"])
+app.include_router(purchase_requests.router, prefix="/api/purchase", tags=["Purchase Requests"])
 
 # Serve uploaded files statically
 UPLOAD_DIR = Path(__file__).parent.parent / "uploads"

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Palette, Ruler, Package, Factory, Sparkles, Settings, Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Palette, Ruler, Package, Factory, Sparkles, Settings, Plus, X, ChevronDown, ChevronUp, ExternalLink, Scale } from 'lucide-react'
 import CustomSpecModal from './CustomSpecModal'
 import './SpecificationSection.css'
 
@@ -7,9 +8,9 @@ import './SpecificationSection.css'
  * SpecificationSection - Professional UI for managing category variant specifications
  *
  * Props:
- * - specifications: current specification state { colour, size, uom, vendor }
+ * - specifications: current specification state { colour, size, uom, vendor, brand, supplier_group }
  * - setSpecifications: state setter for specifications
- * - variantGroups: available groups { colour: [], size: [], uom: [], vendor: [] }
+ * - variantGroups: available groups { colour: [], size: [], uom: [], vendor: [], brand: [], supplier_group: [] }
  * - customFields: array of custom field configurations
  * - setCustomFields: state setter for custom fields
  * - categoryCode: current category code (for API calls)
@@ -22,14 +23,30 @@ export default function SpecificationSection({
   setCustomFields,
   categoryCode
 }) {
+  const navigate = useNavigate()
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [expandedSections, setExpandedSections] = useState({
-    colour: true,
-    sizeUom: true,
-    supplier: true,
+    colour: false,
+    size: false,
+    uom: false,
+    supplier: false,
     brand: false,
-    custom: true
+    custom: false
   })
+
+  // Auto-expand sections that have enabled specifications
+  useEffect(() => {
+    if (specifications) {
+      setExpandedSections({
+        colour: specifications.colour?.enabled || false,
+        size: specifications.size?.enabled || false,
+        uom: specifications.uom?.enabled || false,
+        supplier: specifications.supplier_group?.enabled || specifications.vendor?.enabled || false,
+        brand: specifications.brand?.enabled || false,
+        custom: customFields && customFields.length > 0
+      })
+    }
+  }, [specifications?.colour?.enabled, specifications?.size?.enabled, specifications?.uom?.enabled, specifications?.supplier_group?.enabled, specifications?.vendor?.enabled, specifications?.brand?.enabled, customFields?.length])
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -48,19 +65,6 @@ export default function SpecificationSection({
         groups: enabled ? (prev[specKey]?.groups || []) : []
       }
     }))
-
-    // Special handling for Size/UOM mutual exclusivity
-    if (specKey === 'size' && enabled) {
-      setSpecifications(prev => ({
-        ...prev,
-        uom: { enabled: false, required: false, groups: [] }
-      }))
-    } else if (specKey === 'uom' && enabled) {
-      setSpecifications(prev => ({
-        ...prev,
-        size: { enabled: false, required: false, groups: [] }
-      }))
-    }
   }
 
   const handleGroupSelect = (specKey, groupCode) => {
@@ -102,7 +106,7 @@ export default function SpecificationSection({
     if (!groups || groups.length === 0) {
       return (
         <div className="spec-no-groups">
-          No groups available. Create groups in Variant Master.
+          No groups available. Create groups in Variant/Master.
         </div>
       )
     }
@@ -129,28 +133,15 @@ export default function SpecificationSection({
 
   return (
     <div className="specification-section">
-      {/* Header */}
-      <div className="spec-header">
-        <div className="spec-header-icon">
-          <Settings size={24} />
-        </div>
-        <div className="spec-header-text">
-          <h2>Variant Specifications</h2>
-          <p>Configure variant attributes for items in this category</p>
-        </div>
-      </div>
-
-      {/* Variant 1: Colour Group - MANDATORY */}
+      {/* Colour Group */}
       <div className="spec-group variant-colour">
         <div
           className="spec-group-header"
           onClick={() => toggleSection('colour')}
         >
-          <div className="spec-badge variant-1">Variant 1</div>
           <div className="spec-title">
             <Palette size={20} className="spec-icon" />
             <span>Colour Group</span>
-            <span className="mandatory-badge">MANDATORY</span>
           </div>
           <button type="button" className="spec-expand-btn">
             {expandedSections.colour ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -161,7 +152,6 @@ export default function SpecificationSection({
           <div className="spec-card">
             <p className="spec-description">
               Select which colour groups are available for items in this category.
-              At least one colour group is required for variant generation.
             </p>
 
             <div className="spec-content">
@@ -193,69 +183,87 @@ export default function SpecificationSection({
         )}
       </div>
 
-      {/* Variant 2: Size / UOM */}
-      <div className="spec-group variant-size-uom">
+      {/* Size Group */}
+      <div className="spec-group variant-size">
         <div
           className="spec-group-header"
-          onClick={() => toggleSection('sizeUom')}
+          onClick={() => toggleSection('size')}
         >
-          <div className="spec-badge variant-2">Variant 2</div>
           <div className="spec-title">
             <Ruler size={20} className="spec-icon" />
-            <span>Size / UOM</span>
+            <span>Size Group</span>
           </div>
           <button type="button" className="spec-expand-btn">
-            {expandedSections.sizeUom ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            {expandedSections.size ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
           </button>
         </div>
 
-        {expandedSections.sizeUom && (
+        {expandedSections.size && (
           <div className="spec-card">
             <p className="spec-description">
-              Choose between Size variants (S, M, L, XL) or UOM variants (PCS, KG, MTR).
-              Only one can be active at a time.
+              Select which size groups are available for items in this category (S, M, L, XL, etc.).
             </p>
 
-            <div className="spec-content two-columns">
-              {/* Size Option */}
-              <div className="spec-option-card">
-                <label className="spec-toggle">
-                  <input
-                    type="checkbox"
-                    checked={specifications.size?.enabled || false}
-                    onChange={(e) => handleToggleSpec('size', e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                  <span className="toggle-label">Size Variants</span>
-                </label>
+            <div className="spec-content">
+              <label className="spec-toggle">
+                <input
+                  type="checkbox"
+                  checked={specifications.size?.enabled || false}
+                  onChange={(e) => handleToggleSpec('size', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+                <span className="toggle-label">Enable Size Variants</span>
+              </label>
 
-                {specifications.size?.enabled && (
-                  <div className="spec-groups-container">
-                    <label className="spec-field-label">Select Size Groups:</label>
-                    {renderGroupSelector('size', variantGroups.size, specifications.size?.groups)}
-                  </div>
-                )}
-              </div>
+              {specifications.size?.enabled && (
+                <div className="spec-groups-container">
+                  <label className="spec-field-label">Select Size Groups:</label>
+                  {renderGroupSelector('size', variantGroups.size, specifications.size?.groups)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
-              {/* UOM Option */}
-              <div className="spec-option-card">
-                <label className="spec-toggle">
-                  <input
-                    type="checkbox"
-                    checked={specifications.uom?.enabled || false}
-                    onChange={(e) => handleToggleSpec('uom', e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                  <span className="toggle-label">UOM Variants</span>
-                </label>
+      {/* UOM Group */}
+      <div className="spec-group variant-uom">
+        <div
+          className="spec-group-header"
+          onClick={() => toggleSection('uom')}
+        >
+          <div className="spec-title">
+            <Scale size={20} className="spec-icon" />
+            <span>UOM Group</span>
+          </div>
+          <button type="button" className="spec-expand-btn">
+            {expandedSections.uom ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+        </div>
 
-                {specifications.uom?.enabled && (
-                  <div className="spec-groups-container">
-                    <label className="spec-field-label">Select UOM Groups:</label>
-                    {renderGroupSelector('uom', variantGroups.uom, specifications.uom?.groups)}
-                  </div>
-                )}
-              </div>
+        {expandedSections.uom && (
+          <div className="spec-card">
+            <p className="spec-description">
+              Select which unit of measure groups are available for items in this category (PCS, KG, MTR, etc.).
+            </p>
+
+            <div className="spec-content">
+              <label className="spec-toggle">
+                <input
+                  type="checkbox"
+                  checked={specifications.uom?.enabled || false}
+                  onChange={(e) => handleToggleSpec('uom', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+                <span className="toggle-label">Enable UOM Variants</span>
+              </label>
+
+              {specifications.uom?.enabled && (
+                <div className="spec-groups-container">
+                  <label className="spec-field-label">Select UOM Groups:</label>
+                  {renderGroupSelector('uom', variantGroups.uom, specifications.uom?.groups)}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -267,7 +275,6 @@ export default function SpecificationSection({
           className="spec-group-header"
           onClick={() => toggleSection('supplier')}
         >
-          <div className="spec-badge supplier">Supplier</div>
           <div className="spec-title">
             <Factory size={20} className="spec-icon" />
             <span>Supplier Group</span>
@@ -280,25 +287,24 @@ export default function SpecificationSection({
         {expandedSections.supplier && (
           <div className="spec-card">
             <p className="spec-description">
-              Select which suppliers are available for items in this category.
-              This helps in purchase order creation and vendor management.
+              Select which supplier groups are valid for items in this category.
             </p>
 
             <div className="spec-content">
               <label className="spec-toggle">
                 <input
                   type="checkbox"
-                  checked={specifications.vendor?.enabled || false}
-                  onChange={(e) => handleToggleSpec('vendor', e.target.checked)}
+                  checked={specifications.supplier_group?.enabled || false}
+                  onChange={(e) => handleToggleSpec('supplier_group', e.target.checked)}
                 />
                 <span className="toggle-slider"></span>
-                <span className="toggle-label">Enable Supplier Selection</span>
+                <span className="toggle-label">Enable Supplier Group Selection</span>
               </label>
 
-              {specifications.vendor?.enabled && (
+              {specifications.supplier_group?.enabled && (
                 <div className="spec-groups-container">
-                  <label className="spec-field-label">Select Suppliers:</label>
-                  {renderGroupSelector('vendor', variantGroups.vendor, specifications.vendor?.groups)}
+                  <label className="spec-field-label">Select Supplier Groups:</label>
+                  {renderGroupSelector('supplier_group', variantGroups.supplier_group, specifications.supplier_group?.groups)}
                 </div>
               )}
             </div>
@@ -312,7 +318,6 @@ export default function SpecificationSection({
           className="spec-group-header"
           onClick={() => toggleSection('brand')}
         >
-          <div className="spec-badge brand">Brand</div>
           <div className="spec-title">
             <Sparkles size={20} className="spec-icon" />
             <span>Brand Group</span>
@@ -325,13 +330,26 @@ export default function SpecificationSection({
         {expandedSections.brand && (
           <div className="spec-card">
             <p className="spec-description">
-              Associate brands with items in this category for brand-specific inventory tracking.
+              Select which brand groups are valid for items in this category.
             </p>
 
             <div className="spec-content">
-              <div className="spec-coming-soon">
-                <span>Brand selection coming soon</span>
-              </div>
+              <label className="spec-toggle">
+                <input
+                  type="checkbox"
+                  checked={specifications.brand?.enabled || false}
+                  onChange={(e) => handleToggleSpec('brand', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+                <span className="toggle-label">Enable Brand Group Selection</span>
+              </label>
+
+              {specifications.brand?.enabled && (
+                <div className="spec-groups-container">
+                  <label className="spec-field-label">Select Brand Groups:</label>
+                  {renderGroupSelector('brand', variantGroups.brand, specifications.brand?.groups)}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -343,7 +361,6 @@ export default function SpecificationSection({
           className="spec-group-header"
           onClick={() => toggleSection('custom')}
         >
-          <div className="spec-badge custom">Custom</div>
           <div className="spec-title">
             <Settings size={20} className="spec-icon" />
             <span>Custom Specifications</span>
@@ -400,6 +417,10 @@ export default function SpecificationSection({
           onClose={() => setShowCustomModal(false)}
           onAdd={handleAddCustomSpec}
           selectedSpecs={customFields}
+          onNavigateToVariant={() => {
+            setShowCustomModal(false)
+            navigate('/variant-master?tab=attributes')
+          }}
         />
       )}
     </div>

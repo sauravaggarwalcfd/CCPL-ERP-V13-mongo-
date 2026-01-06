@@ -28,8 +28,8 @@ from ..models.specifications import (
 from ..models.colour_master import ColourMaster
 from ..models.size_master import SizeMaster
 from ..models.uom_master import UOMMaster
-# Assuming supplier model exists
-# from ..models.supplier import Supplier
+from ..models.brand_master import BrandMaster
+from ..models.supplier import Supplier
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -62,6 +62,8 @@ def item_spec_to_response(item_spec: ItemSpecifications) -> ItemSpecificationsRe
         size_code=item_spec.size_code,
         uom_code=item_spec.uom_code,
         vendor_code=item_spec.vendor_code,
+        brand_code=getattr(item_spec, 'brand_code', None),
+        supplier_code=getattr(item_spec, 'supplier_code', None),
         custom_field_values=item_spec.custom_field_values,
         created_date=item_spec.created_date,
         last_modified_date=item_spec.last_modified_date
@@ -120,22 +122,26 @@ async def create_or_update_specifications(
         if data.specifications:
             spec_dict = {}
             for field_key, field_config in data.specifications.items():
-                if field_key in ["colour", "size", "uom", "vendor"]:
+                # Map supplier_group to supplier for consistency
+                actual_key = "supplier" if field_key == "supplier_group" else field_key
+                if actual_key in ["colour", "size", "uom", "vendor", "brand", "supplier"]:
                     # Get source
                     source_map = {
                         "colour": FieldSource.COLOUR_MASTER,
                         "size": FieldSource.SIZE_MASTER,
                         "uom": FieldSource.UOM_MASTER,
-                        "vendor": FieldSource.SUPPLIER_MASTER
+                        "vendor": FieldSource.SUPPLIER_MASTER,
+                        "brand": FieldSource.BRAND_MASTER,
+                        "supplier": FieldSource.SUPPLIER_MASTER
                     }
 
-                    spec_dict[field_key] = VariantFieldConfig(
+                    spec_dict[actual_key] = VariantFieldConfig(
                         enabled=field_config.enabled,
                         required=field_config.required,
-                        field_name=field_key.title(),
+                        field_name=actual_key.title(),
                         field_type="SELECT",
-                        field_key=f"{field_key}_code",
-                        source=source_map[field_key],
+                        field_key=f"{actual_key}_code",
+                        source=source_map[actual_key],
                         groups=field_config.groups,
                         allow_multiple=field_config.allow_multiple,
                         default_value=field_config.default_value
@@ -145,6 +151,8 @@ async def create_or_update_specifications(
             existing.specifications.size = spec_dict.get("size")
             existing.specifications.uom = spec_dict.get("uom")
             existing.specifications.vendor = spec_dict.get("vendor")
+            existing.specifications.brand = spec_dict.get("brand")
+            existing.specifications.supplier = spec_dict.get("supplier")
 
         # Update custom fields
         if data.custom_fields:
@@ -181,27 +189,31 @@ async def create_or_update_specifications(
         # Apply provided configurations
         if data.specifications:
             for field_key, field_config in data.specifications.items():
-                if field_key in ["colour", "size", "uom", "vendor"]:
+                # Map supplier_group to supplier for consistency
+                actual_key = "supplier" if field_key == "supplier_group" else field_key
+                if actual_key in ["colour", "size", "uom", "vendor", "brand", "supplier"]:
                     source_map = {
                         "colour": FieldSource.COLOUR_MASTER,
                         "size": FieldSource.SIZE_MASTER,
                         "uom": FieldSource.UOM_MASTER,
-                        "vendor": FieldSource.SUPPLIER_MASTER
+                        "vendor": FieldSource.SUPPLIER_MASTER,
+                        "brand": FieldSource.BRAND_MASTER,
+                        "supplier": FieldSource.SUPPLIER_MASTER
                     }
 
                     variant_config = VariantFieldConfig(
                         enabled=field_config.enabled,
                         required=field_config.required,
-                        field_name=field_key.title(),
+                        field_name=actual_key.title(),
                         field_type="SELECT",
-                        field_key=f"{field_key}_code",
-                        source=source_map[field_key],
+                        field_key=f"{actual_key}_code",
+                        source=source_map[actual_key],
                         groups=field_config.groups,
                         allow_multiple=field_config.allow_multiple,
                         default_value=field_config.default_value
                     )
 
-                    setattr(spec_config, field_key, variant_config)
+                    setattr(spec_config, actual_key, variant_config)
 
         custom_fields = []
         if data.custom_fields:
@@ -255,10 +267,10 @@ async def update_variant_field(
             detail=f"Specifications for category '{category_code}' not found"
         )
 
-    if field not in ["colour", "size", "uom", "vendor"]:
+    if field not in ["colour", "size", "uom", "vendor", "brand", "supplier"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid field '{field}'. Must be one of: colour, size, uom, vendor"
+            detail=f"Invalid field '{field}'. Must be one of: colour, size, uom, vendor, brand, supplier"
         )
 
     # Get source
@@ -266,7 +278,9 @@ async def update_variant_field(
         "colour": FieldSource.COLOUR_MASTER,
         "size": FieldSource.SIZE_MASTER,
         "uom": FieldSource.UOM_MASTER,
-        "vendor": FieldSource.SUPPLIER_MASTER
+        "vendor": FieldSource.SUPPLIER_MASTER,
+        "brand": FieldSource.BRAND_MASTER,
+        "supplier": FieldSource.SUPPLIER_MASTER
     }
 
     # Update field config
@@ -305,7 +319,7 @@ async def delete_variant_field(category_code: str, field: str):
             detail=f"Specifications for category '{category_code}' not found"
         )
 
-    if field not in ["colour", "size", "uom", "vendor"]:
+    if field not in ["colour", "size", "uom", "vendor", "brand", "supplier"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid field '{field}'"
@@ -467,8 +481,8 @@ async def get_form_fields(category_code: str):
 
     # Add variant fields
     if spec.specifications:
-        for field_name in ["colour", "size", "uom", "vendor"]:
-            field_config = getattr(spec.specifications, field_name)
+        for field_name in ["colour", "size", "uom", "vendor", "brand", "supplier"]:
+            field_config = getattr(spec.specifications, field_name, None)
             if field_config and field_config.enabled:
                 fields.append(FormField(
                     field_key=field_config.field_key,
@@ -530,6 +544,10 @@ async def get_field_values(category_code: str, field_key: str):
         field_config = spec.specifications.uom
     elif field_key in ["vendor", "vendor_code"]:
         field_config = spec.specifications.vendor
+    elif field_key in ["brand", "brand_code"]:
+        field_config = getattr(spec.specifications, 'brand', None)
+    elif field_key in ["supplier", "supplier_code"]:
+        field_config = getattr(spec.specifications, 'supplier', None)
 
     if not field_config or not field_config.enabled:
         return []
@@ -582,10 +600,29 @@ async def get_field_values(category_code: str, field_key: str):
             for u in uoms
         ]
 
+    elif field_config.source == FieldSource.BRAND_MASTER:
+        query = {"is_active": True}
+        brands = await BrandMaster.find(query).sort("+brand_name").to_list()
+        options = [
+            FieldOption(
+                code=b.brand_code,
+                name=b.brand_name,
+                additional_info={"description": b.description}
+            )
+            for b in brands
+        ]
+
     elif field_config.source == FieldSource.SUPPLIER_MASTER:
-        # TODO: Implement when Supplier model is available
-        # For now, return empty list
-        options = []
+        query = {"is_active": True}
+        suppliers = await Supplier.find(query).sort("+company_name").to_list()
+        options = [
+            FieldOption(
+                code=s.code,
+                name=s.company_name,
+                additional_info={"contact_person": s.contact_person, "phone": s.phone}
+            )
+            for s in suppliers
+        ]
 
     return options
 
@@ -626,6 +663,8 @@ async def create_or_update_item_specifications(
         existing.size_code = data.size_code
         existing.uom_code = data.uom_code
         existing.vendor_code = data.vendor_code
+        existing.brand_code = data.brand_code
+        existing.supplier_code = data.supplier_code
         existing.custom_field_values = data.custom_field_values
         existing.last_modified_date = datetime.utcnow()
         await existing.save()
@@ -642,6 +681,8 @@ async def create_or_update_item_specifications(
             size_code=data.size_code,
             uom_code=data.uom_code,
             vendor_code=data.vendor_code,
+            brand_code=data.brand_code,
+            supplier_code=data.supplier_code,
             custom_field_values=data.custom_field_values
         )
 

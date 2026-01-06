@@ -92,6 +92,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     size_code: null,
     uom_code: null,
     vendor_code: null,
+    brand_code: null,
+    supplier_code: null,
     custom_field_values: {}
   })
   
@@ -776,6 +778,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                                   specifications.size_code ||
                                   specifications.uom_code ||
                                   specifications.vendor_code ||
+                                  specifications.brand_code ||
+                                  specifications.supplier_code ||
                                   Object.keys(specifications.custom_field_values || {}).length > 0;
 
         if (hasSpecifications && effectiveCategoryCode) {

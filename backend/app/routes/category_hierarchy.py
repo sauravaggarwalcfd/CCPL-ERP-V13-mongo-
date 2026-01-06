@@ -38,12 +38,12 @@ async def list_categories(
 ):
     """List all Level 1 categories"""
     
+    query_conditions = [ItemCategory.is_deleted == False]
+    
     if is_active is not None:
-        categories = await ItemCategory.find(
-            ItemCategory.is_active == is_active
-        ).sort("sort_order").to_list()
-    else:
-        categories = await ItemCategory.find_all().sort("sort_order").to_list()
+        query_conditions.append(ItemCategory.is_active == is_active)
+    
+    categories = await ItemCategory.find(*query_conditions).sort("sort_order").to_list()
     
     if search:
         search_lower = search.lower()
@@ -204,17 +204,14 @@ async def list_sub_categories(
 ):
     """List Level 2 sub-categories, optionally filtered by parent"""
     
-    query_conditions = []
+    query_conditions = [ItemSubCategory.is_deleted == False]
     
     if category_code:
         query_conditions.append(ItemSubCategory.category_code == category_code.upper())
     if is_active is not None:
         query_conditions.append(ItemSubCategory.is_active == is_active)
     
-    if query_conditions:
-        items = await ItemSubCategory.find(*query_conditions).sort("sort_order").to_list()
-    else:
-        items = await ItemSubCategory.find_all().sort("sort_order").to_list()
+    items = await ItemSubCategory.find(*query_conditions).sort("sort_order").to_list()
     
     return [
         {
@@ -348,7 +345,7 @@ async def list_divisions(
 ):
     """List Level 3 divisions"""
     
-    query_conditions = []
+    query_conditions = [ItemDivision.is_deleted == False]
     
     if category_code:
         query_conditions.append(ItemDivision.category_code == category_code.upper())
@@ -498,7 +495,7 @@ async def list_classes(
 ):
     """List Level 4 classes"""
     
-    query_conditions = []
+    query_conditions = [ItemClass.is_deleted == False]
     
     if category_code:
         query_conditions.append(ItemClass.category_code == category_code.upper())
@@ -662,7 +659,7 @@ async def list_sub_classes(
 ):
     """List Level 5 sub-classes"""
     
-    query_conditions = []
+    query_conditions = [ItemSubClass.is_deleted == False]
     
     if category_code:
         query_conditions.append(ItemSubClass.category_code == category_code.upper())
@@ -868,6 +865,8 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                 "color_code": subcat.color_code,
                 "is_active": subcat.is_active,
                 "child_count": subcat.child_count,
+                "item_type": subcat.item_type,
+                "category_code": subcat.category_code,
                 "children": []
             }
             
@@ -892,6 +891,9 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                     "color_code": div.color_code,
                     "is_active": div.is_active,
                     "child_count": div.child_count,
+                    "item_type": div.item_type,
+                    "category_code": div.category_code,
+                    "sub_category_code": div.sub_category_code,
                     "children": []
                 }
                 
@@ -916,6 +918,10 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                         "color_code": cls.color_code,
                         "is_active": cls.is_active,
                         "child_count": cls.child_count,
+                        "item_type": cls.item_type,
+                        "category_code": cls.category_code,
+                        "sub_category_code": cls.sub_category_code,
+                        "division_code": cls.division_code,
                         "children": []
                     }
                     
@@ -940,6 +946,11 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                             "color_code": subcls.color_code,
                             "is_active": subcls.is_active,
                             "item_count": subcls.item_count,
+                            "item_type": subcls.item_type,
+                            "category_code": subcls.category_code,
+                            "sub_category_code": subcls.sub_category_code,
+                            "division_code": subcls.division_code,
+                            "class_code": subcls.class_code,
                             "children": []
                         })
                     

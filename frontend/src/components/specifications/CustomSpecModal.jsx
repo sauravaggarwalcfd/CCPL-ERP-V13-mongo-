@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Plus, Settings, FileText, Hash, CheckSquare, List, Link } from 'lucide-react'
+import { X, Plus, Settings, FileText, Hash, CheckSquare, List, Link, ExternalLink } from 'lucide-react'
 import { specificationApi } from '../../services/specificationApi'
 import './CustomSpecModal.css'
 
@@ -11,12 +11,14 @@ import './CustomSpecModal.css'
  * - onClose: function to close the modal
  * - onAdd: function to add a selected/created specification
  * - selectedSpecs: array of already selected specifications
+ * - onNavigateToVariant: function to navigate to variant master
  */
 export default function CustomSpecModal({
   isOpen,
   onClose,
   onAdd,
-  selectedSpecs = []
+  selectedSpecs = [],
+  onNavigateToVariant
 }) {
   const [activeTab, setActiveTab] = useState('select') // 'select' or 'create'
   const [availableSpecs, setAvailableSpecs] = useState([])
@@ -445,10 +447,12 @@ export default function CustomSpecModal({
               )}
             </button>
           )}
-          <a href="/settings/special-attributes" className="btn-manage">
-            <Link size={16} />
-            Manage All Specifications
-          </a>
+          {onNavigateToVariant && (
+            <button onClick={onNavigateToVariant} className="btn-manage">
+              <ExternalLink size={16} />
+              Manage All Specifications
+            </button>
+          )}
         </div>
       </div>
     </div>

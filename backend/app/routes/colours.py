@@ -29,7 +29,8 @@ def colour_to_response(colour: ColourMaster) -> ColourResponse:
         colour_name=colour.colour_name,
         colour_hex=colour.colour_hex,
         rgb_value=colour.rgb_value,
-        colour_group=colour.colour_group,  # Now a string
+        colour_groups=getattr(colour, 'colour_groups', []) or [],
+        colour_group=colour.colour_group,  # Legacy
         group_name=colour.group_name,
         is_active=colour.is_active,
         display_order=colour.display_order,
@@ -52,7 +53,11 @@ async def list_colours(
     query = {}
 
     if group:
-        query["colour_group"] = group
+        # Search in both colour_groups array and legacy colour_group
+        query["$or"] = [
+            {"colour_groups": group},
+            {"colour_group": group}
+        ]
 
     if is_active is not None:
         query["is_active"] = is_active
@@ -71,9 +76,13 @@ async def list_colours(
 @router.get("/colours/group/{group}", response_model=List[ColourResponse])
 async def get_colours_by_group(group: str):
     """Get colours by group"""
-    colours = await ColourMaster.find(
-        ColourMaster.colour_group == group
-    ).sort([
+    # Search in both colour_groups array and legacy colour_group
+    colours = await ColourMaster.find({
+        "$or": [
+            {"colour_groups": group},
+            {"colour_group": group}
+        ]
+    }).sort([
         ("display_order", 1),
         ("colour_name", 1)
     ]).to_list()
@@ -152,11 +161,17 @@ async def create_colour(data: ColourCreate):
     # Convert hex to RGB
     rgb = hex_to_rgb(data.colour_hex)
 
+    # Build colour_groups list from input or default to primary group
+    colour_groups = getattr(data, 'colour_groups', []) or []
+    if data.colour_group and data.colour_group not in colour_groups:
+        colour_groups.append(data.colour_group)
+
     colour = ColourMaster(
         colour_code=data.colour_code.upper(),
         colour_name=data.colour_name,
         colour_hex=data.colour_hex.upper(),
         rgb_value=rgb,
+        colour_groups=colour_groups,
         colour_group=data.colour_group,
         group_name=group.group_name,
         display_order=data.display_order,

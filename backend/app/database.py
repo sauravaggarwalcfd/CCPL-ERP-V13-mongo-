@@ -21,8 +21,8 @@ from .models.size_master import SizeMaster
 from .models.uom_master import UOMMaster
 from .models.variant_groups import VariantGroup
 from .models.specifications import CategorySpecifications, ItemSpecifications
-from .models.brand_master import BrandMaster
-from .models.supplier_master import SupplierMaster
+from .models.brand_master import BrandMaster, BrandGroup
+from .models.supplier_master import SupplierMaster, SupplierGroup
 from .models.file_master import FileMaster
 from .models.inventory_management import (
     InventoryStock,
@@ -38,6 +38,7 @@ from .models.purchase import (
     PurchaseReturn,
     VendorBill
 )
+from .models.purchase_request import PurchaseRequest
 
 
 class Database:
@@ -85,7 +86,9 @@ async def connect_to_mongo():
             CategorySpecifications,  # Specifications
             ItemSpecifications,
             BrandMaster,            # Masters
+            BrandGroup,
             SupplierMaster,
+            SupplierGroup,
             FileMaster,             # File Management
             InventoryStock,         # Inventory Management
             InventoryStockMovement,
@@ -97,6 +100,7 @@ async def connect_to_mongo():
             GoodsReceipt,
             PurchaseReturn,
             VendorBill,
+            PurchaseRequest,        # Purchase Requests
         ],
     )
 

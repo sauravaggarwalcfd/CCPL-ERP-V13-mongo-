@@ -1,3 +1,5 @@
+export { default as PurchaseRequests } from './PurchaseRequests'
+export { default as PurchaseRequestForm } from './PurchaseRequestForm'
 export { default as PurchaseOrders } from './PurchaseOrders'
 export { default as GoodsReceipt } from './GoodsReceipt'
 export { default as PurchaseReturns } from './PurchaseReturns'
