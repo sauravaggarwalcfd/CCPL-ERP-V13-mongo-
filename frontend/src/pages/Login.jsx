@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
-  const [email, setEmail] = useState('admin@ccpl.com') // Pre-fill for testing
-  const [password, setPassword] = useState('Admin@123') // Pre-fill for testing
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
   const navigate = useNavigate()
   const { login, error, clearError, isAuth, loading } = useAuth()
@@ -121,7 +121,7 @@ export default function Login() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
                 className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="••••••••"
@@ -157,16 +157,6 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Test Credentials Info */}
-          <div className="rounded-md bg-blue-50 p-4 border border-blue-200">
-            <div className="text-sm text-blue-700">
-              <p className="font-semibold mb-2">📋 Test Credentials:</p>
-              <p className="font-mono text-xs">
-                Email: admin@ccpl.com<br />
-                Password: Admin@123
-              </p>
-            </div>
-          </div>
         </form>
 
         {/* Footer Info */}

@@ -366,21 +366,21 @@ export default function ImageUploadField({ onImageChange, currentImage }) {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <label style={{
-              padding: '10px 20px',
+              padding: '8px 12px',
               backgroundColor: '#007bff',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '6px'
             }}>
-              📷 Change Image
+              📷 Change
               <input
                 type="file"
                 accept="image/jpeg,image/jpg,image/png"
@@ -393,38 +393,38 @@ export default function ImageUploadField({ onImageChange, currentImage }) {
               type="button"
               onClick={startCamera}
               style={{
-                padding: '10px 20px',
+                padding: '8px 12px',
                 backgroundColor: '#28a745',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '6px'
               }}
             >
-              <Camera size={16} />
-              Capture Photo
+              <Camera size={14} />
+              Capture
             </button>
 
             <button
               type="button"
               onClick={handleRemove}
               style={{
-                padding: '10px 20px',
+                padding: '8px 12px',
                 backgroundColor: '#dc3545',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500'
               }}
             >
-              ✕ Remove Image
+              ✕ Remove
             </button>
           </div>
         </>
@@ -460,21 +460,21 @@ export default function ImageUploadField({ onImageChange, currentImage }) {
               type="button"
               onClick={startCamera}
               style={{
-                padding: '12px 24px',
+                padding: '10px 16px',
                 backgroundColor: '#28a745',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '6px'
               }}
             >
-              <Camera size={18} />
-              Or Capture from Camera
+              <Camera size={14} />
+              Capture from Camera
             </button>
           </div>
         </div>

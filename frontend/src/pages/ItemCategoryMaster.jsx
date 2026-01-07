@@ -1808,7 +1808,7 @@ export default function ItemCategoryMaster() {
             {/* Panel Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 sticky top-0 z-10">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1">
                   <h2 className="text-lg font-bold">
                     {panelMode === 'create' 
                       ? hierarchyPath.length > 0 
@@ -1835,42 +1835,62 @@ export default function ItemCategoryMaster() {
             {/* Panel Body */}
             <form onSubmit={handleSubmit} className="p-4 text-sm">
               {/* Step 1: Select Item Type */}
-                <div className={`mb-6 p-3 rounded-lg ${formErrors.item_type ? 'bg-red-50 border border-red-300' : 'bg-blue-50'}`}>
+              <div className={`mb-6 p-4 rounded-lg border-2 ${
+                formErrors.item_type 
+                  ? 'bg-red-50 border-red-300' 
+                  : panelMode === 'edit' && formData.item_type
+                    ? 'bg-emerald-50 border-emerald-300'
+                    : 'bg-blue-50 border-blue-200'
+              }`}>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Step 1: Select Item Type <span className="text-red-500">*</span>
                 </label>
-                    <div className="flex flex-wrap gap-2">
-                  {itemTypesList.map((type) => (
-                    <label
-                      key={type.value}
-                      className={`flex items-center gap-2 px-3 py-1 text-sm rounded-lg border-2 cursor-pointer transition ${
-                        formData.item_type === type.value
-                          ? 'border-blue-500 bg-blue-100'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="item_type"
-                        value={type.value}
-                        checked={formData.item_type === type.value}
-                        onChange={(e) => {
-                          setFormData(prev => ({ ...prev, item_type: e.target.value }))
-                          setFormErrors(prev => ({ ...prev, item_type: null }))
-                        }}
-                        className="sr-only"
-                      />
-                      <span 
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: type.color }}
-                      />
-                      <span className="text-sm font-bold">{type.value}</span>
-                      <span className="text-xs text-gray-600">{type.name}</span>
-                      {formData.item_type === type.value && (
-                        <Check size={16} className="text-blue-600 ml-1" />
-                      )}
-                    </label>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {itemTypesList.map((type) => {
+                    const isSelected = formData.item_type === type.value
+                    const isEditMode = panelMode === 'edit'
+                    
+                    return (
+                      <label
+                        key={type.value}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg border-2 cursor-pointer transition-all ${
+                          isSelected
+                            ? isEditMode
+                              ? 'border-emerald-500 bg-emerald-100 shadow-md ring-2 ring-emerald-200'
+                              : 'border-blue-500 bg-blue-100 shadow-md'
+                            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="item_type"
+                          value={type.value}
+                          checked={isSelected}
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, item_type: e.target.value }))
+                            setFormErrors(prev => ({ ...prev, item_type: null }))
+                          }}
+                          className="sr-only"
+                        />
+                        <span 
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        <span className={`text-sm font-bold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
+                          {type.value}
+                        </span>
+                        <span className="text-xs text-gray-600">{type.name}</span>
+                        {isSelected && (
+                          <div className="flex items-center gap-1 ml-1">
+                            <Check size={16} className={isEditMode ? "text-emerald-600" : "text-blue-600"} />
+                            {isEditMode && (
+                              <span className="text-[10px] font-semibold text-emerald-700">ACTIVE</span>
+                            )}
+                          </div>
+                        )}
+                      </label>
+                    )
+                  })}
                 </div>
                 {formErrors.item_type && (
                   <p className="text-red-500 text-xs mt-2">{formErrors.item_type}</p>

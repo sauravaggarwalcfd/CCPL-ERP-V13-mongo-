@@ -540,7 +540,7 @@ export default function BrandMaster() {
                         className="p-1.5 text-pink-600 hover:bg-pink-100 rounded-full transition"
                         title={`Add brand to ${groupName}`}
                       >
-                        <UserPlus size={18} />
+                        <Plus size={18} />
                       </button>
                     </div>
                   </div>

@@ -3,7 +3,7 @@
  * Displays variant items grouped by their categories
  */
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, UserPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
 const GroupedVariantList = ({ groupedItems, groups, renderItem, emptyMessage, onAddToGroup }) => {
   const groupKeys = Object.keys(groupedItems);
@@ -69,7 +69,7 @@ const GroupedVariantList = ({ groupedItems, groups, renderItem, emptyMessage, on
                     className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition"
                     title={`Add item to ${groupName}`}
                   >
-                    <UserPlus size={18} />
+                    <Plus size={18} />
                   </button>
                 )}
               </div>

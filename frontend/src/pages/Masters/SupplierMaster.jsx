@@ -632,7 +632,7 @@ export default function SupplierMaster() {
                         className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition"
                         title={`Add supplier to ${groupName}`}
                       >
-                        <UserPlus size={18} />
+                        <Plus size={18} />
                       </button>
                     </div>
                   </div>
