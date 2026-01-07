@@ -63,14 +63,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS - Allow all origins for LAN network access from any device
-# This enables access from any IP address on the network
+# CORS - Allow specific origins including forwarded port and local network
+# This enables access from forwarded public IP and local network
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://192.168.1.25:5173",
+    "http://103.223.12.235:5173",  # Forwarded public IP
+    # Add any other IPs that need access
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for LAN access
-    allow_credentials=False,  # Must be False when using allow_origins=["*"]
+    allow_origins=allowed_origins,
+    allow_credentials=True,  # Enable credentials for authentication
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers

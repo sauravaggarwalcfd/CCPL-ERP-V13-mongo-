@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { BarChart3, Package, TrendingUp, ShoppingCart, Users, Truck, GitBranch, Settings, LogOut, ChevronDown, Home, Archive, Boxes, FileText, Lock, Mail, FolderTree } from 'lucide-react'
+import { BarChart3, Package, TrendingUp, ShoppingCart, Users, Truck, GitBranch, Settings, LogOut, ChevronDown, Home, Archive, Boxes, FileText, Lock, Mail, FolderTree, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useState } from 'react'
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { logout } = useAuth()
   const [expandedMenu, setExpandedMenu] = useState('Dashboard')
 
@@ -93,10 +93,23 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className="w-64 bg-gray-900 text-white h-screen flex flex-col overflow-hidden">
-      <div className="p-6 border-b border-gray-800 flex-shrink-0">
-        <h2 className="text-xl font-bold">ERP Inventory</h2>
-        <p className="text-xs text-gray-400 mt-1">v1.0.0</p>
+    <aside className={`
+      fixed lg:static inset-y-0 left-0 z-50
+      w-64 bg-gray-900 text-white h-screen flex flex-col overflow-hidden
+      transform transition-transform duration-300 ease-in-out
+      ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+    `}>
+      <div className="p-6 border-b border-gray-800 flex-shrink-0 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">ERP Inventory</h2>
+          <p className="text-xs text-gray-400 mt-1">v1.0.0</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="lg:hidden text-gray-400 hover:text-white"
+        >
+          <X size={24} />
+        </button>
       </div>
       
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">

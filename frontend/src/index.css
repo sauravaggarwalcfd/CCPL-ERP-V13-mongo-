@@ -63,6 +63,17 @@ body {
   }
 }
 
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
 /* Animation Classes */
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
@@ -82,4 +93,97 @@ body {
 
 .animate-progress {
   animation: progress 2s linear;
+}
+
+/* Mobile Responsive Utilities */
+@layer utilities {
+  /* Touch-friendly tap targets */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text selection on interactive elements */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Smooth scrolling for mobile */
+  .smooth-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  /* Make tables horizontally scrollable */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Adjust font sizes for mobile */
+  body {
+    font-size: 14px;
+  }
+
+  /* Make modals full screen on mobile */
+  .modal-mobile-full {
+    @apply fixed inset-0 w-full h-full max-w-none rounded-none;
+  }
+
+  /* Stack form fields vertically on mobile */
+  .form-grid-mobile {
+    @apply grid-cols-1 !important;
+  }
+
+  /* Adjust padding for mobile */
+  .mobile-padding {
+    @apply px-3 py-2;
+  }
+
+  /* Hide desktop-only content */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Full width buttons on mobile */
+  .mobile-full-width {
+    @apply w-full;
+  }
+}
+
+/* Tablet-specific styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Desktop-specific styles */
+@media (min-width: 1025px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Better touch interactions */
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Disable zoom on input focus for iOS */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Smooth transitions for mobile interactions */
+* {
+  -webkit-tap-highlight-color: transparent;
 }

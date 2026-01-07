@@ -384,10 +384,16 @@ async def get_next_sku(prefix: str):
         # Normalize prefix to 2 uppercase letters
         prefix = prefix[:2].upper()
 
-        # Find all NON-DELETED items with this prefix
+        # Find all NON-DELETED items with this prefix (both old and new format)
+        # New format: RM-BTNS-A0001-0000-00
+        # Old format: RM00001
         items = await ItemMaster.find(
             {
-                "item_code": {"$regex": f"^{prefix}\\d{{5}}$"},
+                "$or": [
+                    {"item_code": {"$regex": f"^{prefix}\\d{{5}}$"}},  # Old format
+                    {"item_code": {"$regex": f"^{prefix}-"}},  # New format
+                    {"sku": {"$regex": f"^{prefix}-"}}  # New format in sku field
+                ],
                 "deleted_at": None  # Exclude deleted items
             }
         ).to_list()
@@ -396,21 +402,40 @@ async def get_next_sku(prefix: str):
             # No items with this prefix yet, start from 1
             return {"next_sku": f"{prefix}00001", "sequence": 1}
 
-        # Extract numeric parts and find the maximum
+        # Extract sequence numbers from both old and new formats
         max_sequence = 0
         for item in items:
             try:
-                numeric_part = int(item.item_code[2:])
-                if numeric_part > max_sequence:
-                    max_sequence = numeric_part
-            except (ValueError, IndexError):
+                # Try new format first: RM-BTNS-A0001-0000-00
+                # The sequence is in the third part after splitting by '-'
+                sku_to_check = item.sku if item.sku else item.item_code
+                
+                if '-' in sku_to_check:
+                    # New format: extract sequence from third part (A0001)
+                    parts = sku_to_check.split('-')
+                    if len(parts) >= 3:
+                        sequence_part = parts[2]  # A0001
+                        if sequence_part and len(sequence_part) >= 2:
+                            # Extract numeric part: A0001 -> 0001 (letter + 4 digits)
+                            letter = sequence_part[0]
+                            number = int(sequence_part[1:])
+                            # Calculate absolute sequence: A=0-9999, B=10000-19999, etc.
+                            letter_value = ord(letter) - ord('A')
+                            absolute_sequence = (letter_value * 10000) + number
+                            if absolute_sequence > max_sequence:
+                                max_sequence = absolute_sequence
+                else:
+                    # Old format: RM00001
+                    numeric_part = int(item.item_code[2:])
+                    if numeric_part > max_sequence:
+                        max_sequence = numeric_part
+            except (ValueError, IndexError, AttributeError):
                 continue
 
-        # Generate next SKU
+        # Generate next sequence
         next_sequence = max_sequence + 1
-        next_sku = f"{prefix}{str(next_sequence).zfill(5)}"
 
-        return {"next_sku": next_sku, "sequence": next_sequence}
+        return {"next_sku": f"{prefix}{str(next_sequence).zfill(5)}", "sequence": next_sequence}
     except Exception as e:
         logger.error(f"Error generating next SKU: {e}")
         raise HTTPException(

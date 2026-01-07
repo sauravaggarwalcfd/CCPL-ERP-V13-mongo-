@@ -64,11 +64,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-6 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
         {/* Header */}
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-4 sm:mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
             🏢 CCPL ERP System
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
@@ -78,7 +78,7 @@ export default function Login() {
 
         {/* Error Message */}
         {error && (
-          <div className="rounded-md bg-red-50 p-4 border border-red-200">
+          <div className="rounded-md bg-red-50 p-3 sm:p-4 border border-red-200">
             <div className="flex">
               <div className="flex-shrink-0">
                 <span className="text-red-400">❌</span>
@@ -91,7 +91,7 @@ export default function Login() {
         )}
 
         {/* Login Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        <form className="mt-6 sm:mt-8 space-y-4 sm:space-y-6" onSubmit={handleLogin}>
           <div className="rounded-md shadow-sm space-y-3">
             {/* Email Field */}
             <div>

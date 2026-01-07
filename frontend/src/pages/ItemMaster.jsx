@@ -268,6 +268,25 @@ export default function ItemMaster() {
     setSidebarOpen(true)
   }
 
+  const handleCopyItem = (item) => {
+    // Create a copy of the item without the ID and codes, open in create mode
+    // Keep original codes for reference to extract item type
+    const copiedItem = {
+      ...item,
+      _id: undefined, // Remove MongoDB ID
+      id: undefined, // Remove any ID field
+      item_name: `${item.item_name} (Copy)`,
+      original_sku: item.sku, // Keep original for type extraction
+      original_item_code: item.item_code, // Keep original for type extraction
+      sku: '', // Will be auto-generated
+      item_code: '', // Will be auto-generated
+    }
+    console.log('[COPY] Creating copy from item:', item.item_code, 'Type code:', item.sku_type_code)
+    setSelectedItem(copiedItem)
+    setSidebarView('create')
+    setSidebarOpen(true)
+  }
+
   const handleDeleteItem = async (item) => {
     if (!window.confirm(`Are you sure you want to delete item "${item.item_name}" (${item.item_code})?`)) {
       return
@@ -291,25 +310,25 @@ export default function ItemMaster() {
   return (
     <div className="flex flex-col h-full">
       {/* Top Bar - Filters & Actions */}
-      <div className="bg-white p-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
+      <div className="bg-white p-3 sm:p-4 border-b flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 sm:gap-4 sticky top-0 z-10">
         {/* Left: Search & Filters */}
-        <div className="flex flex-wrap items-center gap-4 flex-1">
-          <div className="relative min-w-64">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 flex-1">
+          <div className="relative w-full sm:min-w-64 sm:w-auto">
             <Search className="absolute left-3 top-3 text-gray-400" size={20} />
             <input
               type="text"
               placeholder="Search by code or name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div className="min-w-48">
+          <div className="w-full sm:min-w-48 sm:w-auto">
             <select
               value={selectedCategory}
               onChange={handleCategoryChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Categories</option>
               {categories.map(cat => (
@@ -320,12 +339,12 @@ export default function ItemMaster() {
             </select>
           </div>
 
-          <div className="min-w-48">
+          <div className="w-full sm:min-w-48 sm:w-auto">
             <select
               value={selectedSubCategory}
               onChange={(e) => setSelectedSubCategory(e.target.value)}
               disabled={!selectedCategory}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             >
               <option value="">All Sub-Categories</option>
               {subCategories.map(subcat => (
@@ -341,16 +360,18 @@ export default function ItemMaster() {
         <div className="flex gap-2">
           <button
             onClick={() => { setSidebarView('create'); setSidebarOpen(true) }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition whitespace-nowrap"
+            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition whitespace-nowrap text-sm sm:text-base"
           >
-            <Plus size={20} /> Add Item
+            <Plus size={18} className="sm:w-5 sm:h-5" /> 
+            <span className="hidden xs:inline">Add Item</span>
+            <span className="xs:hidden">Add</span>
           </button>
           <button
             onClick={handleOpenBin}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
+            className="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
             title="View Deleted Items (Bin)"
           >
-            <Archive size={20} />
+            <Archive size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
@@ -358,7 +379,7 @@ export default function ItemMaster() {
       {/* Main Content - Split View */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel: Items List */}
-        <div className={`flex-1 overflow-auto p-4 transition-all duration-300 ${sidebarOpen ? 'w-1/2' : 'w-full'}`}>
+        <div className={`flex-1 overflow-auto p-2 sm:p-4 transition-all duration-300 ${sidebarOpen ? 'hidden lg:block lg:w-1/2' : 'w-full'}`}>
           {/* Items Table */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             {loading ? (
@@ -370,14 +391,14 @@ export default function ItemMaster() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[640px]">
                   <thead className="bg-gray-100 border-b">
                     <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Image</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Item</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Inventory</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Action</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Image</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Item</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700 hidden md:table-cell">Category</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Stock</th>
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -388,7 +409,7 @@ export default function ItemMaster() {
                         onClick={() => handleViewItem(item)}
                         title="Click to view item details"
                       >
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           {item.image_base64 || item.thumbnail_url || item.image_url ? (
                             <img
                               src={
@@ -397,27 +418,27 @@ export default function ItemMaster() {
                                   : files.getThumbnailUrl(item.thumbnail_url) || files.getFileUrl(item.image_url)
                               }
                               alt={item.item_name}
-                              className="w-12 h-12 object-cover rounded border border-gray-200"
+                              className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded border border-gray-200"
                               onError={(e) => {
                                 e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect fill="%23f3f4f6" width="48" height="48"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="10" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E'
                               }}
                             />
                           ) : (
-                            <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
                               <span className="text-gray-400 text-xs">No img</span>
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded inline-block w-fit" title="Stock Keeping Unit">
+                            <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-1.5 sm:px-2 py-0.5 rounded inline-block w-fit" title="Stock Keeping Unit">
                               {item.sku || item.item_code}
                             </span>
-                            <span className="font-bold text-gray-900">{item.item_name}</span>
+                            <span className="font-bold text-gray-900 text-sm sm:text-base">{item.item_name}</span>
                             {item.color_name && <span className="text-xs text-gray-500">{item.color_name}</span>}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm hidden md:table-cell">
                           <div className="flex flex-col gap-1 text-gray-700">
                             {item.category_name && <div>L1 - {item.category_name}</div>}
                             {item.sub_category_name && <div>L2 - {item.sub_category_name}</div>}
@@ -426,31 +447,31 @@ export default function ItemMaster() {
                             {item.sub_class_name && <div>L5 - {item.sub_class_name}</div>}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-center">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-center">
                           <div className="font-semibold text-gray-900">{item.quantity ?? item.current_stock ?? 0}</div>
-                          <p className="text-xs text-gray-600">Available</p>
+                          <p className="text-xs text-gray-600">Avail</p>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-center">
+                          <div className="flex items-center justify-center gap-1 sm:gap-2">
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleViewItem(item)
                               }}
-                              className="p-2 hover:bg-blue-100 rounded text-blue-600 transition" 
+                              className="p-1.5 sm:p-2 hover:bg-blue-100 rounded text-blue-600 transition" 
                               title="View"
                             >
-                              <Eye size={16} />
+                              <Eye size={14} className="sm:w-4 sm:h-4" />
                             </button>
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleEditItem(item)
                               }}
-                              className="p-2 hover:bg-orange-100 rounded text-orange-600 transition" 
+                              className="p-1.5 sm:p-2 hover:bg-orange-100 rounded text-orange-600 transition" 
                               title="Edit"
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={14} className="sm:w-4 sm:h-4" />
                             </button>
                             <button 
                               onClick={(e) => {
@@ -461,6 +482,16 @@ export default function ItemMaster() {
                               title="Delete"
                             >
                               <Trash2 size={16} />
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCopyItem(item)
+                              }}
+                              className="p-2 hover:bg-green-100 rounded text-green-600 transition" 
+                              title="Copy this item"
+                            >
+                              <Plus size={16} />
                             </button>
                           </div>
                         </td>
@@ -491,8 +522,19 @@ export default function ItemMaster() {
 
         {/* Right Panel: Sidebar Form */}
         {sidebarOpen && (
-          <div className="w-1/2 border-l bg-gray-50 overflow-auto p-4 transition-all duration-300 shadow-xl z-20">
+          <div className="fixed lg:static inset-0 lg:w-1/2 border-l bg-gray-50 overflow-auto p-2 sm:p-4 transition-all duration-300 shadow-xl z-20">
             <div className="bg-white rounded-lg shadow-md border border-gray-200 h-full overflow-hidden">
+              {/* Mobile close button */}
+              <div className="lg:hidden sticky top-0 bg-white z-10 p-3 border-b flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800">{sidebarView === 'create' ? 'Add Item' : sidebarView === 'edit' ? 'Edit Item' : 'Item Details'}</h3>
+                <button
+                  onClick={() => { setSidebarOpen(false); setSidebarView('none') }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
               {sidebarView === 'create' && (
                 <ItemCreateForm
                   isOpen={true}

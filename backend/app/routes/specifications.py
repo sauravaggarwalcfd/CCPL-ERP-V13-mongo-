@@ -524,107 +524,129 @@ async def get_form_fields(category_code: str):
 @router.get("/specifications/{category_code}/field-values/{field_key}")
 async def get_field_values(category_code: str, field_key: str):
     """Get dropdown options for a specific field"""
-    spec = await CategorySpecifications.find_one(
-        CategorySpecifications.category_code == category_code.upper()
-    )
+    try:
+        spec = await CategorySpecifications.find_one(
+            CategorySpecifications.category_code == category_code.upper()
+        )
 
-    if not spec:
+        if not spec:
+            logger.warning(f"Specifications not found for category: {category_code}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Specifications for category '{category_code}' not found"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error finding specifications for {category_code}: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Specifications for category '{category_code}' not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving specifications: {str(e)}"
         )
 
     # Determine field source
-    field_config = None
-    if field_key in ["colour", "colour_code"]:
-        field_config = spec.specifications.colour
-    elif field_key in ["size", "size_code"]:
-        field_config = spec.specifications.size
-    elif field_key in ["uom", "uom_code"]:
-        field_config = spec.specifications.uom
-    elif field_key in ["vendor", "vendor_code"]:
-        field_config = spec.specifications.vendor
-    elif field_key in ["brand", "brand_code"]:
-        field_config = getattr(spec.specifications, 'brand', None)
-    elif field_key in ["supplier", "supplier_code"]:
-        field_config = getattr(spec.specifications, 'supplier', None)
+    try:
+        field_config = None
+        if field_key in ["colour", "colour_code"]:
+            field_config = spec.specifications.colour if hasattr(spec.specifications, 'colour') else None
+        elif field_key in ["size", "size_code"]:
+            field_config = spec.specifications.size if hasattr(spec.specifications, 'size') else None
+        elif field_key in ["uom", "uom_code"]:
+            field_config = spec.specifications.uom if hasattr(spec.specifications, 'uom') else None
+        elif field_key in ["vendor", "vendor_code"]:
+            field_config = spec.specifications.vendor if hasattr(spec.specifications, 'vendor') else None
+        elif field_key in ["brand", "brand_code"]:
+            field_config = getattr(spec.specifications, 'brand', None) if spec.specifications else None
+        elif field_key in ["supplier", "supplier_code"]:
+            field_config = getattr(spec.specifications, 'supplier', None) if spec.specifications else None
+        else:
+            # Unknown field type
+            logger.warning(f"Unknown field type requested: {field_key} for category {category_code}")
+            return []
 
-    if not field_config or not field_config.enabled:
-        return []
+        if not field_config or not hasattr(field_config, 'enabled') or not field_config.enabled:
+            logger.info(f"Field {field_key} not configured or disabled for category {category_code}")
+            return []
 
-    # Fetch values based on source
-    options = []
+        # Fetch values based on source
+        options = []
 
-    if field_config.source == FieldSource.COLOUR_MASTER:
-        query = {"is_active": True}
-        if field_config.groups:
-            query["colour_group"] = {"$in": field_config.groups}
+        if field_config.source == FieldSource.COLOUR_MASTER:
+            query = {"is_active": True}
+            if field_config.groups:
+                query["colour_group"] = {"$in": field_config.groups}
 
-        colours = await ColourMaster.find(query).sort("+display_order").to_list()
-        options = [
-            FieldOption(
-                code=c.colour_code,
-                name=c.colour_name,
-                additional_info={"hex": c.colour_hex, "group": c.colour_group}
-            )
-            for c in colours
-        ]
+            colours = await ColourMaster.find(query).sort("+display_order").to_list()
+            options = [
+                FieldOption(
+                    code=c.colour_code,
+                    name=c.colour_name,
+                    additional_info={"hex": c.colour_hex, "group": c.colour_group}
+                )
+                for c in colours
+            ]
 
-    elif field_config.source == FieldSource.SIZE_MASTER:
-        query = {"is_active": True}
-        if field_config.groups:
-            query["size_group"] = {"$in": field_config.groups}
+        elif field_config.source == FieldSource.SIZE_MASTER:
+            query = {"is_active": True}
+            if field_config.groups:
+                query["size_group"] = {"$in": field_config.groups}
 
-        sizes = await SizeMaster.find(query).sort("+display_order").to_list()
-        options = [
-            FieldOption(
-                code=s.size_code,
-                name=s.size_name,
-                additional_info={"group": s.size_group, "numeric_value": s.numeric_value}
-            )
-            for s in sizes
-        ]
+            sizes = await SizeMaster.find(query).sort("+display_order").to_list()
+            options = [
+                FieldOption(
+                    code=s.size_code,
+                    name=s.size_name,
+                    additional_info={"group": s.size_group, "numeric_value": s.numeric_value}
+                )
+                for s in sizes
+            ]
 
-    elif field_config.source == FieldSource.UOM_MASTER:
-        query = {"is_active": True}
-        if field_config.groups:
-            query["uom_group"] = {"$in": field_config.groups}
+        elif field_config.source == FieldSource.UOM_MASTER:
+            query = {"is_active": True}
+            if field_config.groups:
+                query["uom_group"] = {"$in": field_config.groups}
 
-        uoms = await UOMMaster.find(query).sort("+display_order").to_list()
-        options = [
-            FieldOption(
-                code=u.uom_code,
-                name=f"{u.uom_name} ({u.uom_symbol})",
-                additional_info={"symbol": u.uom_symbol, "group": u.uom_group}
-            )
-            for u in uoms
-        ]
+            uoms = await UOMMaster.find(query).sort("+display_order").to_list()
+            options = [
+                FieldOption(
+                    code=u.uom_code,
+                    name=f"{u.uom_name} ({u.uom_symbol})",
+                    additional_info={"symbol": u.uom_symbol, "group": u.uom_group}
+                )
+                for u in uoms
+            ]
 
-    elif field_config.source == FieldSource.BRAND_MASTER:
-        query = {"is_active": True}
-        brands = await BrandMaster.find(query).sort("+brand_name").to_list()
-        options = [
-            FieldOption(
-                code=b.brand_code,
-                name=b.brand_name,
-                additional_info={"description": b.description}
-            )
-            for b in brands
-        ]
+        elif field_config.source == FieldSource.BRAND_MASTER:
+            query = {"is_active": True}
+            brands = await BrandMaster.find(query).sort("+brand_name").to_list()
+            options = [
+                FieldOption(
+                    code=b.brand_code,
+                    name=b.brand_name,
+                    additional_info={"category": b.brand_category, "country": b.country}
+                )
+                for b in brands
+            ]
 
-    elif field_config.source == FieldSource.SUPPLIER_MASTER:
-        query = {"is_active": True}
-        suppliers = await Supplier.find(query).sort("+company_name").to_list()
-        options = [
-            FieldOption(
-                code=s.code,
-                name=s.company_name,
-                additional_info={"contact_person": s.contact_person, "phone": s.phone}
-            )
-            for s in suppliers
-        ]
+        elif field_config.source == FieldSource.SUPPLIER_MASTER:
+            query = {"is_active": True}
+            suppliers = await Supplier.find(query).sort("+company_name").to_list()
+            options = [
+                FieldOption(
+                    code=s.code,
+                    name=s.company_name,
+                    additional_info={"contact_person": s.contact_person, "phone": s.phone}
+                )
+                for s in suppliers
+            ]
 
-    return options
+        return options
+    except Exception as e:
+        logger.error(f"Error fetching field values for {category_code}/{field_key}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching field values: {str(e)}"
+        )
 
 
 # ==================== ITEM SPECIFICATIONS ====================

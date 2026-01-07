@@ -29,8 +29,8 @@ const generateSKU = (itemType = 'FG', sequence = 1) => {
 }
 
 export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = 'modal', item = null }) {
-  // Edit mode detection
-  const isEditMode = !!item
+  // Edit mode detection - if item has no SKU/item_code, it's a copy operation (create mode)
+  const isEditMode = !!item && !!item.sku && !!item.item_code
 
   // Loading states
   const [loading, setLoading] = useState(false)
@@ -103,7 +103,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
       fetchCategories()
       fetchItemTypes()
 
-      // If editing, populate form with item data
+      // If editing an existing item, populate form with item data
       if (isEditMode && item) {
         console.log('[EDIT MODE] Loading item:', item.item_code, item)
         console.log('[EDIT MODE] Image data:', {
@@ -190,8 +190,76 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           
           setFormData(prev => ({ ...prev, sku: newSku }))
         }
+      } else if (!isEditMode && item) {
+        // COPY MODE - item is passed but SKU/item_code are empty
+        console.log('[COPY MODE] Copying item:', item.item_name, 'Original codes:', {
+          sku: item.sku,
+          item_code: item.item_code,
+          original_sku: item.original_sku,
+          original_item_code: item.original_item_code
+        })
+        console.log('[COPY MODE] isEditMode =', isEditMode, 'item exists =', !!item)
+        
+        // Set form data with copied item info but NO SKU/item_code
+        setFormData({
+          sku: '',  // Will be generated
+          itemName: item.item_name,
+          stockUom: item.uom || 'PCS',
+          purchaseUom: 'PCS',
+          conversionFactor: 1,
+          opening_stock: 0,  // Reset opening stock for copy
+          image_id: item.image_id,
+          image_url: item.image_url,
+          image_name: item.image_name,
+          thumbnail_url: item.thumbnail_url,
+          image_base64: item.image_base64,
+          image_type: item.image_type,
+          image_size: item.image_size,
+        })
+        console.log('[COPY MODE] Set formData with empty SKU')
+
+        // Set category hierarchy from copied item
+        const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
+        if (cat) setSelectedCategory(cat)
+
+        const subCat = item.sub_category_code ? { code: item.sub_category_code, name: item.sub_category_name } : null
+        if (subCat) setSelectedSubCategory(subCat)
+
+        const div = item.division_code ? { code: item.division_code, name: item.division_name } : null
+        if (div) setSelectedDivision(div)
+
+        const cls = item.class_code ? { code: item.class_code, name: item.class_name } : null
+        if (cls) setSelectedClass(cls)
+
+        const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
+        if (subCls) setSelectedSubClass(subCls)
+
+        // Determine item type - try sku_type_code first, then extract from original SKU/item_code
+        let itemTypeCode = 'FG'
+        if (item.sku_type_code) {
+          itemTypeCode = item.sku_type_code
+        } else if (item.original_sku && item.original_sku.includes('-')) {
+          itemTypeCode = item.original_sku.split('-')[0]
+        } else if (item.original_item_code && item.original_item_code.includes('-')) {
+          itemTypeCode = item.original_item_code.split('-')[0]
+        } else if (item.original_sku && item.original_sku.length >= 2) {
+          itemTypeCode = item.original_sku.substring(0, 2)
+        } else if (item.original_item_code && item.original_item_code.length >= 2) {
+          itemTypeCode = item.original_item_code.substring(0, 2)
+        }
+        
+        // Determine category code (use deepest level available)
+        const deepestCat = item.sub_class_code || item.class_code || item.division_code || item.sub_category_code || item.category_code
+        
+        // Generate new SKU based on copied item's type and category
+        console.log(`[COPY MODE] Generating new SKU for type: ${itemTypeCode}, category: ${deepestCat}`)
+        if (deepestCat) {
+          fetchNextSku(itemTypeCode, deepestCat)
+        } else {
+          fetchNextSku(itemTypeCode)
+        }
       } else {
-        // Create mode - fetch initial SKU
+        // Create mode - new item from scratch
         fetchNextSku('FG')
       }
     }
@@ -722,12 +790,15 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
       toast.error('Please enter an Item Name')
       return
     }
+    
+    console.log('[SUBMIT] Mode:', isEditMode ? 'EDIT' : 'CREATE', 'SKU:', formData.sku, 'Item:', formData.itemName)
 
     setSaving(true)
 
     try {
       // Only check for duplicates in create mode
       if (!isEditMode) {
+        console.log('[SUBMIT] Checking if SKU exists:', formData.sku)
         const checkResponse = await items.checkExists(formData.sku)
         if (checkResponse.data && checkResponse.data.length > 0) {
           const existingItem = checkResponse.data[0]

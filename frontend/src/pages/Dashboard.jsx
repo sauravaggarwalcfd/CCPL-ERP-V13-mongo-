@@ -44,14 +44,14 @@ export default function Dashboard() {
   }
 
   const StatCard = ({ icon: Icon, label, value, color }) => (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-gray-600 text-sm">{label}</p>
-          <p className="text-2xl font-bold mt-2">{value}</p>
+          <p className="text-gray-600 text-xs sm:text-sm">{label}</p>
+          <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{value}</p>
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
-          <Icon size={28} className="text-white" />
+        <div className={`p-2 sm:p-3 rounded-lg ${color}`}>
+          <Icon size={20} className="sm:w-7 sm:h-7 text-white" />
         </div>
       </div>
     </div>
@@ -65,10 +65,10 @@ export default function Dashboard() {
   const items = stockData?.items || []
 
   return (
-    <div className="flex-1 overflow-auto p-6">
-      <div className="space-y-6">
+    <div className="flex-1 overflow-auto p-3 sm:p-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           icon={ShoppingCart}
           label="Total Orders"
@@ -96,17 +96,17 @@ export default function Dashboard() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Sales Trend */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Sales Trend (Last 30 Days)</h2>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Sales Trend (Last 30 Days)</h2>
+          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
             <LineChart data={generateChartData(salesData?.orders || [])}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
               <Line type="monotone" dataKey="orders" stroke="#3b82f6" />
               <Line type="monotone" dataKey="revenue" stroke="#10b981" />
             </LineChart>
@@ -114,9 +114,9 @@ export default function Dashboard() {
         </div>
 
         {/* Stock Distribution */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Stock Levels</h2>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Stock Levels</h2>
+          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
             <PieChart>
               <Pie
                 data={[
