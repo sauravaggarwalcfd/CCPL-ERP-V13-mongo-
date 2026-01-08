@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+﻿import { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Search, ChevronRight, Lock, Package, Save, FileText, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api, { categoryHierarchy, itemTypes, items } from '../../services/api'
+import api, { categoryHierarchy, itemTypes, items, brands, suppliers } from '../../services/api'
 import DynamicSpecificationForm from '../specifications/DynamicSpecificationForm'
-import { itemSpecificationApi } from '../../services/specificationApi'
+import { itemSpecificationApi, specificationApi } from '../../services/specificationApi'
+import { colourApi, sizeApi, uomApi } from '../../services/variantApi'
 import ImageUploadField from '../ImageUploadField'
 
 // UOM Options
@@ -70,7 +71,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
   
   // Form data
   const [formData, setFormData] = useState({
-    sku: '',
+    uid: '',  // Unique Identifier - immutable, auto-generated
+    sku: '',  // SKU - can change based on item attributes
     itemName: '',
     stockUom: 'PCS',
     purchaseUom: 'PCS',
@@ -96,6 +98,59 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     supplier_code: null,
     custom_field_values: {}
   })
+
+  // Specification configuration (includes group info)
+  const [specificationConfig, setSpecificationConfig] = useState(null)
+
+  // Draft save functionality
+  const saveDraft = () => {
+    const draftData = {
+      formData,
+      specifications,
+      selectedItemType,
+      selectedCategory,
+      selectedSubCategory,
+      selectedDivision,
+      selectedClass,
+      selectedSubClass,
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('itemMasterDraft', JSON.stringify(draftData));
+    console.log('[DRAFT] Saved draft to localStorage');
+  };
+
+  // Load draft on mount
+  useEffect(() => {
+    const loadDraft = () => {
+      const draft = localStorage.getItem('itemMasterDraft');
+      if (draft && !isEditMode && !item) {
+        try {
+          const draftData = JSON.parse(draft);
+          setFormData(draftData.formData || formData);
+          setSpecifications(draftData.specifications || specifications);
+          if (draftData.selectedItemType) setSelectedItemType(draftData.selectedItemType);
+          if (draftData.selectedCategory) setSelectedCategory(draftData.selectedCategory);
+          if (draftData.selectedSubCategory) setSelectedSubCategory(draftData.selectedSubCategory);
+          if (draftData.selectedDivision) setSelectedDivision(draftData.selectedDivision);
+          if (draftData.selectedClass) setSelectedClass(draftData.selectedClass);
+          if (draftData.selectedSubClass) setSelectedSubClass(draftData.selectedSubClass);
+          toast.success('Draft restored!');
+          console.log('[DRAFT] Loaded draft from localStorage');
+        } catch (error) {
+          console.error('[DRAFT] Error loading draft:', error);
+        }
+      }
+    };
+    if (isOpen) {
+      loadDraft();
+    }
+  }, [isOpen]);
+
+  // Clear draft after successful submission
+  const clearDraft = () => {
+    localStorage.removeItem('itemMasterDraft');
+    console.log('[DRAFT] Cleared draft from localStorage');
+  };
   
   // Fetch initial data
   useEffect(() => {
@@ -116,9 +171,10 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         // Check if item has old format SKU (no hyphens) - needs regeneration
         const currentSku = item.sku || item.item_code
         const hasOldSku = !currentSku.includes('-')
-        
+
         setFormData({
-          sku: currentSku,  // Will be regenerated below if old format
+          uid: item.uid || '',  // UID is immutable, load from item
+          sku: currentSku,  // SKU can change based on item attributes
           itemName: item.item_name,
           stockUom: item.uom || 'PCS',
           purchaseUom: 'PCS',
@@ -133,28 +189,99 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           image_size: item.image_size,
         })
 
-        // Set category hierarchy
-        const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
-        if (cat) setSelectedCategory(cat)
+        // Load category hierarchy with proper async handling to ensure dropdowns are populated
+        const loadCategoryHierarchy = async () => {
+          try {
+            // Set Level 1 (Category)
+            const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
+            if (cat) {
+              setSelectedCategory(cat)
 
-        const subCat = item.sub_category_code ? { code: item.sub_category_code, name: item.sub_category_name } : null
-        if (subCat) setSelectedSubCategory(subCat)
+              // Fetch and set Level 2 (Sub-Category) if exists
+              if (item.sub_category_code) {
+                const subCatsResponse = await categoryHierarchy.getSubCategories({
+                  category_code: item.category_code,
+                  is_active: true
+                })
+                const subCats = subCatsResponse.data || []
+                setSubCategories(subCats)
 
-        const div = item.division_code ? { code: item.division_code, name: item.division_name } : null
-        if (div) setSelectedDivision(div)
+                const subCat = subCats.find(sc => sc.code === item.sub_category_code) ||
+                               { code: item.sub_category_code, name: item.sub_category_name }
+                setSelectedSubCategory(subCat)
 
-        const cls = item.class_code ? { code: item.class_code, name: item.class_name } : null
-        if (cls) setSelectedClass(cls)
+                // Fetch and set Level 3 (Division) if exists
+                if (item.division_code) {
+                  const divsResponse = await categoryHierarchy.getDivisions({
+                    category_code: item.category_code,
+                    sub_category_code: item.sub_category_code,
+                    is_active: true
+                  })
+                  const divs = divsResponse.data || []
+                  setDivisions(divs)
 
-        const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
-        if (subCls) setSelectedSubClass(subCls)
+                  const div = divs.find(d => d.code === item.division_code) ||
+                              { code: item.division_code, name: item.division_name }
+                  setSelectedDivision(div)
+
+                  // Fetch and set Level 4 (Class) if exists
+                  if (item.class_code) {
+                    const classesResponse = await categoryHierarchy.getClasses({
+                      category_code: item.category_code,
+                      sub_category_code: item.sub_category_code,
+                      division_code: item.division_code,
+                      is_active: true
+                    })
+                    const clss = classesResponse.data || []
+                    setClasses(clss)
+
+                    const cls = clss.find(c => c.code === item.class_code) ||
+                                { code: item.class_code, name: item.class_name }
+                    setSelectedClass(cls)
+
+                    // Fetch and set Level 5 (Sub-Class) if exists
+                    if (item.sub_class_code) {
+                      const subClassesResponse = await categoryHierarchy.getSubClasses({
+                        category_code: item.category_code,
+                        sub_category_code: item.sub_category_code,
+                        division_code: item.division_code,
+                        class_code: item.class_code,
+                        is_active: true
+                      })
+                      const subClss = subClassesResponse.data || []
+                      setSubClasses(subClss)
+
+                      const subCls = subClss.find(sc => sc.code === item.sub_class_code) ||
+                                     { code: item.sub_class_code, name: item.sub_class_name }
+                      setSelectedSubClass(subCls)
+                    }
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[EDIT MODE] Error loading category hierarchy:', error)
+            // Fallback: set values directly without fetching dropdowns
+            const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
+            if (cat) setSelectedCategory(cat)
+            const subCat = item.sub_category_code ? { code: item.sub_category_code, name: item.sub_category_name } : null
+            if (subCat) setSelectedSubCategory(subCat)
+            const div = item.division_code ? { code: item.division_code, name: item.division_name } : null
+            if (div) setSelectedDivision(div)
+            const cls = item.class_code ? { code: item.class_code, name: item.class_name } : null
+            if (cls) setSelectedClass(cls)
+            const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
+            if (subCls) setSelectedSubClass(subCls)
+          }
+        }
+        loadCategoryHierarchy()
         
         // Load existing specifications for the item
         const loadSpecifications = async () => {
           try {
             const specsResponse = await itemSpecificationApi.get(item.item_code || item.sku)
             if (specsResponse.data) {
-              console.log('[EDIT MODE] Loading specifications:', specsResponse.data)
+              console.log('[EDIT MODE] Loading specifications from API:', specsResponse.data)
               setSpecifications({
                 colour_code: specsResponse.data.colour_code || '',
                 size_code: specsResponse.data.size_code || '',
@@ -166,8 +293,19 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
               })
             }
           } catch (specError) {
-            console.log('[EDIT MODE] No existing specifications found:', specError.message)
-            // No specifications exist yet - that's ok
+            console.log('[EDIT MODE] No specifications found from API, checking item directly:', specError.message)
+            // Fallback: check if item has specifications directly
+            const directSpecs = {
+              colour_code: item.color_id || item.colour_code || '',
+              size_code: item.size_id || item.size_code || '',
+              uom_code: item.uom_code || '',
+              vendor_code: item.vendor_code || '',
+              brand_code: item.brand_id || item.brand_code || '',
+              supplier_code: item.supplier_id || item.supplier_code || '',
+              custom_field_values: {}
+            }
+            console.log('[EDIT MODE] Using specifications from item object:', directSpecs)
+            setSpecifications(directSpecs)
           }
         }
         loadSpecifications()
@@ -218,21 +356,92 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         })
         console.log('[COPY MODE] Set formData with empty SKU')
 
-        // Set category hierarchy from copied item
-        const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
-        if (cat) setSelectedCategory(cat)
+        // Load category hierarchy with proper async handling to ensure dropdowns are populated
+        const loadCopyModeHierarchy = async () => {
+          try {
+            // Set Level 1 (Category)
+            const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
+            if (cat) {
+              setSelectedCategory(cat)
 
-        const subCat = item.sub_category_code ? { code: item.sub_category_code, name: item.sub_category_name } : null
-        if (subCat) setSelectedSubCategory(subCat)
+              // Fetch and set Level 2 (Sub-Category) if exists
+              if (item.sub_category_code) {
+                const subCatsResponse = await categoryHierarchy.getSubCategories({
+                  category_code: item.category_code,
+                  is_active: true
+                })
+                const subCats = subCatsResponse.data || []
+                setSubCategories(subCats)
 
-        const div = item.division_code ? { code: item.division_code, name: item.division_name } : null
-        if (div) setSelectedDivision(div)
+                const subCat = subCats.find(sc => sc.code === item.sub_category_code) ||
+                               { code: item.sub_category_code, name: item.sub_category_name }
+                setSelectedSubCategory(subCat)
 
-        const cls = item.class_code ? { code: item.class_code, name: item.class_name } : null
-        if (cls) setSelectedClass(cls)
+                // Fetch and set Level 3 (Division) if exists
+                if (item.division_code) {
+                  const divsResponse = await categoryHierarchy.getDivisions({
+                    category_code: item.category_code,
+                    sub_category_code: item.sub_category_code,
+                    is_active: true
+                  })
+                  const divs = divsResponse.data || []
+                  setDivisions(divs)
 
-        const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
-        if (subCls) setSelectedSubClass(subCls)
+                  const div = divs.find(d => d.code === item.division_code) ||
+                              { code: item.division_code, name: item.division_name }
+                  setSelectedDivision(div)
+
+                  // Fetch and set Level 4 (Class) if exists
+                  if (item.class_code) {
+                    const classesResponse = await categoryHierarchy.getClasses({
+                      category_code: item.category_code,
+                      sub_category_code: item.sub_category_code,
+                      division_code: item.division_code,
+                      is_active: true
+                    })
+                    const clss = classesResponse.data || []
+                    setClasses(clss)
+
+                    const cls = clss.find(c => c.code === item.class_code) ||
+                                { code: item.class_code, name: item.class_name }
+                    setSelectedClass(cls)
+
+                    // Fetch and set Level 5 (Sub-Class) if exists
+                    if (item.sub_class_code) {
+                      const subClassesResponse = await categoryHierarchy.getSubClasses({
+                        category_code: item.category_code,
+                        sub_category_code: item.sub_category_code,
+                        division_code: item.division_code,
+                        class_code: item.class_code,
+                        is_active: true
+                      })
+                      const subClss = subClassesResponse.data || []
+                      setSubClasses(subClss)
+
+                      const subCls = subClss.find(sc => sc.code === item.sub_class_code) ||
+                                     { code: item.sub_class_code, name: item.sub_class_name }
+                      setSelectedSubClass(subCls)
+                    }
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[COPY MODE] Error loading category hierarchy:', error)
+            // Fallback: set values directly
+            const cat = item.category_code ? { code: item.category_code, name: item.category_name } : null
+            if (cat) setSelectedCategory(cat)
+            const subCat = item.sub_category_code ? { code: item.sub_category_code, name: item.sub_category_name } : null
+            if (subCat) setSelectedSubCategory(subCat)
+            const div = item.division_code ? { code: item.division_code, name: item.division_name } : null
+            if (div) setSelectedDivision(div)
+            const cls = item.class_code ? { code: item.class_code, name: item.class_name } : null
+            if (cls) setSelectedClass(cls)
+            const subCls = item.sub_class_code ? { code: item.sub_class_code, name: item.sub_class_name } : null
+            if (subCls) setSelectedSubClass(subCls)
+          }
+        }
+        loadCopyModeHierarchy()
 
         // Determine item type - try sku_type_code first, then extract from original SKU/item_code
         let itemTypeCode = 'FG'
@@ -265,36 +474,70 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     }
   }, [isOpen, isEditMode, item])
   
-  // Fetch next available SKU - ALWAYS generates full hierarchical format
-  const fetchNextSku = async (itemTypeCode, categoryCode = null) => {
+  // Fetch next available SKU with colour and size - generates full hierarchical format with specifications
+  const fetchNextSku = async (itemTypeCode, categoryCode = null, colorName = null, sizeName = null) => {
     try {
       const typeCode = itemTypeCode.substring(0, 2).toUpperCase()
       const catCode = categoryCode ? categoryCode.substring(0, 4).toUpperCase() : 'GNRL'
-      
-      // Get the next sequence number from backend
+
+      // Try to use the new API endpoint that includes colour and size
+      try {
+        const params = new URLSearchParams({
+          item_type_code: typeCode,
+          category_code: catCode,
+        })
+        if (colorName) params.append('color', colorName)
+        if (sizeName) params.append('size', sizeName)
+
+        const response = await api.get(`/items/generate-full-sku?${params.toString()}`)
+        const data = response.data
+
+        console.log(`[SKU] Generated full SKU with specs: ${data.sku} (uid: ${data.uid})`)
+
+        setFormData(prev => ({
+          ...prev,
+          sku: data.sku,
+          uid: data.uid || prev.uid,  // Store UID preview
+        }))
+        return
+      } catch (apiError) {
+        console.warn('[SKU] Full SKU API failed, using fallback:', apiError.message)
+      }
+
+      // Fallback: Get the next sequence number from backend
       const response = await items.getNextSku(typeCode)
       const sequence = response.data.sequence || 1
-      
-      // Generate full SKU format: FM-ABCD-A0000-0000-00
-      const sequenceLetter = String.fromCharCode(65 + Math.floor((sequence - 1) / 10000)) // A, B, C, etc.
+
+      // Generate full SKU format: FM-ABCD-A0000-COLR-SZ
+      const sequenceLetter = String.fromCharCode(65 + Math.floor((sequence - 1) / 10000))
       const sequenceNum = ((sequence - 1) % 10000) + 1
       const sequenceCode = `${sequenceLetter}${String(sequenceNum).padStart(4, '0')}`
-      
-      // Build full SKU
-      const fullSku = `${typeCode}-${catCode}-${sequenceCode}-0000-00`
-      
+
+      // Generate variant codes from colour and size
+      const colorCode = colorName ? colorName.substring(0, 4).toUpperCase().padEnd(4, '0') : '0000'
+      const sizeCode = sizeName ? sizeName.substring(0, 2).toUpperCase().padEnd(2, '0') : '00'
+
+      // Build full SKU with colour and size
+      const fullSku = `${typeCode}-${catCode}-${sequenceCode}-${colorCode}-${sizeCode}`
+
+      // Generate UID preview: [ItemType 2][Category 2][Counter 4]
+      const uidPreview = `${typeCode}${catCode.substring(0, 2)}0001`
+
       console.log(`[SKU] Generated full SKU: ${fullSku} (type=${typeCode}, cat=${catCode}, seq=${sequence})`)
-      
+
       setFormData(prev => ({
         ...prev,
-        sku: fullSku
+        sku: fullSku,
+        uid: prev.uid || uidPreview,
       }))
     } catch (error) {
       console.error(`[SKU] Error fetching next SKU: ${error.message}`)
       // Fallback: still generate full format
       const typeCode = itemTypeCode.substring(0, 2).toUpperCase()
       const catCode = categoryCode ? categoryCode.substring(0, 4).toUpperCase() : 'GNRL'
-      const fallbackSku = `${typeCode}-${catCode}-A0001-0000-00`
+      const colorCode = colorName ? colorName.substring(0, 4).toUpperCase().padEnd(4, '0') : '0000'
+      const sizeCode = sizeName ? sizeName.substring(0, 2).toUpperCase().padEnd(2, '0') : '00'
+      const fallbackSku = `${typeCode}-${catCode}-A0001-${colorCode}-${sizeCode}`
       console.log(`[SKU] Using fallback SKU: ${fallbackSku}`)
       setFormData(prev => ({
         ...prev,
@@ -498,12 +741,15 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           is_active: true
         })
         setSubCategories(subCatsResponse.data || [])
-        toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+        toast.success(`âœ“ Selected: ${result.path}`, { duration: 3000 })
         return
       }
 
       // If level >= 2, fetch and select sub-category
-      if (result.level >= 2 && result.sub_category_code) {
+      // For level 2, the result itself IS the sub-category, so use result.code
+      // For levels 3+, the sub_category_code is stored in the result
+      const subCategoryCode = result.level === 2 ? result.code : result.sub_category_code
+      if (result.level >= 2 && subCategoryCode) {
         const subCatsResponse = await categoryHierarchy.getSubCategories({
           category_code: category.code,
           is_active: true
@@ -511,7 +757,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         const subCats = subCatsResponse.data || []
         setSubCategories(subCats)
 
-        const subCat = subCats.find(sc => sc.code === result.sub_category_code)
+        const subCat = subCats.find(sc => sc.code === subCategoryCode)
         if (subCat) {
           setSelectedSubCategory(subCat)
 
@@ -523,7 +769,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
               is_active: true
             })
             setDivisions(divsResponse.data || [])
-            toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+            toast.success(`âœ“ Selected: ${result.path}`, { duration: 3000 })
             return
           }
 
@@ -550,7 +796,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   is_active: true
                 })
                 setClasses(classesResponse.data || [])
-                toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+                toast.success(`âœ“ Selected: ${result.path}`, { duration: 3000 })
                 return
               }
 
@@ -579,7 +825,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                       is_active: true
                     })
                     setSubClasses(subClassesResponse.data || [])
-                    toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+                    toast.success(`âœ“ Selected: ${result.path}`, { duration: 3000 })
                     return
                   }
 
@@ -607,7 +853,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         }
       }
 
-      toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+      toast.success(`âœ“ Selected: ${result.path}`, { duration: 3000 })
     } catch (error) {
       console.error('Error selecting hierarchy:', error)
       toast.error('Failed to select hierarchy')
@@ -759,15 +1005,74 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     return null
   }, [selectedCategory, selectedSubCategory, selectedDivision, selectedClass, selectedSubClass])
 
-  // Regenerate full SKU whenever category hierarchy changes (not just sub-class)
+  // Fetch specification configuration for the effective category
+  useEffect(() => {
+    const fetchSpecificationConfig = async () => {
+      if (effectiveCategoryCode) {
+        try {
+          const response = await specificationApi.get(effectiveCategoryCode);
+          setSpecificationConfig(response.data);
+          console.log('[SPEC CONFIG] Loaded for category:', effectiveCategoryCode, response.data);
+        } catch (error) {
+          console.log('[SPEC CONFIG] No configuration found for category:', effectiveCategoryCode);
+          setSpecificationConfig(null);
+        }
+      }
+    };
+    fetchSpecificationConfig();
+  }, [effectiveCategoryCode])
+
+  // Track colour and size names for SKU generation
+  const [specColorName, setSpecColorName] = useState(null)
+  const [specSizeName, setSpecSizeName] = useState(null)
+
+  // Update colour name when colour_code changes
+  useEffect(() => {
+    const fetchColorName = async () => {
+      if (specifications.colour_code) {
+        try {
+          const colorRes = await colourApi.get(specifications.colour_code)
+          if (colorRes.data) {
+            setSpecColorName(colorRes.data.colour_name)
+          }
+        } catch (error) {
+          console.warn('Failed to fetch color name for SKU:', error)
+        }
+      } else {
+        setSpecColorName(null)
+      }
+    }
+    fetchColorName()
+  }, [specifications.colour_code])
+
+  // Update size name when size_code changes
+  useEffect(() => {
+    const fetchSizeName = async () => {
+      if (specifications.size_code) {
+        try {
+          const sizeRes = await sizeApi.get(specifications.size_code)
+          if (sizeRes.data) {
+            setSpecSizeName(sizeRes.data.size_name)
+          }
+        } catch (error) {
+          console.warn('Failed to fetch size name for SKU:', error)
+        }
+      } else {
+        setSpecSizeName(null)
+      }
+    }
+    fetchSizeName()
+  }, [specifications.size_code])
+
+  // Regenerate full SKU whenever category, colour, or size changes
   useEffect(() => {
     if (!isEditMode && effectiveCategoryCode && autoFilledData.itemType) {
-      // Use the deepest level category code for SKU generation
+      // Use the deepest level category code for SKU generation with colour and size
       const itemTypeCode = autoFilledData.itemType
-      console.log(`[SKU] Category changed, regenerating SKU with code: ${effectiveCategoryCode}`)
-      fetchNextSku(itemTypeCode, effectiveCategoryCode)
+      console.log(`[SKU] Regenerating SKU - category: ${effectiveCategoryCode}, color: ${specColorName}, size: ${specSizeName}`)
+      fetchNextSku(itemTypeCode, effectiveCategoryCode, specColorName, specSizeName)
     }
-  }, [effectiveCategoryCode, isEditMode, autoFilledData.itemType])
+  }, [effectiveCategoryCode, isEditMode, autoFilledData.itemType, specColorName, specSizeName])
 
   // Handle BASE64 image upload
   const handleImageChange = (file, base64Data, imageType) => {
@@ -779,6 +1084,84 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
       image_name: file?.name || null
     })
   }
+
+  // Fetch names from specification codes
+  const fetchSpecificationNames = async () => {
+    const names = {
+      color_name: '',
+      size_name: '',
+      uom_name: '',
+      brand_name: '',
+      supplier_name: '',
+    };
+
+    try {
+      // Fetch color name if color_code is specified
+      if (specifications.colour_code) {
+        try {
+          const colorRes = await colourApi.get(specifications.colour_code);
+          if (colorRes.data) {
+            names.color_name = colorRes.data.colour_name;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch color name:', error);
+        }
+      }
+
+      // Fetch size name if size_code is specified
+      if (specifications.size_code) {
+        try {
+          const sizeRes = await sizeApi.get(specifications.size_code);
+          if (sizeRes.data) {
+            names.size_name = sizeRes.data.size_name;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch size name:', error);
+        }
+      }
+
+      // Fetch UOM name if uom_code is specified
+      if (specifications.uom_code) {
+        try {
+          const uomRes = await uomApi.get(specifications.uom_code);
+          if (uomRes.data) {
+            names.uom_name = uomRes.data.uom_name;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch UOM name:', error);
+        }
+      }
+
+      // Fetch brand name if brand_code is specified
+      if (specifications.brand_code) {
+        try {
+          const brandRes = await brands.get(specifications.brand_code);
+          if (brandRes.data) {
+            names.brand_name = brandRes.data.brand_name;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch brand name:', error);
+        }
+      }
+
+      // Fetch supplier name if supplier_code is specified
+      if (specifications.supplier_code) {
+        try {
+          const supplierRes = await suppliers.get(specifications.supplier_code);
+          if (supplierRes.data) {
+            names.supplier_name = supplierRes.data.supplier_name;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch supplier name:', error);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error fetching specification names:', error);
+    }
+
+    return names;
+  };
 
   // Handle form submission
   const handleSubmit = async (isDraft = false) => {
@@ -805,13 +1188,16 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           if (existingItem.item_code === formData.sku) {
             toast.error(`Item already exists: ${existingItem.item_code} - ${existingItem.item_name}`, {
               duration: 5000,
-              icon: '⚠️',
+              icon: 'âš ï¸',
             })
             setSaving(false)
             return
           }
         }
       }
+
+      // Fetch specification names (color_name, size_name, etc.)
+      const specNames = await fetchSpecificationNames();
 
       const payload = {
         item_code: formData.sku,
@@ -834,7 +1220,16 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         class_name: selectedClass?.name || null,
         sub_class_code: selectedSubClass?.code || null,
         sub_class_name: selectedSubClass?.name || null,
-        uom: formData.stockUom,
+        // Specification fields
+        color_id: specifications.colour_code || null,
+        color_name: specNames.color_name || null,
+        size_id: specifications.size_code || null,
+        size_name: specNames.size_name || null,
+        brand_id: specifications.brand_code || null,
+        brand_name: specNames.brand_name || null,
+        supplier_id: specifications.supplier_code || null,
+        supplier_name: specNames.supplier_name || null,
+        uom: formData.stockUom || specNames.uom_name,
         hsn_code: autoFilledData.hsnCode,
         gst_rate: autoFilledData.gstRate,
         inventory_type: 'stocked',
@@ -875,6 +1270,11 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
 
         if (hasSpecifications && effectiveCategoryCode) {
           try {
+            console.log('[UPDATE] Saving specifications:', {
+              itemCode: formData.sku,
+              categoryCode: effectiveCategoryCode,
+              specifications: specifications
+            });
             await itemSpecificationApi.createOrUpdate(
               formData.sku,
               effectiveCategoryCode,
@@ -883,7 +1283,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
             console.log('[UPDATE] Specifications saved successfully')
           } catch (specError) {
             console.error('Error saving specifications:', specError);
-            toast.error('Item updated but specifications could not be saved', { duration: 4000 });
+            console.error('Error response:', specError.response?.data);
+            toast.error(`Item updated but specifications could not be saved: ${specError.response?.data?.detail || specError.message}`, { duration: 4000 });
           }
         }
         
@@ -914,6 +1315,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         }
 
         toast.success(isDraft ? 'Item saved as draft!' : 'Item created successfully!')
+
+        // Clear draft after successful creation
+        clearDraft();
 
         // Fetch next SKU for the same item type (only on create)
         await fetchNextSku(autoFilledData.itemType || 'FG')
@@ -1235,90 +1639,84 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
             {/* Path Display */}
             {hierarchyPath && (
               <div className="bg-blue-50 rounded-lg px-4 py-2 flex items-center gap-2">
-                <span className="text-blue-600 font-medium">📍 Path:</span>
+                <span className="text-blue-600 font-medium">ðŸ“ Path:</span>
                 <span className="text-blue-800">{hierarchyPath}</span>
               </div>
             )}
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-gray-200" />
-
-          {/* Auto-filled from Category */}
-          {selectedCategory && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-600 uppercase mb-3">
-                Auto-filled from Category:
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Item Type</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={autoFilledData.itemType ? `${autoFilledData.itemType} - ${autoFilledData.itemTypeName}` : ''}
-                      readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
-                    />
-                    <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">HSN Code</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={autoFilledData.hsnCode || 'Not Set'}
-                      readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
-                    />
-                    <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">GST Rate</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={`${autoFilledData.gstRate}%`}
-                      readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
-                    />
-                    <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Divider */}
-          <div className="border-t border-gray-200" />
-
           {/* Step 2: Item Details */}
           <div>
-            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">2</span>
               ITEM DETAILS
             </h3>
 
             {/* Card-like Layout: Image on Left, Details on Right */}
-            <div className="flex gap-6 items-start">
+            <div className="flex gap-4 items-start">
               {/* Left: Image Section */}
-              <div className="flex-shrink-0" style={{ width: '240px' }}>
+              <div className="flex-shrink-0" style={{ width: '220px' }}>
                 <ImageUploadField
                   onImageChange={handleImageChange}
                   currentImage={formData.image_base64 ? `data:${formData.image_type};base64,${formData.image_base64}` : null}
                 />
               </div>
 
-              {/* Right: SKU and Item Name */}
-              <div className="flex-1 space-y-4">
-                {/* SKU (Auto) */}
+              {/* Right: Item Type, UID, SKU and Item Name */}
+              <div className="flex-1 space-y-3">
+                {/* Item Type - Fixed from Category */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">Item Type</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={autoFilledData.itemType ? `${autoFilledData.itemType} - ${autoFilledData.itemTypeName}` : ''}
+                      readOnly
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed text-sm"
+                    />
+                    <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
+                  </div>
+                </div>
+
+                {/* UID - Unique Identifier (Immutable) */}
+                {(isEditMode || formData.uid) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      <span className="flex items-center gap-2">
+                        <span>Unique ID (UID)</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${isEditMode ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {isEditMode ? 'Cannot be changed' : 'Auto-generated'}
+                        </span>
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.uid}
+                        readOnly
+                        placeholder={!isEditMode ? 'Will be generated on save' : ''}
+                        className={`w-full px-3 py-2 pr-10 border rounded-lg font-mono text-sm font-semibold cursor-not-allowed ${
+                          isEditMode
+                            ? 'border-amber-300 bg-amber-50 text-amber-900'
+                            : 'border-blue-300 bg-blue-50 text-blue-900'
+                        }`}
+                      />
+                      <Lock className={`absolute right-3 top-2.5 w-4 h-4 ${isEditMode ? 'text-amber-500' : 'text-blue-500'}`} />
+                    </div>
+                    {!isEditMode && (
+                      <p className="text-xs text-gray-500 mt-1">Format: [ItemType][Category][Counter] e.g., FGRN0001</p>
+                    )}
+                  </div>
+                )}
+
+                {/* SKU - Stock Keeping Unit (Can change based on item attributes) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
                     <span className="flex items-center gap-2">
-                      <span>SKU</span>
-                      <span className="text-xs text-gray-500">(Auto-generated)</span>
+                      <span>SKU (Stock Keeping Unit)</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${isEditMode ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                        {isEditMode ? 'Updates with changes' : 'Auto-generated'}
+                      </span>
                     </span>
                   </label>
                   <div className="relative">
@@ -1326,29 +1724,31 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                       type="text"
                       value={formData.sku}
                       readOnly
-                      className="w-full px-4 py-3 pr-10 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-mono text-base font-semibold cursor-not-allowed"
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 bg-gray-50 text-gray-900 rounded-lg font-mono text-sm font-semibold cursor-not-allowed"
                     />
-                    <Lock className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
+                    <Lock className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    SKU is generated based on item type, category, and sequence
+                  </p>
                 </div>
 
                 {/* Item Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
                     Item Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.itemName}
                     onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                    placeholder="e.g., Men's Round Neck Cotton T-Shirt"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
 
                 {/* Opening Stock */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
                     {isEditMode ? 'Current Stock' : 'Opening Stock'}
                     <span className="text-xs text-gray-500 ml-2">
                       {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
@@ -1361,28 +1761,15 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     value={formData.opening_stock}
                     onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
 
-                {/* SKU Breakdown Display */}
-                {formData.sku && formData.sku.includes('-') && (
-                  <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                    <div className="text-xs font-semibold text-indigo-700 mb-2">SKU Structure Breakdown:</div>
-                    <div className="grid grid-cols-5 gap-2 text-center text-xs">
-                      {formData.sku.split('-').map((part, idx) => (
-                        <div key={idx} className="bg-white border border-indigo-200 rounded p-1.5">
-                          <div className="font-mono font-bold text-indigo-700 text-sm">{part}</div>
-                          <div className="text-gray-600 text-xs mt-0.5">
-                            {idx === 0 && 'Item Type'}
-                            {idx === 1 && 'Category'}
-                            {idx === 2 && 'Sequence'}
-                            {idx === 3 && 'Variant 1'}
-                            {idx === 4 && 'Variant 2'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {/* Created Date (Edit Mode) */}
+                {isEditMode && item?.created_at && (
+                  <div className="text-xs text-gray-500 mt-2">
+                    Created: {new Date(item.created_at).toLocaleString()}
+                    {item.updated_at && ` | Last Updated: ${new Date(item.updated_at).toLocaleString()}`}
                   </div>
                 )}
               </div>
@@ -1400,9 +1787,10 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
               <span className="text-sm text-gray-500 font-normal">(Based on Category Configuration)</span>
             </h3>
 
-            <DynamicSpecificationForm
-              categoryCode={effectiveCategoryCode}
+            <DynamicSpecificationForm key={`spec-${isEditMode ? formData.sku : "new"}-${specifications.colour_code || ""}-${specifications.size_code || ""}`} categoryCode={effectiveCategoryCode}
+              initialValues={specifications}
               onSpecificationsChange={setSpecifications}
+              onSaveDraft={saveDraft}
               showTitle={false}
             />
           </div>
@@ -1696,90 +2084,84 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
             {/* Path Display */}
             {hierarchyPath && (
               <div className="bg-blue-50 rounded-lg px-4 py-2 flex items-center gap-2">
-                <span className="text-blue-600 font-medium">📍 Path:</span>
+                <span className="text-blue-600 font-medium">ðŸ“ Path:</span>
                 <span className="text-blue-800">{hierarchyPath}</span>
               </div>
             )}
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-gray-200" />
-
-          {/* Auto-filled from Category */}
-          {selectedCategory && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-600 uppercase mb-3">
-                Auto-filled from Category:
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Item Type</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={autoFilledData.itemType ? `${autoFilledData.itemType} - ${autoFilledData.itemTypeName}` : ''}
-                      readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
-                    />
-                    <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">HSN Code</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={autoFilledData.hsnCode || 'Not Set'}
-                      readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
-                    />
-                    <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">GST Rate</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={`${autoFilledData.gstRate}%`}
-                      readOnly
-                      className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed"
-                    />
-                    <Lock className="absolute right-3 top-3 w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Divider */}
-          <div className="border-t border-gray-200" />
-
           {/* Step 2: Item Details */}
           <div>
-            <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
               <span className="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm">2</span>
               ITEM DETAILS
             </h3>
 
             {/* Card-like Layout: Image on Left, Details on Right */}
-            <div className="flex gap-6 items-start">
+            <div className="flex gap-4 items-start">
               {/* Left: Image Section */}
-              <div className="flex-shrink-0" style={{ width: '240px' }}>
+              <div className="flex-shrink-0" style={{ width: '220px' }}>
                 <ImageUploadField
                   onImageChange={handleImageChange}
                   currentImage={formData.image_base64 ? `data:${formData.image_type};base64,${formData.image_base64}` : null}
                 />
               </div>
 
-              {/* Right: SKU and Item Name */}
-              <div className="flex-1 space-y-4">
-                {/* SKU (Auto) */}
+              {/* Right: Item Type, UID, SKU and Item Name */}
+              <div className="flex-1 space-y-3">
+                {/* Item Type - Fixed from Category */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">Item Type</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={autoFilledData.itemType ? `${autoFilledData.itemType} - ${autoFilledData.itemTypeName}` : ''}
+                      readOnly
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed text-sm"
+                    />
+                    <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
+                  </div>
+                </div>
+
+                {/* UID - Unique Identifier (Immutable) */}
+                {(isEditMode || formData.uid) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      <span className="flex items-center gap-2">
+                        <span>Unique ID (UID)</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${isEditMode ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {isEditMode ? 'Cannot be changed' : 'Auto-generated'}
+                        </span>
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.uid}
+                        readOnly
+                        placeholder={!isEditMode ? 'Will be generated on save' : ''}
+                        className={`w-full px-3 py-2 pr-10 border rounded-lg font-mono text-sm font-semibold cursor-not-allowed ${
+                          isEditMode
+                            ? 'border-amber-300 bg-amber-50 text-amber-900'
+                            : 'border-blue-300 bg-blue-50 text-blue-900'
+                        }`}
+                      />
+                      <Lock className={`absolute right-3 top-2.5 w-4 h-4 ${isEditMode ? 'text-amber-500' : 'text-blue-500'}`} />
+                    </div>
+                    {!isEditMode && (
+                      <p className="text-xs text-gray-500 mt-1">Format: [ItemType][Category][Counter] e.g., FGRN0001</p>
+                    )}
+                  </div>
+                )}
+
+                {/* SKU - Stock Keeping Unit (Can change based on item attributes) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
                     <span className="flex items-center gap-2">
-                      <span>SKU</span>
-                      <span className="text-xs text-gray-500">(Auto-generated)</span>
+                      <span>SKU (Stock Keeping Unit)</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${isEditMode ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                        {isEditMode ? 'Updates with changes' : 'Auto-generated'}
+                      </span>
                     </span>
                   </label>
                   <div className="relative">
@@ -1787,15 +2169,18 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                       type="text"
                       value={formData.sku}
                       readOnly
-                      className="w-full px-4 py-3 pr-10 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-mono text-base font-semibold cursor-not-allowed"
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 bg-gray-50 text-gray-900 rounded-lg font-mono text-sm font-semibold cursor-not-allowed"
                     />
-                    <Lock className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
+                    <Lock className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    SKU is generated based on item type, category, and sequence
+                  </p>
                 </div>
 
                 {/* Item Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
                     Item Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1803,13 +2188,13 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     value={formData.itemName}
                     onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                     placeholder="e.g., Men's Round Neck Cotton T-Shirt"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
 
                 {/* Opening Stock */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
                     {isEditMode ? 'Current Stock' : 'Opening Stock'}
                     <span className="text-xs text-gray-500 ml-2">
                       {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
@@ -1822,7 +2207,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     value={formData.opening_stock}
                     onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
               </div>
@@ -1840,9 +2225,10 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
               <span className="text-sm text-gray-500 font-normal">(Based on Category Configuration)</span>
             </h3>
 
-            <DynamicSpecificationForm
-              categoryCode={effectiveCategoryCode}
+            <DynamicSpecificationForm key={`spec-${isEditMode ? formData.sku : "new"}-${specifications.colour_code || ""}-${specifications.size_code || ""}`} categoryCode={effectiveCategoryCode}
+              initialValues={specifications}
               onSpecificationsChange={setSpecifications}
+              onSaveDraft={saveDraft}
               showTitle={false}
             />
           </div>
@@ -1880,3 +2266,11 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     </div>
   )
 }
+
+
+
+
+
+
+
+

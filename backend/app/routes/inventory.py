@@ -44,9 +44,9 @@ async def generate_movement_id():
     today = datetime.utcnow().strftime("%Y%m%d")
     prefix = f"MOV-{today}-"
 
-    # Find the latest movement for today
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     latest = await StockMovement.find(
-        StockMovement.movement_id.startswith(prefix)
+        {"movement_id": {"$regex": f"^{prefix}"}}
     ).sort("-movement_id").first_or_none()
 
     if latest:
@@ -66,8 +66,9 @@ async def generate_adjustment_id():
     today = datetime.utcnow().strftime("%Y%m%d")
     prefix = f"ADJ-{today}-"
 
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     latest = await StockAdjustment.find(
-        StockAdjustment.adjustment_id.startswith(prefix)
+        {"adjustment_id": {"$regex": f"^{prefix}"}}
     ).sort("-adjustment_id").first_or_none()
 
     if latest:
@@ -87,8 +88,9 @@ async def generate_transfer_id():
     today = datetime.utcnow().strftime("%Y%m%d")
     prefix = f"TRF-{today}-"
 
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     latest = await StockTransfer.find(
-        StockTransfer.transfer_id.startswith(prefix)
+        {"transfer_id": {"$regex": f"^{prefix}"}}
     ).sort("-transfer_id").first_or_none()
 
     if latest:
@@ -108,8 +110,9 @@ async def generate_issue_id():
     today = datetime.utcnow().strftime("%Y%m%d")
     prefix = f"ISS-{today}-"
 
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     latest = await StockIssue.find(
-        StockIssue.issue_id.startswith(prefix)
+        {"issue_id": {"$regex": f"^{prefix}"}}
     ).sort("-issue_id").first_or_none()
 
     if latest:

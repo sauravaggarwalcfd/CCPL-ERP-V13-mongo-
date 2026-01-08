@@ -33,8 +33,9 @@ logger = logging.getLogger(__name__)
 async def generate_po_code():
     """Generate next PO code"""
     today = datetime.utcnow().strftime("%Y%m%d")
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     count = await PurchaseOrder.find(
-        PurchaseOrder.po_code.startswith(f"PO-{today}")
+        {"po_code": {"$regex": f"^PO-{today}"}}
     ).count()
     return f"PO-{today}-{str(count + 1).zfill(4)}"
 
@@ -42,8 +43,9 @@ async def generate_po_code():
 async def generate_gr_code():
     """Generate next GR code"""
     today = datetime.utcnow().strftime("%Y%m%d")
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     count = await GoodsReceipt.find(
-        GoodsReceipt.gr_code.startswith(f"GR-{today}")
+        {"gr_code": {"$regex": f"^GR-{today}"}}
     ).count()
     return f"GR-{today}-{str(count + 1).zfill(4)}"
 
@@ -51,8 +53,9 @@ async def generate_gr_code():
 async def generate_pr_code():
     """Generate next PR code"""
     today = datetime.utcnow().strftime("%Y%m%d")
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     count = await PurchaseReturn.find(
-        PurchaseReturn.pr_code.startswith(f"PR-{today}")
+        {"pr_code": {"$regex": f"^PR-{today}"}}
     ).count()
     return f"PR-{today}-{str(count + 1).zfill(4)}"
 
@@ -60,8 +63,9 @@ async def generate_pr_code():
 async def generate_bill_code():
     """Generate next Bill code"""
     today = datetime.utcnow().strftime("%Y%m%d")
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     count = await VendorBill.find(
-        VendorBill.bill_code.startswith(f"BILL-{today}")
+        {"bill_code": {"$regex": f"^BILL-{today}"}}
     ).count()
     return f"BILL-{today}-{str(count + 1).zfill(4)}"
 
@@ -123,35 +127,64 @@ async def get_purchase_orders(
 ):
     """Get all Purchase Orders"""
     try:
-        query_conditions = []
-
+        # Use raw MongoDB query to handle both schema versions
+        from ..database import db
+        from ..config import settings
+        collection = db.client[settings.DATABASE_NAME]["purchase_orders"]
+        
+        query = {}
         if status:
-            query_conditions.append(PurchaseOrder.status == status)
+            # Handle both status field names
+            query["$or"] = [{"status": status}, {"po_status": status}]
         if vendor_code:
-            query_conditions.append(PurchaseOrder.vendor_code == vendor_code)
+            # Handle both vendor_code and supplier.code
+            if "$or" in query:
+                # Already has $or, need to use $and
+                query = {"$and": [query, {"$or": [{"vendor_code": vendor_code}, {"supplier.code": vendor_code}]}]}
+            else:
+                query["$or"] = [{"vendor_code": vendor_code}, {"supplier.code": vendor_code}]
 
-        if query_conditions:
-            pos = await PurchaseOrder.find(*query_conditions).sort("-created_at").skip(skip).limit(limit).to_list()
-        else:
-            pos = await PurchaseOrder.find_all().sort("-created_at").skip(skip).limit(limit).to_list()
+        cursor = collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        pos = await cursor.to_list(length=limit)
 
-        return [
-            {
-                "id": str(po.id),
-                "po_code": po.po_code,
-                "vendor_code": po.vendor_code,
-                "vendor_name": po.vendor_name,
-                "po_date": po.po_date.isoformat() if po.po_date else None,
-                "delivery_date": po.delivery_date.isoformat() if po.delivery_date else None,
-                "status": po.status,
-                "line_items": po.line_items,
-                "subtotal": po.subtotal,
-                "tax_amount": po.tax_amount,
-                "total_amount": po.total_amount,
-                "created_at": po.created_at.isoformat() if po.created_at else None,
-            }
-            for po in pos
-        ]
+        result = []
+        for po in pos:
+            # Handle both schema versions
+            po_code = po.get("po_code") or po.get("po_number", "")
+            vendor_code_val = po.get("vendor_code") or (po.get("supplier", {}).get("code", "") if po.get("supplier") else "")
+            vendor_name_val = po.get("vendor_name") or (po.get("supplier", {}).get("name", "") if po.get("supplier") else "")
+            status_val = po.get("status") or po.get("po_status", "DRAFT")
+            line_items = po.get("line_items") or po.get("items", [])
+            
+            # Get totals from either schema
+            if po.get("summary"):
+                subtotal = po["summary"].get("subtotal", 0)
+                tax_amount = po["summary"].get("total_gst", 0)
+                total_amount = po["summary"].get("grand_total", 0)
+            else:
+                subtotal = po.get("subtotal", 0)
+                tax_amount = po.get("tax_amount", 0)
+                total_amount = po.get("total_amount", 0)
+            
+            result.append({
+                "id": str(po["_id"]),
+                "po_code": po_code,
+                "po_number": po_code,  # Include both for compatibility
+                "vendor_code": vendor_code_val,
+                "vendor_name": vendor_name_val,
+                "supplier": po.get("supplier"),
+                "po_date": po.get("po_date").isoformat() if po.get("po_date") else None,
+                "delivery_date": po.get("delivery_date").isoformat() if po.get("delivery_date") else None,
+                "status": status_val,
+                "line_items": line_items,
+                "items": line_items,  # Include both for compatibility
+                "subtotal": subtotal,
+                "tax_amount": tax_amount,
+                "total_amount": total_amount,
+                "created_at": po.get("created_at").isoformat() if po.get("created_at") else None,
+            })
+
+        return result
 
     except Exception as e:
         logger.error(f"Error fetching POs: {e}")

@@ -23,11 +23,14 @@ class ItemMaster(Document):
     Item Master Document
     References the 5-level hierarchy from category_hierarchy.py
     """
+    # Unique Identifier (UID) - IMMUTABLE, never changes once created
+    uid: Optional[Indexed(str, unique=True)] = None  # Format: ITM-YYYYMMDD-XXXXX (e.g., ITM-20260107-00001)
+
     item_code: Indexed(str, unique=True)  # TSHRT-M-BLUE-001
     item_name: str  # Men's Basic Crew Neck T-Shirt - Blue (Medium)
     item_description: Optional[str] = None
-    
-    # SKU (Stock Keeping Unit)
+
+    # SKU (Stock Keeping Unit) - Can change based on item attributes
     sku: Optional[str] = None  # Full SKU: FM-ABCD-A0000-0000-00
     sku_type_code: Optional[str] = None  # Part 1: Item Type (FM)
     sku_category_code: Optional[str] = None  # Part 2: Category (ABCD)
@@ -131,6 +134,7 @@ class ItemMaster(Document):
     class Settings:
         name = "item_master"
         indexes = [
+            "uid",
             "item_code",
             "category_code",
             "sub_category_code",
@@ -143,10 +147,11 @@ class ItemMaster(Document):
 
 # ==================== REQUEST/RESPONSE SCHEMAS ====================
 class ItemMasterCreate(BaseModel):
+    uid: Optional[str] = None  # Auto-generated if not provided
     item_code: str
     item_name: str
     item_description: Optional[str] = None
-    # SKU Fields
+    # SKU Fields (can change based on item attributes)
     sku: Optional[str] = None
     sku_type_code: Optional[str] = None
     sku_category_code: Optional[str] = None
@@ -232,6 +237,7 @@ class ItemMasterUpdate(BaseModel):
 
 class ItemMasterResponse(BaseModel):
     id: str
+    uid: Optional[str] = None  # Unique Identifier (immutable)
     item_code: str
     item_name: str
     item_description: Optional[str]

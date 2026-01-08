@@ -5,14 +5,19 @@ PR management with workflow and conversion to PO
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from bson import ObjectId
 import logging
+from collections import defaultdict
 
 from ..models.purchase_request import (
     PurchaseRequest, PRStatus, PRPriority, PRLineItem,
     PurchaseRequestCreate, PurchaseRequestUpdate, PRApproval, PRRejection,
     PRLineItemCreate
+)
+from ..models.purchase_order import (
+    PurchaseOrder, POStatus, POLineItem, POSupplierInfo,
+    POSummary, PODelivery, POPayment, POApproval, POTracking
 )
 from ..core.dependencies import get_current_user
 
@@ -44,8 +49,9 @@ async def generate_pr_number() -> str:
     month = str(now.month).zfill(2)
 
     prefix = f"PR-{year}-{month}"
+    # Use regex to find PRs starting with the prefix
     last_pr = await PurchaseRequest.find(
-        PurchaseRequest.pr_code.startswith(prefix)
+        {"pr_code": {"$regex": f"^{prefix}"}}
     ).sort("-pr_code").limit(1).to_list()
 
     if last_pr:
@@ -209,16 +215,21 @@ async def create_purchase_request(
 ):
     """Create new purchase request"""
     try:
+        # Debug logging
+        logger.info(f"PR Data received: {pr_data}")
+        logger.info(f"PR Data line_items: {pr_data.line_items}")
+        logger.info(f"Current user: {current_user}, type: {type(current_user)}")
+        
         # Generate PR number
         pr_code = await generate_pr_number()
         
         # Build line items
         line_items = []
-        for idx, item in enumerate(pr_data.items, start=1):
+        for idx, item in enumerate(pr_data.line_items, start=1):
             estimated_amount = None
             if item.estimated_unit_rate and item.quantity:
                 estimated_amount = item.estimated_unit_rate * item.quantity
-                
+
             line_items.append(PRLineItem(
                 line_number=idx,
                 item_code=item.item_code,
@@ -269,7 +280,9 @@ async def create_purchase_request(
             "message": f"Purchase Request {pr_code} created successfully"
         }
     except Exception as e:
+        import traceback
         logger.error(f"Error creating purchase request: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(500, f"Error creating purchase request: {str(e)}")
 
 
@@ -303,13 +316,13 @@ async def update_purchase_request(
             pr.notes = pr_data.notes
 
         # Update items if provided
-        if pr_data.items is not None:
+        if pr_data.line_items is not None:
             line_items = []
-            for idx, item in enumerate(pr_data.items, start=1):
+            for idx, item in enumerate(pr_data.line_items, start=1):
                 estimated_amount = None
                 if item.estimated_unit_rate and item.quantity:
                     estimated_amount = item.estimated_unit_rate * item.quantity
-                    
+
                 line_items.append(PRLineItem(
                     line_number=idx,
                     item_code=item.item_code,
@@ -524,7 +537,7 @@ async def get_pr_stats(
         approved = await PurchaseRequest.find({"status": PRStatus.APPROVED, "is_active": True}).count()
         rejected = await PurchaseRequest.find({"status": PRStatus.REJECTED, "is_active": True}).count()
         converted = await PurchaseRequest.find({"status": PRStatus.CONVERTED, "is_active": True}).count()
-        
+
         return {
             "total": total,
             "draft": draft,
@@ -537,3 +550,307 @@ async def get_pr_stats(
     except Exception as e:
         logger.error(f"Error getting PR stats: {e}")
         raise HTTPException(500, f"Error getting PR stats: {str(e)}")
+
+
+# ==================== PR TO PO CONVERSION ====================
+
+async def generate_po_number() -> str:
+    """Generate unique PO number in format: PO-YYYY-MM-XXXX"""
+    now = datetime.utcnow()
+    year = now.year
+    month = str(now.month).zfill(2)
+
+    prefix = f"PO-{year}-{month}"
+    # Use regex query instead of .startswith() which returns boolean in Beanie
+    last_po = await PurchaseOrder.find(
+        {"po_number": {"$regex": f"^{prefix}"}}
+    ).sort("-po_number").limit(1).to_list()
+
+    if last_po:
+        last_seq = int(last_po[0].po_number.split("-")[-1])
+        new_seq = last_seq + 1
+    else:
+        new_seq = 1
+
+    po_number = f"{prefix}-{str(new_seq).zfill(4)}"
+
+    # Verify uniqueness
+    existing = await PurchaseOrder.find_one(PurchaseOrder.po_number == po_number)
+    if existing:
+        po_number = f"{prefix}-{str(new_seq).zfill(4)}-{now.strftime('%H%M%S')}"
+
+    return po_number
+
+
+@router.post("/purchase-requests/{pr_code}/convert-to-po")
+async def convert_pr_to_po(
+    pr_code: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Convert approved Purchase Request to Purchase Order(s).
+    Groups items by supplier and creates separate POs for each supplier.
+    Returns list of created PO numbers.
+    """
+    try:
+        pr = await PurchaseRequest.find_one(PurchaseRequest.pr_code == pr_code)
+        if not pr:
+            raise HTTPException(404, f"Purchase Request {pr_code} not found")
+
+        if pr.status != PRStatus.APPROVED:
+            raise HTTPException(400, f"Can only convert APPROVED purchase requests. Current status: {pr.status}")
+
+        if pr.converted_to_po:
+            raise HTTPException(400, f"Purchase Request {pr_code} has already been converted to PO: {pr.converted_to_po}")
+
+        username, full_name = get_user_info(current_user)
+
+        # Group approved items by supplier
+        supplier_items = defaultdict(list)
+        for item in pr.items:
+            if item.is_approved and item.approved_quantity > 0:
+                supplier_code = item.suggested_supplier_code or "DEFAULT"
+                supplier_name = item.suggested_supplier_name or "Default Supplier"
+                supplier_items[(supplier_code, supplier_name)].append(item)
+
+        if not supplier_items:
+            raise HTTPException(400, "No approved items to convert to PO")
+
+        created_pos = []
+
+        # Create a PO for each supplier
+        for (supplier_code, supplier_name), items in supplier_items.items():
+            po_number = await generate_po_number()
+
+            # Build PO line items
+            po_items = []
+            subtotal = 0
+
+            for idx, pr_item in enumerate(items, start=1):
+                quantity = pr_item.approved_quantity or pr_item.quantity
+                unit_rate = pr_item.estimated_unit_rate or 0
+                line_amount = round(quantity * unit_rate, 2)
+
+                # Calculate GST (default 18%)
+                gst_percent = 18.0
+                cgst_percent = gst_percent / 2
+                sgst_percent = gst_percent / 2
+                taxable_amount = line_amount
+                cgst_amount = round(taxable_amount * (cgst_percent / 100), 2)
+                sgst_amount = round(taxable_amount * (sgst_percent / 100), 2)
+                gst_amount = cgst_amount + sgst_amount
+                net_amount = round(taxable_amount + gst_amount, 2)
+
+                po_item = POLineItem(
+                    line_number=idx,
+                    item_code=pr_item.item_code,
+                    item_name=pr_item.item_name,
+                    item_description=pr_item.item_description,
+                    item_category=pr_item.item_category,
+                    quantity=quantity,
+                    unit=pr_item.unit or "PCS",
+                    unit_rate=unit_rate,
+                    line_amount=line_amount,
+                    discount_percent=0,
+                    discount_amount=0,
+                    taxable_amount=taxable_amount,
+                    hsn_code="",
+                    gst_percent=gst_percent,
+                    cgst_percent=cgst_percent,
+                    sgst_percent=sgst_percent,
+                    igst_percent=0,
+                    gst_amount=gst_amount,
+                    cgst_amount=cgst_amount,
+                    sgst_amount=sgst_amount,
+                    igst_amount=0,
+                    net_amount=net_amount,
+                    expected_delivery_date=pr_item.required_date or pr.required_by_date,
+                    notes=pr_item.notes,
+                    received_quantity=0,
+                    pending_quantity=quantity
+                )
+                po_items.append(po_item)
+                subtotal += line_amount
+
+            # Calculate summary
+            total_cgst = sum(item.cgst_amount for item in po_items)
+            total_sgst = sum(item.sgst_amount for item in po_items)
+            total_gst = total_cgst + total_sgst
+            grand_total = round(subtotal + total_gst, 2)
+
+            po_summary = POSummary(
+                subtotal=subtotal,
+                total_discount=0,
+                total_taxable=subtotal,
+                total_cgst=total_cgst,
+                total_sgst=total_sgst,
+                total_igst=0,
+                total_gst=total_gst,
+                round_off=0,
+                grand_total=grand_total
+            )
+
+            # Create supplier info
+            supplier_info = POSupplierInfo(
+                code=supplier_code,
+                name=supplier_name,
+                payment_method="BANK_TRANSFER",
+                payment_terms="NET 30"
+            )
+
+            # Create delivery info
+            delivery_info = PODelivery(
+                location="Main Warehouse",
+                method="COURIER",
+                lead_time_days=15,
+                expected_delivery_date=pr.required_by_date or (date.today() + timedelta(days=15))
+            )
+
+            # Create tracking info
+            tracking_info = POTracking(
+                created_by=username,
+                created_date=datetime.utcnow()
+            )
+
+            # Create the PO
+            po = PurchaseOrder(
+                po_number=po_number,
+                po_version=1,
+                po_date=date.today(),
+                po_status=POStatus.DRAFT,
+                indent_number=pr_code,  # Link to PR
+                supplier=supplier_info,
+                items=po_items,
+                summary=po_summary,
+                delivery=delivery_info,
+                payment=POPayment(),
+                department=pr.department,
+                remarks=f"Auto-generated from PR: {pr_code}. Purpose: {pr.purpose}",
+                approval=POApproval(),
+                tracking=tracking_info,
+                is_active=True,
+                is_deleted=False
+            )
+
+            await po.insert()
+            created_pos.append(po_number)
+            logger.info(f"Created PO {po_number} from PR {pr_code} for supplier {supplier_code}")
+
+        # Update PR status to CONVERTED
+        pr.status = PRStatus.CONVERTED
+        pr.converted_to_po = ", ".join(created_pos)
+        pr.converted_date = datetime.utcnow()
+        pr.updated_at = datetime.utcnow()
+        pr.updated_by = username
+
+        await pr.save()
+
+        return {
+            "success": True,
+            "message": f"Purchase Request {pr_code} converted to {len(created_pos)} Purchase Order(s)",
+            "pr_code": pr_code,
+            "po_numbers": created_pos,
+            "redirect_to": f"/purchase-orders/{created_pos[0]}" if len(created_pos) == 1 else "/purchase-orders"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error converting PR to PO: {e}")
+        raise HTTPException(500, f"Error converting PR to PO: {str(e)}")
+
+
+@router.put("/purchase-requests/{pr_code}/mark-converted")
+async def mark_pr_as_converted(
+    pr_code: str,
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Mark a PR as converted to PO after manual PO creation.
+    Called from PO form when creating PO from PR data.
+    """
+    try:
+        pr = await PurchaseRequest.find_one(PurchaseRequest.pr_code == pr_code)
+        if not pr:
+            raise HTTPException(404, f"Purchase Request {pr_code} not found")
+
+        po_number = data.get("po_number")
+        if not po_number:
+            raise HTTPException(400, "PO number is required")
+
+        # Update PR status
+        pr.status = PRStatus.CONVERTED
+        pr.converted_to_po = po_number
+        pr.updated_at = datetime.utcnow()
+        await pr.save()
+
+        return {
+            "success": True,
+            "message": f"PR {pr_code} marked as converted to PO {po_number}",
+            "pr_code": pr_code,
+            "po_number": po_number
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking PR as converted: {e}")
+        raise HTTPException(500, f"Error marking PR as converted: {str(e)}")
+
+
+@router.get("/purchase-requests/{pr_code}/conversion-preview")
+async def preview_pr_to_po_conversion(
+    pr_code: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Preview what POs will be created from this PR.
+    Shows grouping by supplier without actually creating POs.
+    """
+    try:
+        pr = await PurchaseRequest.find_one(PurchaseRequest.pr_code == pr_code)
+        if not pr:
+            raise HTTPException(404, f"Purchase Request {pr_code} not found")
+
+        if pr.status != PRStatus.APPROVED:
+            raise HTTPException(400, f"Can only preview conversion for APPROVED purchase requests")
+
+        # Group approved items by supplier
+        supplier_items = defaultdict(list)
+        for item in pr.items:
+            if item.is_approved and item.approved_quantity > 0:
+                supplier_code = item.suggested_supplier_code or "DEFAULT"
+                supplier_name = item.suggested_supplier_name or "Default Supplier"
+                supplier_items[(supplier_code, supplier_name)].append({
+                    "item_code": item.item_code,
+                    "item_name": item.item_name,
+                    "quantity": item.approved_quantity or item.quantity,
+                    "unit": item.unit,
+                    "estimated_rate": item.estimated_unit_rate,
+                    "estimated_amount": (item.approved_quantity or item.quantity) * (item.estimated_unit_rate or 0)
+                })
+
+        preview = []
+        for (supplier_code, supplier_name), items in supplier_items.items():
+            total = sum(item["estimated_amount"] for item in items)
+            preview.append({
+                "supplier_code": supplier_code,
+                "supplier_name": supplier_name,
+                "item_count": len(items),
+                "items": items,
+                "estimated_total": total
+            })
+
+        return {
+            "pr_code": pr_code,
+            "can_convert": len(preview) > 0,
+            "po_count": len(preview),
+            "preview": preview
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing PR conversion: {e}")
+        raise HTTPException(500, f"Error previewing PR conversion: {str(e)}")

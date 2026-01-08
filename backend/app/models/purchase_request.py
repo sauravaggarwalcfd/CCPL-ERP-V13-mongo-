@@ -157,8 +157,11 @@ class PurchaseRequestCreate(BaseModel):
     required_by_date: Optional[date] = None
     purpose: Optional[str] = None
     justification: Optional[str] = None
-    items: List[PRLineItemCreate] = []
+    line_items: List[PRLineItemCreate] = Field(default=[], alias='items')
     notes: Optional[str] = None
+    
+    class Config:
+        populate_by_name = True
 
 
 class PurchaseRequestUpdate(BaseModel):
@@ -168,8 +171,11 @@ class PurchaseRequestUpdate(BaseModel):
     required_by_date: Optional[date] = None
     purpose: Optional[str] = None
     justification: Optional[str] = None
-    items: Optional[List[PRLineItemCreate]] = None
+    line_items: Optional[List[PRLineItemCreate]] = Field(default=None, alias='items')
     notes: Optional[str] = None
+    
+    class Config:
+        populate_by_name = True
 
 
 class PRApproval(BaseModel):

@@ -34,6 +34,15 @@ export const purchaseRequestApi = {
 
   // Get statistics summary
   getStats: () => api.get('/purchase/purchase-requests/stats/summary'),
+
+  // Convert approved PR to PO (auto-create)
+  convertToPO: (prCode) => api.post(`/purchase/purchase-requests/${prCode}/convert-to-po`),
+
+  // Preview PR to PO conversion
+  previewConversion: (prCode) => api.get(`/purchase/purchase-requests/${prCode}/conversion-preview`),
+  
+  // Mark PR as converted to PO (after manual PO creation)
+  markConverted: (prCode, poNumber) => api.put(`/purchase/purchase-requests/${prCode}/mark-converted`, { po_number: poNumber }),
 };
 
 export default purchaseRequestApi;

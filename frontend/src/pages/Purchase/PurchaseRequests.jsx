@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
-import { 
-  FileText, Plus, Eye, Check, X, Search, Filter, RefreshCw, 
-  Edit2, Trash2, Send, AlertCircle, Clock, CheckCircle, XCircle
+import { useNavigate } from 'react-router-dom'
+import {
+  FileText, Plus, Eye, Check, X, Search, Filter, RefreshCw,
+  Edit2, Trash2, Send, AlertCircle, Clock, CheckCircle, XCircle,
+  ShoppingCart, ArrowRight
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
+import { purchaseRequestApi } from '../../services/purchaseRequestApi'
 import PurchaseRequestForm from './PurchaseRequestForm'
 
 export default function PurchaseRequests() {
+  const navigate = useNavigate()
   const [prs, setPrs] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -17,6 +21,7 @@ export default function PurchaseRequests() {
   const [editingPR, setEditingPR] = useState(null)
   const [viewingPR, setViewingPR] = useState(null)
   const [stats, setStats] = useState(null)
+  const [converting, setConverting] = useState(null)
 
   useEffect(() => {
     fetchPRs()
@@ -105,6 +110,30 @@ export default function PurchaseRequests() {
   const handleEdit = (pr) => {
     setEditingPR(pr)
     setShowForm(true)
+  }
+
+  const handleConvertToPO = async (prCode) => {
+    try {
+      setConverting(prCode)
+      
+      // Fetch PR details to pre-fill the PO form
+      const response = await purchaseRequestApi.get(prCode)
+      const prData = response.data
+      
+      // Navigate to PO creation form with PR data
+      navigate('/purchase-orders/create', {
+        state: {
+          fromPR: true,
+          prCode: prCode,
+          prData: prData
+        }
+      })
+    } catch (error) {
+      console.error('Error fetching PR for conversion:', error)
+      toast.error(error.response?.data?.detail || 'Failed to load PR data')
+    } finally {
+      setConverting(null)
+    }
   }
 
   const handleFormClose = () => {
@@ -376,6 +405,25 @@ export default function PurchaseRequests() {
                             </button>
                           </>
                         )}
+
+                        {pr.status === 'APPROVED' && (
+                          <button
+                            onClick={() => handleConvertToPO(pr.pr_code)}
+                            disabled={converting === pr.pr_code}
+                            className="flex items-center gap-1 px-2 py-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded text-xs font-medium"
+                            title="Convert to Purchase Order"
+                          >
+                            {converting === pr.pr_code ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <>
+                                <ShoppingCart className="w-3 h-3" />
+                                <ArrowRight className="w-3 h-3" />
+                              </>
+                            )}
+                            To PO
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -400,6 +448,10 @@ export default function PurchaseRequests() {
         <PurchaseRequestView
           pr={viewingPR}
           onClose={() => setViewingPR(null)}
+          onConvert={async (prCode) => {
+            await handleConvertToPO(prCode)
+            setViewingPR(null)
+          }}
         />
       )}
     </div>
@@ -407,9 +459,10 @@ export default function PurchaseRequests() {
 }
 
 // View Component
-function PurchaseRequestView({ pr, onClose }) {
+function PurchaseRequestView({ pr, onClose, onConvert }) {
   const [details, setDetails] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [converting, setConverting] = useState(false)
 
   useEffect(() => {
     fetchDetails()
@@ -551,6 +604,32 @@ function PurchaseRequestView({ pr, onClose }) {
                 <p className="text-sm font-medium text-green-800">Approved by {details.approved_by_name || details.approved_by}</p>
                 <p className="text-xs text-green-600">{details.approved_date ? new Date(details.approved_date).toLocaleString() : ''}</p>
                 {details.approval_notes && <p className="text-sm text-green-700 mt-1">{details.approval_notes}</p>}
+
+                {/* Convert to PO Button */}
+                {!details.converted_to_po && onConvert && (
+                  <button
+                    onClick={() => {
+                      setConverting(true)
+                      onConvert(details.pr_code)
+                    }}
+                    disabled={converting}
+                    className="mt-3 flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+                  >
+                    {converting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ShoppingCart className="w-4 h-4" />
+                    )}
+                    Convert to Purchase Order
+                  </button>
+                )}
+              </div>
+            )}
+
+            {details.status === 'CONVERTED' && details.converted_to_po && (
+              <div className="p-4 bg-purple-50 rounded-lg">
+                <p className="text-sm font-medium text-purple-800">Converted to PO: {details.converted_to_po}</p>
+                <p className="text-xs text-purple-600">{details.converted_date ? new Date(details.converted_date).toLocaleString() : ''}</p>
               </div>
             )}
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Search, X, Truck, AlertTriangle, ChevronLeft, ChevronRight, Filter, Settings, ChevronDown, ChevronUp, LayoutGrid, List, UserPlus, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { suppliers } from '../../services/api'
+import { suppliers, categoryHierarchy } from '../../services/api'
 
 const PAYMENT_TERMS = ['Net 30', 'Net 60', 'Advance', 'COD']
 
@@ -35,6 +35,7 @@ export default function SupplierMaster() {
     supplier_name: '',
     supplier_groups: [], // Multiple groups support
     supplier_group_code: '', // Legacy - kept for backward compatibility
+    item_categories: [], // Item categories this supplier is linked to
     country: '',
     city: '',
     contact_person: '',
@@ -66,10 +67,14 @@ export default function SupplierMaster() {
 
   // Get unique cities for filter dropdown
   const [cities, setCities] = useState([])
+  
+  // Item categories for linking
+  const [itemCategories, setItemCategories] = useState([])
 
   useEffect(() => {
     fetchSuppliers()
     fetchSupplierGroups()
+    fetchItemCategories()
   }, [currentPage, searchTerm, filterCity, selectedGroup])
 
   useEffect(() => {
@@ -77,6 +82,29 @@ export default function SupplierMaster() {
     const uniqueCities = [...new Set(supplierList.map(s => s.city).filter(Boolean))]
     setCities(uniqueCities.sort())
   }, [supplierList])
+  
+  const fetchItemCategories = async () => {
+    try {
+      const response = await categoryHierarchy.getCategories({ is_active: true })
+      const categories = response.data || []
+      console.log('[SupplierMaster] Loaded item categories:', categories)
+      
+      // Validate that we got an array
+      if (!Array.isArray(categories)) {
+        console.error('[SupplierMaster] Invalid categories response:', categories)
+        toast.error('Invalid categories data received')
+        setItemCategories([])
+        return
+      }
+      
+      setItemCategories(categories)
+    } catch (error) {
+      console.error('Error fetching item categories:', error)
+      console.error('Error response:', error.response?.data)
+      toast.error('Failed to load item categories')
+      setItemCategories([])
+    }
+  }
 
   const fetchSuppliers = async () => {
     try {
@@ -126,6 +154,7 @@ export default function SupplierMaster() {
       supplier_name: '',
       supplier_groups: [], // Multiple groups
       supplier_group_code: '', // Legacy
+      item_categories: [],
       country: '',
       city: '',
       contact_person: '',
@@ -156,6 +185,7 @@ export default function SupplierMaster() {
       supplier_name: supplier.supplier_name || '',
       supplier_groups: supplier.supplier_groups || [], // Multiple groups
       supplier_group_code: supplier.supplier_group_code || '', // Legacy
+      item_categories: supplier.item_categories || [],
       country: supplier.country || '',
       city: supplier.city || '',
       contact_person: supplier.contact_person || '',
@@ -235,9 +265,32 @@ export default function SupplierMaster() {
       fetchSuppliers()
       setCurrentPage(1)
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Operation failed'
+      console.error('Supplier submit error:', error)
+      console.error('Error response:', error.response?.data)
+      
+      let errorMessage = 'Operation failed'
+      
+      // Handle validation errors (422)
+      if (error.response?.status === 422 && error.response?.data?.detail) {
+        const details = error.response.data.detail
+        if (Array.isArray(details)) {
+          // Pydantic validation errors
+          errorMessage = details.map(err => {
+            const field = err.loc?.join('.') || 'field'
+            return `${field}: ${err.msg}`
+          }).join(', ')
+        } else if (typeof details === 'string') {
+          errorMessage = details
+        } else {
+          errorMessage = 'Validation error occurred'
+        }
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast.error(errorMessage)
-      console.error(error)
     }
   }
 
@@ -952,6 +1005,9 @@ export default function SupplierMaster() {
                   {errors.supplier_groups && (
                     <p className="text-xs text-red-500 mt-1">{errors.supplier_groups}</p>
                   )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Tip: Link supplier groups to categories in the Category Master to control which suppliers appear for each category
+                  </p>
                 </div>
 
                 {/* Payment Terms & Country */}

@@ -13,38 +13,30 @@ const DynamicSpecificationForm = ({
   categoryCode,
   initialValues = {},
   onSpecificationsChange,
+  onSaveDraft,
   showTitle = true
 }) => {
   const { specifications, formFields, loading, error } = useSpecifications(categoryCode);
-  const [values, setValues] = useState({});
+  const [values, setValues] = useState(initialValues || {});
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Initialize values from initialValues
-  useEffect(() => {
-    if (initialValues && Object.keys(initialValues).length > 0) {
-      setValues(initialValues);
-    }
-  }, [initialValues]);
-
-  // Update values when formFields change (category changed)
+  // Update values when formFields change (category changed), but preserve existing values
   useEffect(() => {
     if (formFields && formFields.length > 0) {
-      // Clear previous values when category changes
-      const newValues = {};
+      setValues(prev => {
+        const newValues = { ...prev }; // Preserve existing values
 
-      // Set default values from field configuration
-      formFields.forEach(field => {
-        if (field.default_value !== null && field.default_value !== undefined) {
-          newValues[field.field_key] = field.default_value;
-        }
+        // Only set default values for fields that don't have a value yet
+        formFields.forEach(field => {
+          if (newValues[field.field_key] === undefined || newValues[field.field_key] === null || newValues[field.field_key] === '') {
+            if (field.default_value !== null && field.default_value !== undefined) {
+              newValues[field.field_key] = field.default_value;
+            }
+          }
+        });
+
+        return newValues;
       });
-
-      setValues(newValues);
-      setFieldErrors({});
-    } else {
-      // No fields, clear values
-      setValues({});
-      setFieldErrors({});
     }
   }, [formFields]);
 
@@ -205,6 +197,8 @@ const DynamicSpecificationForm = ({
             onChange={handleFieldChange}
             categoryCode={categoryCode}
             error={fieldErrors[field.field_key]}
+            onSaveDraft={onSaveDraft}
+            specifications={specifications}
           />
         ))}
       </div>

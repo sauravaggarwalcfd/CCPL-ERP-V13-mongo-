@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Search, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Settings, X, Check } from 'lucide-react';
 import { sizeApi } from '../../services/variantApi';
 import SizeForm from './SizeForm';
 import GroupedVariantList from './GroupedVariantList';
@@ -20,6 +20,11 @@ const SizeMaster = () => {
   const [showForm, setShowForm] = useState(false);
   const [showGroupManager, setShowGroupManager] = useState(false);
   const [editingSize, setEditingSize] = useState(null);
+  
+  // Add to group modal state
+  const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
+  const [addToGroupTarget, setAddToGroupTarget] = useState(null);
+  const [selectedSizesForGroup, setSelectedSizesForGroup] = useState([]);
 
   // Load sizes and groups
   useEffect(() => {
@@ -139,6 +144,56 @@ const SizeMaster = () => {
     setEditingSize(null);
   };
 
+  // Handle opening Add to Group modal
+  const handleOpenAddToGroup = (groupCode) => {
+    setAddToGroupTarget(groupCode);
+    setSelectedSizesForGroup([]);
+    setShowAddToGroupModal(true);
+  };
+
+  // Handle adding sizes to group
+  const handleAddSizesToGroup = async () => {
+    if (!addToGroupTarget || selectedSizesForGroup.length === 0) {
+      toast.error('Please select at least one size');
+      return;
+    }
+
+    try {
+      for (const sizeCode of selectedSizesForGroup) {
+        const size = sizes.find(s => s.size_code === sizeCode);
+        if (size && size.size_group !== addToGroupTarget) {
+          await sizeApi.update(sizeCode, {
+            ...size,
+            size_group: addToGroupTarget
+          });
+        }
+      }
+      
+      toast.success(`Added ${selectedSizesForGroup.length} size(s) to group`);
+      setShowAddToGroupModal(false);
+      setAddToGroupTarget(null);
+      setSelectedSizesForGroup([]);
+      loadData();
+    } catch (error) {
+      toast.error('Failed to add sizes to group');
+      console.error(error);
+    }
+  };
+
+  // Get sizes not in target group
+  const getSizesNotInGroup = (groupCode) => {
+    return sizes.filter(size => size.size_group !== groupCode);
+  };
+
+  // Toggle size selection for adding to group
+  const toggleSizeForGroup = (sizeCode) => {
+    setSelectedSizesForGroup(prev => 
+      prev.includes(sizeCode)
+        ? prev.filter(code => code !== sizeCode)
+        : [...prev, sizeCode]
+    );
+  };
+
   const renderSizeItem = (size) => (
     <div className="flex items-center justify-between p-3 bg-white rounded-lg border hover:shadow-md transition-shadow">
       <div className="flex-1">
@@ -230,6 +285,7 @@ const SizeMaster = () => {
           groups={groups}
           renderItem={renderSizeItem}
           emptyMessage="No sizes found"
+          onAddToGroup={handleOpenAddToGroup}
         />
       )}
 
@@ -252,6 +308,79 @@ const SizeMaster = () => {
             loadData();
           }}
         />
+      )}
+
+      {/* Add to Group Modal */}
+      {showAddToGroupModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Add Sizes to "{groups.find(g => g.code === addToGroupTarget)?.name || addToGroupTarget}"
+              </h3>
+              <button
+                onClick={() => {
+                  setShowAddToGroupModal(false);
+                  setAddToGroupTarget(null);
+                  setSelectedSizesForGroup([]);
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {getSizesNotInGroup(addToGroupTarget).length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  All sizes are already in this group
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {getSizesNotInGroup(addToGroupTarget).map((size) => (
+                    <label
+                      key={size.size_code}
+                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSizesForGroup.includes(size.size_code)}
+                        onChange={() => toggleSizeForGroup(size.size_code)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="font-medium">{size.size_code}</span>
+                      <span className="text-gray-600">- {size.size_name}</span>
+                      {size.numeric_value && (
+                        <span className="text-sm text-gray-500">({size.numeric_value} {size.unit})</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center justify-end gap-2 p-4 border-t bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowAddToGroupModal(false);
+                  setAddToGroupTarget(null);
+                  setSelectedSizesForGroup([]);
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSizesToGroup}
+                disabled={selectedSizesForGroup.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="w-4 h-4" />
+                Add Selected ({selectedSizesForGroup.length})
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

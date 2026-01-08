@@ -3,6 +3,7 @@ import { useLayout } from '../context/LayoutContext'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { DollarSign, Package, ShoppingCart, TrendingUp } from 'lucide-react'
 import { reports, inventory } from '../services/api'
+import ApprovalBox from '../components/dashboard/ApprovalBox'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
@@ -94,6 +95,9 @@ export default function Dashboard() {
           color="bg-orange-500"
         />
       </div>
+
+      {/* Approvals Needed Box */}
+      <ApprovalBox />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

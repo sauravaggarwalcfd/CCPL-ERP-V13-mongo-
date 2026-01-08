@@ -29,20 +29,66 @@ from ..models.colour_master import ColourMaster
 from ..models.size_master import SizeMaster
 from ..models.uom_master import UOMMaster
 from ..models.brand_master import BrandMaster
-from ..models.supplier import Supplier
+from ..models.supplier_master import SupplierMaster
+from ..models.category_hierarchy import ItemCategory, ItemSubCategory, ItemDivision, ItemClass, ItemSubClass
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def get_category_hierarchy_codes(category_code: str) -> List[str]:
+    """Get all category codes in the hierarchy (including all parent categories)"""
+    codes = [category_code]
+    
+    try:
+        # Try to find as SubClass (Level 5)
+        sub_class = await ItemSubClass.find_one(ItemSubClass.sub_class_code == category_code)
+        if sub_class:
+            codes.extend([sub_class.class_code, sub_class.division_code, sub_class.sub_category_code, sub_class.category_code])
+            return codes
+        
+        # Try to find as Class (Level 4)
+        class_item = await ItemClass.find_one(ItemClass.class_code == category_code)
+        if class_item:
+            codes.extend([class_item.division_code, class_item.sub_category_code, class_item.category_code])
+            return codes
+        
+        # Try to find as Division (Level 3)
+        division = await ItemDivision.find_one(ItemDivision.division_code == category_code)
+        if division:
+            codes.extend([division.sub_category_code, division.category_code])
+            return codes
+        
+        # Try to find as SubCategory (Level 2)
+        sub_category = await ItemSubCategory.find_one(ItemSubCategory.sub_category_code == category_code)
+        if sub_category:
+            codes.append(sub_category.category_code)
+            return codes
+        
+        # Try to find as Category (Level 1) - already have it
+        category = await ItemCategory.find_one(ItemCategory.category_code == category_code)
+        if category:
+            return codes
+    except Exception as e:
+        logger.error(f"Error getting category hierarchy for {category_code}: {str(e)}")
+    
+    return codes
+
+
 def spec_to_response(spec: CategorySpecifications) -> CategorySpecificationsResponse:
     """Convert CategorySpecifications document to response"""
+    specs_dict = spec.specifications.model_dump() if spec.specifications else {}
+    
+    # Map 'supplier' to 'supplier_group' for frontend compatibility
+    if 'supplier' in specs_dict:
+        specs_dict['supplier_group'] = specs_dict['supplier']
+    
     return CategorySpecificationsResponse(
         id=str(spec.id),
         category_code=spec.category_code,
         category_name=spec.category_name,
         category_level=spec.category_level,
-        specifications=spec.specifications.model_dump() if spec.specifications else {},
+        specifications=specs_dict,
         custom_fields=spec.custom_fields,
         is_active=spec.is_active,
         created_by=spec.created_by,
@@ -557,7 +603,7 @@ async def get_field_values(category_code: str, field_key: str):
             field_config = spec.specifications.vendor if hasattr(spec.specifications, 'vendor') else None
         elif field_key in ["brand", "brand_code"]:
             field_config = getattr(spec.specifications, 'brand', None) if spec.specifications else None
-        elif field_key in ["supplier", "supplier_code"]:
+        elif field_key in ["supplier", "supplier_code", "supplier_group"]:
             field_config = getattr(spec.specifications, 'supplier', None) if spec.specifications else None
         else:
             # Unknown field type
@@ -629,12 +675,34 @@ async def get_field_values(category_code: str, field_key: str):
             ]
 
         elif field_config.source == FieldSource.SUPPLIER_MASTER:
+            logger.info(f"Fetching suppliers for category: {category_code}")
+            
             query = {"is_active": True}
-            suppliers = await Supplier.find(query).sort("+company_name").to_list()
+            
+            # Check if field_config has specific groups configured
+            if field_config.groups and len(field_config.groups) > 0:
+                # Filter suppliers by groups configured in category specification
+                logger.info(f"Filtering by supplier groups: {field_config.groups}")
+                query["$or"] = [
+                    {"supplier_groups": {"$in": field_config.groups}},  # Supplier belongs to any configured group
+                    {"supplier_group_code": {"$in": field_config.groups}},  # Legacy single group field
+                ]
+            else:
+                # No groups configured - show all active suppliers
+                logger.info("No supplier groups configured for this category - showing all suppliers")
+            
+            logger.info(f"Supplier query: {query}")
+            
+            suppliers = await SupplierMaster.find(query).sort("+supplier_name").to_list()
+            logger.info(f"Found {len(suppliers)} suppliers")
+            for s in suppliers:
+                groups = getattr(s, 'supplier_groups', []) or []
+                logger.info(f"  - {s.supplier_name} ({s.supplier_code}): groups={groups}")
+            
             options = [
                 FieldOption(
-                    code=s.code,
-                    name=s.company_name,
+                    code=s.supplier_code,
+                    name=s.supplier_name,
                     additional_info={"contact_person": s.contact_person, "phone": s.phone}
                 )
                 for s in suppliers

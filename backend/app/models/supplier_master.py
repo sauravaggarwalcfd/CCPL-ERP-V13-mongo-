@@ -65,6 +65,7 @@ class SupplierMaster(Document):
     supplier_name: str = Field(..., index=True)
     supplier_groups: List[str] = Field(default_factory=list)  # Multiple groups
     supplier_group_code: Optional[str] = None  # Legacy single group (kept for backward compatibility)
+    item_categories: List[str] = Field(default_factory=list)  # Item categories this supplier is linked to
     supplier_type: Optional[str] = None  # Textile Supplier/Cotton Supplier/etc
     country: Optional[str] = None
     city: Optional[str] = None
@@ -121,6 +122,7 @@ class SupplierMasterCreate(BaseModel):
     supplier_name: str = Field(..., min_length=2, max_length=200)
     supplier_groups: List[str] = Field(default_factory=list)
     supplier_group_code: Optional[str] = None  # Legacy
+    item_categories: List[str] = Field(default_factory=list)
     supplier_type: Optional[str] = None
     country: Optional[str] = None
     city: Optional[str] = None
@@ -140,6 +142,7 @@ class SupplierMasterUpdate(BaseModel):
     supplier_name: Optional[str] = None
     supplier_groups: Optional[List[str]] = None
     supplier_group_code: Optional[str] = None  # Legacy
+    item_categories: Optional[List[str]] = None
     supplier_type: Optional[str] = None
     country: Optional[str] = None
     city: Optional[str] = None

@@ -33,8 +33,9 @@ async def generate_po_number() -> str:
 
     # Find last PO number for current month
     prefix = f"PO-{year}-{month}"
+    # Use regex query instead of .startswith() which returns boolean in Beanie
     last_po = await PurchaseOrder.find(
-        PurchaseOrder.po_number.startswith(prefix)
+        {"po_number": {"$regex": f"^{prefix}"}}
     ).sort("-po_number").limit(1).to_list()
 
     if last_po:

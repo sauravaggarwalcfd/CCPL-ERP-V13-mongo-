@@ -103,30 +103,70 @@ export default function SpecificationSection({
   }
 
   const renderGroupSelector = (specKey, groups, selectedGroups) => {
+    const groupTypePaths = {
+      colour: '/variant-master?tab=colours',
+      size: '/variant-master?tab=sizes',
+      uom: '/variant-master?tab=uoms',
+      supplier_group: '/masters/suppliers',
+      brand: '/masters/brands'
+    };
+
+    const groupTypeNames = {
+      colour: 'Colour',
+      size: 'Size',
+      uom: 'UOM',
+      supplier_group: 'Supplier',
+      brand: 'Brand'
+    };
+
     if (!groups || groups.length === 0) {
       return (
         <div className="spec-no-groups">
-          No groups available. Create groups in Variant/Master.
+          <p>No groups available. Create groups in Variant/Master.</p>
+          {groupTypePaths[specKey] && (
+            <button
+              type="button"
+              onClick={() => navigate(groupTypePaths[specKey])}
+              className="spec-add-group-btn"
+              style={{ marginTop: '8px', padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Plus size={16} />
+              Add {groupTypeNames[specKey] || specKey} Group
+            </button>
+          )}
         </div>
       )
     }
 
     return (
-      <div className="spec-group-chips">
-        {groups.map(group => {
-          const isSelected = selectedGroups?.includes(group.group_code || group.code)
-          return (
-            <button
-              key={group.group_code || group.code || group.id}
-              type="button"
-              onClick={() => handleGroupSelect(specKey, group.group_code || group.code)}
-              className={`spec-chip ${isSelected ? 'selected' : ''}`}
-            >
-              {isSelected && <span className="chip-check">✓</span>}
-              {group.group_name || group.name}
-            </button>
-          )
-        })}
+      <div>
+        <div className="spec-group-chips">
+          {groups.map(group => {
+            const isSelected = selectedGroups?.includes(group.group_code || group.code)
+            return (
+              <button
+                key={group.group_code || group.code || group.id}
+                type="button"
+                onClick={() => handleGroupSelect(specKey, group.group_code || group.code)}
+                className={`spec-chip ${isSelected ? 'selected' : ''}`}
+              >
+                {isSelected && <span className="chip-check">✓</span>}
+                {group.group_name || group.name}
+              </button>
+            )
+          })}
+        </div>
+        {groupTypePaths[specKey] && (
+          <button
+            type="button"
+            onClick={() => navigate(groupTypePaths[specKey])}
+            className="spec-add-group-btn"
+            style={{ marginTop: '12px', padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}
+          >
+            <Plus size={16} />
+            Add New {groupTypeNames[specKey] || specKey} Group
+          </button>
+        )}
       </div>
     )
   }

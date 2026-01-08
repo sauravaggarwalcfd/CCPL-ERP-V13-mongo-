@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from ..models.item import ItemMaster, ItemMasterCreate, ItemMasterUpdate, InventoryType
 from ..models.category_hierarchy import ItemSubClass
 from ..models.inventory_management import InventoryStock, StockLevel, StockMovement, MovementType
+from ..models.item_type import ItemType
+from ..services.sku_service import SKUService, generate_complete_sku
 from ..core.dependencies import get_current_user
 
 router = APIRouter()
@@ -17,6 +19,97 @@ logger = logging.getLogger(__name__)
 
 
 # ==================== ITEM MASTER ROUTES ====================
+
+async def generate_uid(item_type_code: str, category_code: str = None) -> str:
+    """
+    Generate a unique UID for a new item
+    Format: [ItemTypeCode 2 chars][CategoryCode 2 chars][4 digit running counter]
+    Example: FGRN0001, RMBT0002, TRPK0001
+
+    Args:
+        item_type_code: 2-character item type code (e.g., FG, RM, TR)
+        category_code: Category code to derive 2 letters from (e.g., RNCK -> RN)
+    """
+    # Normalize item type code to uppercase 2 chars
+    type_code = (item_type_code or "XX").upper()[:2].ljust(2, "X")
+
+    # Get first 2 letters from category code or use XX
+    cat_code = "XX"
+    if category_code:
+        cat_code = category_code.upper()[:2].ljust(2, "X")
+
+    # Build prefix for searching
+    prefix = f"{type_code}{cat_code}"
+
+    # Find the highest UID with this prefix
+    # UIDs are now like: FGRN0001, FGRN0002, etc.
+    latest_item = await ItemMaster.find(
+        {"uid": {"$regex": f"^{prefix}\\d{{4}}$"}}
+    ).sort("-uid").limit(1).to_list()
+
+    if latest_item:
+        try:
+            # Extract sequence number from the last UID (last 4 digits)
+            last_uid = latest_item[0].uid
+            last_sequence = int(last_uid[-4:])
+            next_sequence = last_sequence + 1
+        except (ValueError, IndexError):
+            next_sequence = 1
+    else:
+        next_sequence = 1
+
+    # Ensure we don't exceed 9999
+    if next_sequence > 9999:
+        # If we exceed, we might need to use a different approach or log warning
+        logger.warning(f"UID sequence for {prefix} exceeded 9999, resetting to timestamp-based")
+        next_sequence = int(datetime.utcnow().strftime("%H%M"))
+
+    return f"{prefix}{str(next_sequence).zfill(4)}"
+
+
+async def generate_sku_with_specs(
+    item_type_code: str,
+    category_code: str,
+    color_name: str = None,
+    size_name: str = None
+) -> dict:
+    """
+    Generate complete SKU with colour and size from specifications
+    Format: FM-ABCD-A0000-COLR-SZ
+
+    Returns dict with full SKU and components
+    """
+    # Get item type to get current sequence
+    item_type = await ItemType.find_one(ItemType.type_code == item_type_code.upper())
+    if not item_type:
+        # Fallback to basic SKU
+        current_sequence = 1
+        type_code_for_sku = item_type_code.upper()[:2]
+    else:
+        current_sequence = (item_type.next_item_sequence or 0) + 1
+        type_code_for_sku = item_type.sku_type_code or SKUService.generate_item_type_code(item_type.type_name)
+
+    # Generate SKU components
+    cat_code = (category_code or "XX").upper()[:4]
+    sequence_code = SKUService.generate_item_sequence_code(current_sequence)
+
+    # Generate variant codes from colour and size
+    color_code = SKUService.generate_variant_code(color_name, "color", 4) if color_name else "0000"
+    size_code = SKUService.generate_variant_code(size_name, "size", 2) if size_name else "00"
+
+    # Construct full SKU
+    full_sku = f"{type_code_for_sku}-{cat_code}-{sequence_code}-{color_code}-{size_code}"
+
+    return {
+        "sku": full_sku,
+        "sku_type_code": type_code_for_sku,
+        "sku_category_code": cat_code,
+        "sku_sequence": sequence_code,
+        "sku_variant1": color_code,
+        "sku_variant2": size_code,
+        "sequence_number": current_sequence
+    }
+
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_item(
@@ -35,31 +128,63 @@ async def create_item(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Item with code '{data.item_code}' already exists"
         )
-    
+
     # Build hierarchy path if sub_class_code provided
     hierarchy_path = None
     hierarchy_path_name = None
-    
+
     if data.sub_class_code:
         sub_class = await ItemSubClass.find_one(ItemSubClass.sub_class_code == data.sub_class_code.upper())
         if sub_class:
             hierarchy_path = sub_class.path
             hierarchy_path_name = sub_class.path_name
-    
+
+    # Determine the best category code to use for UID/SKU
+    # Priority: sub_class_code > class_code > division_code > sub_category_code > category_code
+    best_category_code = (
+        data.sub_class_code or data.class_code or data.division_code or
+        data.sub_category_code or data.category_code or "XX"
+    )
+
+    # Get item type code from sku_type_code or default to "XX"
+    item_type_code = data.sku_type_code or "XX"
+
+    # Generate unique UID (immutable identifier) with new format
+    # Format: [ItemTypeCode 2 chars][CategoryCode 2 chars][4 digit counter]
+    uid = data.uid if data.uid else await generate_uid(item_type_code, best_category_code)
+
+    # Auto-generate SKU with colour and size from specifications
+    sku_data = None
+    if not data.sku:
+        # Generate SKU automatically using colour and size
+        sku_data = await generate_sku_with_specs(
+            item_type_code=item_type_code,
+            category_code=best_category_code,
+            color_name=data.color_name,
+            size_name=data.size_name
+        )
+
+        # Update ItemType sequence counter
+        item_type = await ItemType.find_one(ItemType.type_code == item_type_code.upper())
+        if item_type:
+            item_type.next_item_sequence = sku_data["sequence_number"]
+            await item_type.save()
+
     # Get opening stock value
     opening_stock = getattr(data, 'opening_stock', 0) or 0
 
     item = await ItemMaster(
+        uid=uid,
         item_code=data.item_code,
         item_name=data.item_name,
         item_description=data.item_description,
-        # SKU Fields
-        sku=data.sku,
-        sku_type_code=data.sku_type_code,
-        sku_category_code=data.sku_category_code,
-        sku_sequence=data.sku_sequence,
-        sku_variant1=data.sku_variant1,
-        sku_variant2=data.sku_variant2,
+        # SKU Fields - use generated if not provided
+        sku=data.sku or (sku_data["sku"] if sku_data else None),
+        sku_type_code=data.sku_type_code or (sku_data["sku_type_code"] if sku_data else None),
+        sku_category_code=data.sku_category_code or (sku_data["sku_category_code"] if sku_data else None),
+        sku_sequence=data.sku_sequence or (sku_data["sku_sequence"] if sku_data else None),
+        sku_variant1=data.sku_variant1 or (sku_data["sku_variant1"] if sku_data else None),
+        sku_variant2=data.sku_variant2 or (sku_data["sku_variant2"] if sku_data else None),
         category_code=data.category_code,
         category_name=data.category_name,
         sub_category_code=data.sub_category_code,
@@ -152,12 +277,14 @@ async def create_item(
         except Exception as inv_error:
             logger.warning(f"Failed to initialize inventory for {data.item_code}: {inv_error}")
 
-    logger.info(f"Created Item: {data.item_code} - {data.item_name}")
+    logger.info(f"Created Item: {data.item_code} - {data.item_name} (UID: {uid})")
 
     return {
         "id": str(item.id),
+        "uid": item.uid,
         "item_code": item.item_code,
         "item_name": item.item_name,
+        "sku": item.sku,
         "opening_stock": opening_stock,
         "message": "Item created successfully"
     }
@@ -226,10 +353,11 @@ async def list_items(
     return [
         {
             "id": str(i.id),
+            "uid": getattr(i, 'uid', None),  # Unique Identifier (immutable)
             "item_code": i.item_code,
             "item_name": i.item_name,
             "item_description": i.item_description,
-            # SKU Fields
+            # SKU Fields (can change)
             "sku": i.sku,
             "sku_type_code": i.sku_type_code,
             "sku_category_code": i.sku_category_code,
@@ -290,10 +418,11 @@ async def get_item(
     
     return {
         "id": str(item.id),
+        "uid": getattr(item, 'uid', None),  # Unique Identifier (immutable)
         "item_code": item.item_code,
         "item_name": item.item_name,
         "item_description": item.item_description,
-        # SKU Fields
+        # SKU Fields (can change based on item attributes)
         "sku": item.sku,
         "sku_type_code": item.sku_type_code,
         "sku_category_code": item.sku_category_code,
@@ -444,6 +573,46 @@ async def get_next_sku(prefix: str):
         )
 
 
+@router.get("/generate-uid")
+async def generate_uid_preview(
+    item_type_code: str = Query(..., description="Item Type Code (e.g., FG, RM)"),
+    category_code: str = Query(..., description="Category Code (e.g., RNCK, BTNS)"),
+):
+    """
+    Preview the next UID that will be generated for a new item
+
+    UID Format: [ItemTypeCode 2 chars][CategoryCode 2 chars][4 digit counter]
+    Example: FGRN0001, RMBT0002, TRPK0001
+
+    Components:
+    1. Item Type Code (2 chars): From item type (e.g., FG, RM, TR)
+    2. Category Code (2 chars): First 2 letters of category code
+    3. Running Counter (4 digits): Auto-increment per type+category combination
+    """
+    try:
+        next_uid = await generate_uid(item_type_code, category_code)
+
+        type_code = item_type_code.upper()[:2].ljust(2, "X")
+        cat_code = category_code.upper()[:2].ljust(2, "X")
+
+        return {
+            "uid": next_uid,
+            "format": "[ItemType 2][Category 2][Counter 4]",
+            "components": {
+                "item_type_code": type_code,
+                "category_code": cat_code,
+                "counter": next_uid[-4:],
+            },
+            "example": f"{type_code}{cat_code}0001"
+        }
+    except Exception as e:
+        logger.error(f"Error generating UID preview: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate UID: {str(e)}"
+        )
+
+
 @router.get("/generate-full-sku")
 async def generate_full_sku(
     item_type_code: str = Query(..., description="Item Type Code (e.g., FM, RM)"),
@@ -452,69 +621,74 @@ async def generate_full_sku(
     size: Optional[str] = Query(None, description="Size for variant (e.g., M, L, Medium)"),
 ):
     """
-    Generate a complete hierarchical SKU with all 5 components
-    Format: FM-ABCD-A0000-0000-00
-    
+    Generate a complete hierarchical SKU with all 5 components including colour and size
+
+    SKU Format: FM-ABCD-A0000-COLR-SZ
+    UID Format: FMAB0001
+
     Components:
     1. FM = Item Type Code (2 letters)
     2. ABCD = Category Code (2-4 letters from deepest category level)
     3. A0000 = Item Sequence (1 letter + 4 digits, auto-increment per type)
-    4. 0000 = Color/Variant 1 (4 characters)
-    5. 00 = Size/Variant 2 (2 characters)
+    4. COLR = Color/Variant 1 (4 characters from colour specification)
+    5. SZ = Size/Variant 2 (2 characters from size specification)
     """
     try:
-        from ..services.sku_service import SKUService
-        from ..models.item_type import ItemType
-        
         # Get or create ItemType to get next sequence
         item_type_upper = item_type_code.upper()
         item_type = await ItemType.find_one(ItemType.type_code == item_type_upper)
-        
+
         if not item_type:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Item Type '{item_type_code}' not found"
             )
-        
+
         # Get current sequence and increment
         current_sequence = max((item_type.next_item_sequence or 0) + 1, 1)
-        
+
         # Generate all SKU components safely
         try:
             type_code = SKUService.generate_item_type_code(item_type.type_name)
         except:
             type_code = item_type_upper[:2]
-        
+
         category_code_upper = category_code.upper()[:4]
-        
+
         try:
             sequence_code = SKUService.generate_item_sequence_code(current_sequence)
         except:
             # Fallback: simple sequence generation
             sequence_code = f"A{str(current_sequence).zfill(4)}"
-        
-        # Generate variant codes with fallback
+
+        # Generate variant codes from colour and size specifications
         try:
             variant1_code = SKUService.generate_variant_code(color, "color", 4) if color else "0000"
         except:
             variant1_code = "0000"
-        
+
         try:
             variant2_code = SKUService.generate_variant_code(size, "size", 2) if size else "00"
         except:
             variant2_code = "00"
-        
+
         # Construct full SKU
         full_sku = f"{type_code}-{category_code_upper}-{sequence_code}-{variant1_code}-{variant2_code}"
-        
+
+        # Also generate the new UID format
+        uid_preview = await generate_uid(item_type_code, category_code)
+
         return {
             "sku": full_sku,
+            "uid": uid_preview,
             "components": {
                 "type_code": type_code,
                 "category_code": category_code_upper,
                 "sequence_code": sequence_code,
                 "variant1_code": variant1_code,
                 "variant2_code": variant2_code,
+                "color_name": color,
+                "size_name": size,
             },
             "next_sequence_number": current_sequence,
             "display": f"{type_code}-{category_code_upper}-{sequence_code}-{variant1_code}-{variant2_code}"

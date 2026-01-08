@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useLayout } from '../context/LayoutContext'
 import {
   Plus, Trash2, Save, X, Calculator, Package, User, MapPin,
@@ -7,16 +7,27 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { purchaseOrders, suppliers, items as itemsAPI } from '../services/api'
+import { purchaseRequestApi } from '../services/purchaseRequestApi'
 
 const PurchaseOrderForm = () => {
   const { setTitle } = useLayout()
   const navigate = useNavigate()
+  const location = useLocation()
   const { poNumber } = useParams()
   const isEditMode = !!poNumber
+  
+  // Check if coming from PR conversion
+  const fromPR = location.state?.fromPR
+  const prCode = location.state?.prCode
+  const prData = location.state?.prData
 
   useEffect(() => {
-    setTitle(isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order')
-  }, [setTitle, isEditMode])
+    if (fromPR && prCode) {
+      setTitle(`Create PO from PR: ${prCode}`)
+    } else {
+      setTitle(isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order')
+    }
+  }, [setTitle, isEditMode, fromPR, prCode])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -101,6 +112,53 @@ const PurchaseOrderForm = () => {
     }
     fetchItems()
   }, [])
+
+  // Pre-fill data from Purchase Request if coming from PR conversion
+  useEffect(() => {
+    if (fromPR && prData) {
+      console.log('Pre-filling PO form from PR:', prData)
+      
+      // Get first supplier from PR items (if items exist)
+      const prItems = prData.items || []
+      const firstSupplierCode = prItems.find(item => item.suggested_supplier_code)?.suggested_supplier_code || ''
+      
+      // Set form data
+      setFormData(prev => ({
+        ...prev,
+        indent_number: prCode || '',
+        supplier_code: firstSupplierCode,
+        delivery_location: prData.delivery_location || '',
+        remarks: `Created from Purchase Request: ${prCode}`,
+        department: prData.department || ''
+      }))
+      
+      // Convert PR line items to PO line items
+      const poLineItems = prItems
+        .filter(item => item.is_approved !== false) // Include approved items
+        .map((item, idx) => ({
+          id: Date.now() + idx,
+          item_code: item.item_code || '',
+          item_name: item.item_name || '',
+          item_description: item.item_description || '',
+          item_category: item.item_category || '',
+          quantity: item.approved_quantity || item.quantity || 1,
+          unit: item.unit || 'PCS',
+          unit_rate: item.estimated_unit_rate || 0,
+          discount_percent: 0,
+          hsn_code: item.hsn_code || '',
+          gst_percent: 18,
+          expected_delivery_date: item.required_date || '',
+          inspection_required: false,
+          quality_specs: '',
+          notes: item.notes || ''
+        }))
+      
+      if (poLineItems.length > 0) {
+        setLineItems(poLineItems)
+        toast.success(`Loaded ${poLineItems.length} items from PR ${prCode}`)
+      }
+    }
+  }, [fromPR, prData, prCode])
 
   // Calculate line item amounts
   const calculateLineItem = (item) => {
@@ -239,8 +297,20 @@ const PurchaseOrderForm = () => {
         toast.success('Purchase Order updated successfully')
       } else {
         const response = await purchaseOrders.create(payload)
-        toast.success(`Purchase Order ${response.data.po_number} created successfully`)
-        navigate(`/purchase-orders/${response.data.po_number}`)
+        const newPoNumber = response.data.po_number
+        
+        // If created from PR, mark the PR as converted
+        if (fromPR && prCode) {
+          try {
+            await purchaseRequestApi.markConverted(prCode, newPoNumber)
+          } catch (err) {
+            console.warn('Failed to mark PR as converted:', err)
+            // Don't block PO creation if this fails
+          }
+        }
+        
+        toast.success(`Purchase Order ${newPoNumber} created successfully`)
+        navigate(`/purchase-orders/${newPoNumber}`)
       }
     } catch (error) {
       console.error('Error saving PO:', error)
@@ -294,12 +364,19 @@ const PurchaseOrderForm = () => {
            </button>
            <div>
              <h1 className="text-xl font-bold text-gray-900">
-               {isEditMode ? `Edit PO #${poNumber}` : 'New Purchase Order'}
+               {fromPR ? `Create PO from ${prCode}` : (isEditMode ? `Edit PO #${poNumber}` : 'New Purchase Order')}
              </h1>
              <p className="text-xs text-gray-500">
-               {isEditMode ? 'Update purchase order details' : 'Create a new purchase order'}
+               {fromPR 
+                 ? 'Review and create purchase order from approved PR' 
+                 : (isEditMode ? 'Update purchase order details' : 'Create a new purchase order')}
              </p>
            </div>
+           {fromPR && (
+             <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-medium">
+               From PR: {prCode}
+             </span>
+           )}
         </div>
 
         <div className="flex items-center gap-2">

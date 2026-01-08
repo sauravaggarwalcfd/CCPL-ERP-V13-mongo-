@@ -212,7 +212,7 @@ export default function CustomSpecModal({
               <p>Add specialized attributes for this category</p>
             </div>
           </div>
-          <button className="modal-close" onClick={onClose}>
+          <button type="button" className="modal-close" onClick={onClose}>
             <X size={24} />
           </button>
         </div>
@@ -220,6 +220,7 @@ export default function CustomSpecModal({
         {/* Tabs */}
         <div className="modal-tabs">
           <button
+            type="button"
             className={`modal-tab ${activeTab === 'select' ? 'active' : ''}`}
             onClick={() => setActiveTab('select')}
           >
@@ -227,6 +228,7 @@ export default function CustomSpecModal({
             Select Existing
           </button>
           <button
+            type="button"
             className={`modal-tab ${activeTab === 'create' ? 'active' : ''}`}
             onClick={() => setActiveTab('create')}
           >
@@ -289,7 +291,7 @@ export default function CustomSpecModal({
                         </div>
                       )}
 
-                      <button className="btn-select-spec">
+                      <button type="button" className="btn-select-spec">
                         <Plus size={16} />
                         Select
                       </button>
@@ -425,11 +427,12 @@ export default function CustomSpecModal({
 
         {/* Modal Footer */}
         <div className="modal-footer">
-          <button onClick={onClose} className="btn-cancel">
+          <button type="button" onClick={onClose} className="btn-cancel">
             Cancel
           </button>
           {activeTab === 'create' && (
             <button
+              type="button"
               onClick={handleCreateSpec}
               className="btn-create"
               disabled={creating || !newSpec.spec_code || !newSpec.spec_name}
@@ -448,7 +451,7 @@ export default function CustomSpecModal({
             </button>
           )}
           {onNavigateToVariant && (
-            <button onClick={onNavigateToVariant} className="btn-manage">
+            <button type="button" onClick={onNavigateToVariant} className="btn-manage">
               <ExternalLink size={16} />
               Manage All Specifications
             </button>
