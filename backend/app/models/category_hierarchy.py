@@ -47,7 +47,10 @@ class ItemCategory(Document):
 
     default_hsn_code: Optional[str] = None
     default_gst_rate: float = 5.0
-    default_uom: str = "PCS"
+
+    # UOM Settings - Fixed per category
+    purchase_uom: str = "PCS"  # Unit for purchasing (e.g., PCS, KG, MTR, BOX)
+    storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
 
     icon: str = "Package"
     color_code: str = "#10b981"
@@ -283,7 +286,8 @@ class ItemCategoryCreate(BaseModel):
     has_season: bool = False
     default_hsn_code: Optional[str] = None
     default_gst_rate: float = 5.0
-    default_uom: str = "PCS"
+    purchase_uom: str = "PCS"
+    storage_uom: str = "PCS"
     icon: str = "Package"
     color_code: str = "#10b981"
     sort_order: int = 0
@@ -395,7 +399,8 @@ class ItemCategoryUpdate(BaseModel):
     has_season: Optional[bool] = None
     default_hsn_code: Optional[str] = None
     default_gst_rate: Optional[float] = None
-    default_uom: Optional[str] = None
+    purchase_uom: Optional[str] = None
+    storage_uom: Optional[str] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None

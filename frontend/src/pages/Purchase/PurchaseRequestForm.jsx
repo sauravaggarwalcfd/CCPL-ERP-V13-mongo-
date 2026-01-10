@@ -772,21 +772,38 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
       return
     }
 
+    // Validate each line item has required fields
+    for (let i = 0; i < lineItems.length; i++) {
+      const item = lineItems[i]
+      if (!item.item_name || item.item_name.trim() === '') {
+        toast.error(`Item ${i + 1}: Item name is required`)
+        return
+      }
+      if (!item.quantity || parseFloat(item.quantity) <= 0) {
+        toast.error(`Item ${i + 1}: Quantity must be greater than 0`)
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const payload = {
-        ...formData,
+        pr_date: formData.pr_date || null,
+        department: formData.department || null,
+        priority: formData.priority || 'NORMAL',
+        required_by_date: formData.required_by_date || null,
+        purpose: formData.purpose || null,
+        justification: formData.justification || null,
+        notes: formData.notes || null,
         items: lineItems.map(item => {
-          // Clean and prepare specifications object
-          const cleanSpecs = {}
-          if (item.specifications) {
-            if (item.specifications.colour_code) cleanSpecs.colour_code = item.specifications.colour_code
-            if (item.specifications.size_code) cleanSpecs.size_code = item.specifications.size_code
-            if (item.specifications.uom_code) cleanSpecs.uom_code = item.specifications.uom_code
-            if (item.specifications.supplier_code) cleanSpecs.supplier_code = item.specifications.supplier_code
-            if (item.specifications.brand_code) cleanSpecs.brand_code = item.specifications.brand_code
-            if (item.specifications.custom_field_values) cleanSpecs.custom_field_values = item.specifications.custom_field_values
-          }
+          // Build specifications object - only include keys that have values
+          const specifications = {}
+          if (item.colour_code) specifications.colour_code = item.colour_code
+          if (item.size_code) specifications.size_code = item.size_code
+          if (item.uom_code) specifications.uom_code = item.uom_code
+          if (item.specifications?.supplier_code) specifications.supplier_code = item.specifications.supplier_code
+          if (item.specifications?.brand_code) specifications.brand_code = item.specifications.brand_code
+          if (item.specifications?.custom_field_values) specifications.custom_field_values = item.specifications.custom_field_values
 
           return {
             item_code: item.item_code || null,
@@ -802,15 +819,15 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
             quantity: parseFloat(item.quantity) || 0,
             unit: item.unit || 'PCS',
             estimated_unit_rate: item.estimated_unit_rate ? parseFloat(item.estimated_unit_rate) : null,
-            required_date: item.required_date || null,
+            required_date: item.required_date && item.required_date !== '' ? item.required_date : null,
+            colour_code: item.colour_code || null,
+            size_code: item.size_code || null,
+            uom_code: item.uom_code || null,
             suggested_supplier_code: item.suggested_supplier_code || null,
             suggested_supplier_name: item.suggested_supplier_name || null,
             suggested_brand_code: item.suggested_brand_code || null,
             suggested_brand_name: item.suggested_brand_name || null,
-            colour_code: item.colour_code || null,
-            size_code: item.size_code || null,
-            uom_code: item.uom_code || null,
-            specifications: cleanSpecs,
+            specifications: specifications,
             notes: item.notes || '',
             is_new_item: item.is_new_item || false,
           }
@@ -830,7 +847,15 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
       onSuccess()
     } catch (error) {
       console.error('Error saving PR:', error)
-      toast.error(error.response?.data?.detail || 'Failed to save Purchase Request')
+      console.error('Error response:', error.response?.data)
+
+      // Show detailed validation errors if available
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const errorMessages = error.response.data.errors.map(e => `${e.field}: ${e.message}`).join('\n')
+        toast.error(`Validation Error:\n${errorMessages}`, { duration: 5000 })
+      } else {
+        toast.error(error.response?.data?.detail || 'Failed to save Purchase Request')
+      }
     } finally {
       setLoading(false)
     }
@@ -1619,18 +1644,6 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
                       min="0"
                       step="0.01"
                       placeholder="0.00"
-                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Required Date
-                    </label>
-                    <input
-                      type="date"
-                      name="required_date"
-                      value={lineItemFormData.required_date}
-                      onChange={handleLineItemFormChange}
                       className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>

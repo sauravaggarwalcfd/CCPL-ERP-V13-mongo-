@@ -71,6 +71,12 @@ const PurchaseOrderForm = () => {
   const [showLineItemSearchResults, setShowLineItemSearchResults] = useState(false)
   const lineItemSearchTimeoutRef = useRef(null)
 
+  // Item search for line items (search from Item Master)
+  const [showItemSearch, setShowItemSearch] = useState(null) // lineItemId for item search
+  const [itemSearchTerm, setItemSearchTerm] = useState('')
+  const [itemSearchResults, setItemSearchResults] = useState([])
+  const itemSearchTimeoutRef = useRef(null)
+
   // Calculated summary
   const [summary, setSummary] = useState({
     subtotal: 0,
@@ -463,6 +469,57 @@ const PurchaseOrderForm = () => {
       updateLineItem(id, 'gst_percent', selectedItem.gst_rate || 18)
       updateLineItem(id, 'unit', selectedItem.unit || 'PCS')
     }
+  }
+
+  // Handle item search from Item Master
+  const handleItemSearch = (searchValue) => {
+    setItemSearchTerm(searchValue)
+
+    if (itemSearchTimeoutRef.current) {
+      clearTimeout(itemSearchTimeoutRef.current)
+    }
+
+    if (searchValue.trim().length >= 2) {
+      itemSearchTimeoutRef.current = setTimeout(() => {
+        const searchLower = searchValue.toLowerCase()
+        const results = itemsList.filter(item =>
+          (item.item_code?.toLowerCase().includes(searchLower)) ||
+          (item.code?.toLowerCase().includes(searchLower)) ||
+          (item.item_name?.toLowerCase().includes(searchLower)) ||
+          (item.name?.toLowerCase().includes(searchLower)) ||
+          (item.sku?.toLowerCase().includes(searchLower))
+        ).slice(0, 10)
+        setItemSearchResults(results)
+      }, 300)
+    } else {
+      setItemSearchResults([])
+    }
+  }
+
+  // Handle selecting an item from search results
+  const handleSelectItemFromSearch = (lineItemId, selectedItem) => {
+    // Update the line item with selected item data
+    setLineItems(lineItems.map(item => {
+      if (item.id === lineItemId) {
+        return {
+          ...item,
+          item_code: selectedItem.item_code || selectedItem.code || selectedItem.sku,
+          item_name: selectedItem.item_name || selectedItem.name,
+          item_description: selectedItem.description || selectedItem.item_description || '',
+          hsn_code: selectedItem.hsn_code || '',
+          gst_percent: selectedItem.gst_rate || selectedItem.gst_percent || 18,
+          unit: selectedItem.uom || selectedItem.unit || 'PCS',
+          unit_rate: selectedItem.purchase_price || selectedItem.unit_rate || 0
+        }
+      }
+      return item
+    }))
+
+    // Close search modal
+    setShowItemSearch(null)
+    setItemSearchTerm('')
+    setItemSearchResults([])
+    toast.success(`Selected: ${selectedItem.item_name || selectedItem.name}`)
   }
 
   // Submit form
@@ -1019,20 +1076,136 @@ const PurchaseOrderForm = () => {
                       )}
                     </div>
 
-                    {/* Item Code & Description */}
+                    {/* Item Search & Details */}
                     <div className="md:col-span-3 space-y-3">
+                      {/* Item Search Button */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Item Code
+                          Search Item <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          value={item.item_code}
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowItemSearch(item.id)}
+                          className="w-full text-left flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg hover:border-blue-500 transition bg-white"
+                        >
+                          <span className="text-sm truncate">
+                            {item.item_code ? `${item.item_code} - ${item.item_name}` : 'Click to search items...'}
+                          </span>
+                          <Search size={16} className="text-gray-400 flex-shrink-0 ml-2" />
+                        </button>
                       </div>
 
+                      {/* Item Search Modal */}
+                      {showItemSearch === item.id && (
+                        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                          <div className="w-full max-w-3xl">
+                            <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
+                              {/* Header */}
+                              <div className="bg-gradient-to-r from-green-600 to-green-800 text-white px-6 py-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <Package className="w-6 h-6" />
+                                  <h3 className="text-base font-semibold">Search Items from Item Master</h3>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowItemSearch(null)
+                                    setItemSearchResults([])
+                                    setItemSearchTerm('')
+                                  }}
+                                  className="p-2 hover:bg-white/20 rounded-lg transition"
+                                >
+                                  <X className="w-6 h-6" />
+                                </button>
+                              </div>
+
+                              {/* Search Input */}
+                              <div className="p-6 border-b">
+                                <input
+                                  type="text"
+                                  placeholder="Search by item code, name, or SKU..."
+                                  value={itemSearchTerm}
+                                  onChange={(e) => handleItemSearch(e.target.value)}
+                                  autoFocus
+                                  className="w-full px-4 py-3.5 text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                />
+                              </div>
+
+                              {/* Results */}
+                              <div className="max-h-96 overflow-y-auto">
+                                {itemSearchTerm.length < 2 ? (
+                                  <div className="p-6 text-center text-gray-500">
+                                    <Search className="w-8 h-8 inline-block mb-2 text-gray-400" />
+                                    <div className="text-base">Type at least 2 characters to search</div>
+                                  </div>
+                                ) : itemSearchResults.length === 0 ? (
+                                  <div className="p-6 text-center text-gray-500">
+                                    <AlertCircle className="w-8 h-8 inline-block mb-2 text-gray-400" />
+                                    <div className="text-base">No items found</div>
+                                    <p className="text-sm mt-1">Try a different search term</p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="p-3 bg-green-50 border-b-2 border-green-200 text-sm font-semibold text-green-800">
+                                      Found {itemSearchResults.length} item{itemSearchResults.length > 1 ? 's' : ''} - Click to select
+                                    </div>
+                                    {itemSearchResults.map((result) => (
+                                      <div
+                                        key={result.id || result.item_code || result.code}
+                                        onClick={() => handleSelectItemFromSearch(item.id, result)}
+                                        className="p-4 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition"
+                                      >
+                                        <div className="flex items-start justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-semibold text-gray-900">
+                                                {result.item_name || result.name}
+                                              </span>
+                                            </div>
+                                            <div className="text-sm text-gray-600 mt-1 flex items-center gap-3">
+                                              <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                                {result.item_code || result.code || result.sku}
+                                              </span>
+                                              {result.hsn_code && (
+                                                <span className="text-xs">HSN: {result.hsn_code}</span>
+                                              )}
+                                              {(result.uom || result.unit) && (
+                                                <span className="text-xs">UOM: {result.uom || result.unit}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="ml-3">
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                              Select
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Item Code (read-only after selection) */}
+                      {item.item_code && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Item Code
+                          </label>
+                          <input
+                            type="text"
+                            value={item.item_code}
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                          />
+                        </div>
+                      )}
+
+                      {/* Item Name */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Item Name

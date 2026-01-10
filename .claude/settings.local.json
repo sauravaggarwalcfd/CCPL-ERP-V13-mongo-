@@ -14,7 +14,13 @@
       "Bash(where:*)",
       "Bash(dir:*)",
       "Bash(python:*)",
-      "Bash(timeout 10 python:*)"
+      "Bash(timeout 10 python:*)",
+      "Bash(npx eslint:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(node -e:*)",
+      "Bash(npm run build:*)",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(curl:*)"
     ]
   }
 }

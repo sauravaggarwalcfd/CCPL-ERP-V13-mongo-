@@ -1,9 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
+import json
 from .database import connect_to_mongo, close_mongo_connection
 from .routes import (
     auth,
@@ -81,6 +85,31 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+# Add validation error handler for better error messages
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    error_details = []
+    for error in errors:
+        error_details.append({
+            "field": " -> ".join(str(loc) for loc in error.get("loc", [])),
+            "message": error.get("msg", ""),
+            "type": error.get("type", ""),
+            "input": str(error.get("input", ""))[:100]  # Truncate long inputs
+        })
+
+    logger.error(f"Validation error on {request.url.path}: {json.dumps(error_details, indent=2)}")
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Validation error",
+            "errors": error_details
+        }
+    )
+
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

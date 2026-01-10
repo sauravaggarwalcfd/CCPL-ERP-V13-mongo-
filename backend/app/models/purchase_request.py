@@ -4,7 +4,7 @@ PR system for requesting items before creating Purchase Orders
 """
 
 from beanie import Document, Indexed
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
@@ -175,6 +175,8 @@ class PRLineItemCreate(BaseModel):
 
 class PurchaseRequestCreate(BaseModel):
     """Schema for creating Purchase Request"""
+    model_config = ConfigDict(populate_by_name=True)
+
     pr_date: Optional[date] = None
     department: Optional[str] = None
     priority: PRPriority = PRPriority.NORMAL
@@ -183,13 +185,12 @@ class PurchaseRequestCreate(BaseModel):
     justification: Optional[str] = None
     line_items: List[PRLineItemCreate] = Field(default=[], alias='items')
     notes: Optional[str] = None
-    
-    class Config:
-        populate_by_name = True
 
 
 class PurchaseRequestUpdate(BaseModel):
     """Schema for updating Purchase Request"""
+    model_config = ConfigDict(populate_by_name=True)
+
     department: Optional[str] = None
     priority: Optional[PRPriority] = None
     required_by_date: Optional[date] = None
@@ -197,9 +198,6 @@ class PurchaseRequestUpdate(BaseModel):
     justification: Optional[str] = None
     line_items: Optional[List[PRLineItemCreate]] = Field(default=None, alias='items')
     notes: Optional[str] = None
-    
-    class Config:
-        populate_by_name = True
 
 
 class PRApproval(BaseModel):
