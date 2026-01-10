@@ -1,58 +1,110 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLayout } from '../context/LayoutContext'
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { DollarSign, Package, ShoppingCart, TrendingUp } from 'lucide-react'
-import { reports, inventory } from '../services/api'
+import { Box, AlertTriangle, ShoppingCart, CheckCircle, Package, Plus } from 'lucide-react'
+import { items, purchaseOrders } from '../services/api'
+import { purchaseRequestApi } from '../services/purchaseRequestApi'
 import ApprovalBox from '../components/dashboard/ApprovalBox'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
   const { setTitle } = useLayout()
-  const [salesData, setSalesData] = useState(null)
-  const [stockData, setStockData] = useState(null)
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    lowStockAlerts: 0,
+    pendingPos: 0,
+    pendingApprovals: 0,
+  })
 
   useEffect(() => {
     setTitle('Dashboard')
-    fetchDashboardData()
+    fetchDashboardStats()
   }, [setTitle])
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardStats = async () => {
     try {
       setLoading(true)
-      const today = new Date()
-      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+      
+      // Fetch data with error handling
+      let allItems = []
+      let allPos = []
+      let allPrs = []
+      
+      try {
+        const itemsRes = await items.getAll()
+        allItems = itemsRes?.data || itemsRes || []
+      } catch (e) {
+        console.warn('Error fetching items:', e)
+      }
+      
+      try {
+        const posRes = await purchaseOrders.getAll()
+        allPos = posRes?.data || posRes || []
+      } catch (e) {
+        console.warn('Error fetching POs:', e)
+      }
+      
+      try {
+        const prsRes = await purchaseRequestApi.list()
+        allPrs = prsRes?.data || prsRes || []
+      } catch (e) {
+        console.warn('Error fetching PRs:', e)
+      }
 
-      // Format dates
-      const formatDate = (date) => date.toISOString().split('T')[0]
+      // Ensure arrays
+      if (!Array.isArray(allItems)) allItems = []
+      if (!Array.isArray(allPos)) allPos = []
+      if (!Array.isArray(allPrs)) allPrs = []
 
-      const [salesRes, stockRes] = await Promise.all([
-        reports.salesSummary({
-          start_date: formatDate(thirtyDaysAgo),
-          end_date: formatDate(today),
-        }),
-        reports.stockCurrent({ limit: 100 }),
-      ])
+      // Calculate stats with safe fallbacks
+      const lowStockCount = allItems.filter(
+        (item) => {
+          const qty = item.opening_stock || item.quantity || 0
+          const minStock = item.min_stock_level || 10
+          return qty > 0 && qty <= minStock
+        }
+      ).length
 
-      setSalesData(salesRes.data)
-      setStockData(stockRes.data)
+      const pendingPoCount = allPos.filter((po) => 
+        po.status === 'PENDING' || po.status === 'pending' || po.status === 'SUBMITTED'
+      ).length
+      
+      const pendingApprovalCount = allPrs.filter((pr) => 
+        pr.approval_status === 'pending' || pr.status === 'pending' || pr.status === 'SUBMITTED'
+      ).length
+
+      setStats({
+        totalItems: allItems.length,
+        lowStockAlerts: lowStockCount,
+        pendingPos: pendingPoCount,
+        pendingApprovals: pendingApprovalCount,
+      })
     } catch (error) {
-      toast.error('Failed to fetch dashboard data')
-      console.error(error)
+      console.error('Failed to fetch dashboard stats:', error)
+      toast.error('Failed to load dashboard data')
+      // Set default stats
+      setStats({
+        totalItems: 0,
+        lowStockAlerts: 0,
+        pendingPos: 0,
+        pendingApprovals: 0,
+      })
     } finally {
       setLoading(false)
     }
   }
 
   const StatCard = ({ icon: Icon, label, value, color }) => (
-    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-      <div className="flex items-center justify-between">
+    <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+      <div className="flex items-start justify-between">
         <div>
-          <p className="text-gray-600 text-xs sm:text-sm">{label}</p>
-          <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{value}</p>
+          <p className="text-gray-600 text-sm font-medium">{label}</p>
+          <p className="text-4xl font-bold mt-2">{value}</p>
         </div>
-        <div className={`p-2 sm:p-3 rounded-lg ${color}`}>
-          <Icon size={20} className="sm:w-7 sm:h-7 text-white" />
+        <div className={`p-3 rounded-lg ${color}`}>
+          <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
     </div>
@@ -62,125 +114,144 @@ export default function Dashboard() {
     return <div className="text-center py-12">Loading dashboard...</div>
   }
 
-  const summary = salesData?.summary || {}
-  const items = stockData?.items || []
-
   return (
-    <div className="flex-1 overflow-auto p-3 sm:p-6">
-      <div className="space-y-4 sm:space-y-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="flex-1 overflow-auto p-6 bg-gray-50">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600 mt-2">Welcome back! Here's an overview of your inventory system.</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
-          icon={ShoppingCart}
-          label="Total Orders"
-          value={summary.total_orders || 0}
+          icon={Package}
+          label="Total Items"
+          value={stats.totalItems}
           color="bg-blue-500"
         />
         <StatCard
-          icon={DollarSign}
-          label="Revenue"
-          value={`₹${(summary.total_revenue || 0).toFixed(2)}`}
-          color="bg-green-500"
+          icon={AlertTriangle}
+          label="Low Stock Alerts"
+          value={stats.lowStockAlerts}
+          color="bg-yellow-500"
         />
         <StatCard
-          icon={Package}
-          label="Items Sold"
-          value={summary.total_items_sold || 0}
+          icon={ShoppingCart}
+          label="Pending POs"
+          value={stats.pendingPos}
           color="bg-purple-500"
         />
         <StatCard
-          icon={TrendingUp}
-          label="Avg Order Value"
-          value={`₹${(summary.avg_order_value || 0).toFixed(2)}`}
-          color="bg-orange-500"
+          icon={CheckCircle}
+          label="Pending Approvals"
+          value={stats.pendingApprovals}
+          color="bg-green-500"
         />
       </div>
 
-      {/* Approvals Needed Box */}
-      <ApprovalBox />
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Sales Trend */}
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Sales Trend (Last 30 Days)</h2>
-          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-            <LineChart data={generateChartData(salesData?.orders || [])}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Line type="monotone" dataKey="orders" stroke="#3b82f6" />
-              <Line type="monotone" dataKey="revenue" stroke="#10b981" />
-            </LineChart>
-          </ResponsiveContainer>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Quick Actions */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate('/purchase/purchase-requests')}
+              className="w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg font-medium transition text-left flex items-center gap-3"
+            >
+              <Plus className="w-5 h-5" />
+              Create Purchase Indent
+            </button>
+            <button
+              onClick={() => navigate('/purchase/purchase-orders')}
+              className="w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg font-medium transition text-left flex items-center gap-3"
+            >
+              <Plus className="w-5 h-5" />
+              Create Purchase Order
+            </button>
+            <button
+              onClick={() => navigate('/purchase/goods-receipt')}
+              className="w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg font-medium transition text-left flex items-center gap-3"
+            >
+              <Plus className="w-5 h-5" />
+              New GRN
+            </button>
+            <button
+              onClick={() => navigate('/purchase/purchase-returns')}
+              className="w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg font-medium transition text-left flex items-center gap-3"
+            >
+              <Plus className="w-5 h-5" />
+              Issue Material
+            </button>
+            <button
+              onClick={() => navigate('/approvals')}
+              className="w-full px-4 py-3 bg-green-50 hover:bg-green-100 text-green-900 rounded-lg font-bold transition text-left flex items-center gap-3"
+            >
+              <CheckCircle className="w-5 h-5" />
+              Manage Approvals
+            </button>
+          </div>
         </div>
 
-        {/* Stock Distribution */}
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Stock Levels</h2>
-          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-            <PieChart>
-              <Pie
-                data={[
-                  { name: 'In Stock', value: items.filter(i => i.quantity > 0).length },
-                  { name: 'Low Stock', value: items.filter(i => i.quantity > 0 && i.quantity <= (i.min_stock_level || 10)).length },
-                  { name: 'Out of Stock', value: items.filter(i => i.quantity === 0).length },
-                ]}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name}: ${value}`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                <Cell fill="#10b981" />
-                <Cell fill="#f59e0b" />
-                <Cell fill="#ef4444" />
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+        {/* Recent Activity */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
+          <div className="flex items-center justify-center h-40 text-gray-500">
+            <p>No recent activity to display</p>
+          </div>
         </div>
       </div>
 
-      {/* Low Stock Alerts */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Low Stock Alerts</h2>
-        {items.filter(i => i.quantity > 0 && i.quantity <= (i.min_stock_level || 10)).length === 0 ? (
-          <p className="text-gray-500">No low stock alerts</p>
-        ) : (
-          <div className="space-y-2">
-            {items
-              .filter(i => i.quantity > 0 && i.quantity <= (i.min_stock_level || 10))
-              .slice(0, 5)
-              .map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded border border-yellow-200">
-                  <span className="font-mono text-sm">{item.variant?.sku}</span>
-                  <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
-                </div>
-              ))}
+      {/* Approvals Section */}
+      <div className="mb-8">
+        <ApprovalBox />
+      </div>
+
+      {/* Main Sections */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Item Master */}
+        <div
+          onClick={() => navigate('/item-master')}
+          className="bg-white rounded-lg shadow p-6 hover:shadow-lg hover:scale-105 transition cursor-pointer"
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <Box className="w-6 h-6 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Item Master</h3>
           </div>
-        )}
+          <p className="text-gray-600">Manage items, categories, and inventory details</p>
+        </div>
+
+        {/* Purchase Orders */}
+        <div
+          onClick={() => navigate('/purchase/purchase-orders')}
+          className="bg-white rounded-lg shadow p-6 hover:shadow-lg hover:scale-105 transition cursor-pointer"
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <ShoppingCart className="w-6 h-6 text-purple-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Purchase Orders</h3>
+          </div>
+          <p className="text-gray-600">Create and manage purchase orders</p>
+        </div>
+
+        {/* Stock Management */}
+        <div
+          onClick={() => navigate('/inventory')}
+          className="bg-white rounded-lg shadow p-6 hover:shadow-lg hover:scale-105 transition cursor-pointer"
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-green-100 rounded-lg">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Stock Management</h3>
+          </div>
+          <p className="text-gray-600">Handle stock inward, transfers, and adjustments</p>
+        </div>
       </div>
     </div>
-  </div>
   )
-}
-
-function generateChartData(orders) {
-  const byDate = {}
-  
-  orders.forEach(order => {
-    const date = new Date(order.order_date).toLocaleDateString('en-IN')
-    if (!byDate[date]) {
-      byDate[date] = { date, orders: 0, revenue: 0 }
-    }
-    byDate[date].orders += 1
-    byDate[date].revenue += order.total_amount
-  })
-
-  return Object.values(byDate).sort((a, b) => new Date(a.date) - new Date(b.date))
 }

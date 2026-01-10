@@ -32,10 +32,12 @@ export const useSpecifications = (categoryCode, autoFetch = true) => {
 
       // Fetch specification configuration
       const specResponse = await specificationApi.get(categoryCode);
+      console.log('[useSpecifications] Fetched specs for category:', categoryCode, specResponse.data);
       setSpecifications(specResponse.data);
 
       // Fetch form fields for rendering
       const fieldsResponse = await specificationApi.getFormFields(categoryCode);
+      console.log('[useSpecifications] Fetched form fields:', fieldsResponse.data);
       setFormFields(fieldsResponse.data || []);
     } catch (err) {
       console.error('Error fetching specifications:', err);

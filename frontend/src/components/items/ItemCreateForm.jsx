@@ -29,9 +29,21 @@ const generateSKU = (itemType = 'FG', sequence = 1) => {
   return `${prefix}${String(sequence).padStart(5, '0')}`
 }
 
-export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = 'modal', item = null }) {
+export default function ItemCreateForm({ 
+  isOpen, 
+  onClose, 
+  onSuccess, 
+  variant = 'modal', 
+  item = null, 
+  initialItemType, 
+  onCancel,
+  purpose = 'full' // 'full' for Item Master page (with opening stock), 'pr' for Purchase Request (no opening stock)
+}) {
   // Edit mode detection - if item has no SKU/item_code, it's a copy operation (create mode)
   const isEditMode = !!item && !!item.sku && !!item.item_code
+  // PR mode - simplified creation without opening stock
+  const isPRMode = purpose === 'pr'
+  const isFullMode = purpose === 'full'
 
   // Loading states
   const [loading, setLoading] = useState(false)
@@ -107,7 +119,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     const draftData = {
       formData,
       specifications,
-      selectedItemType,
+      autoFilledData,
       selectedCategory,
       selectedSubCategory,
       selectedDivision,
@@ -128,7 +140,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           const draftData = JSON.parse(draft);
           setFormData(draftData.formData || formData);
           setSpecifications(draftData.specifications || specifications);
-          if (draftData.selectedItemType) setSelectedItemType(draftData.selectedItemType);
+          if (draftData.autoFilledData) setAutoFilledData(draftData.autoFilledData);
           if (draftData.selectedCategory) setSelectedCategory(draftData.selectedCategory);
           if (draftData.selectedSubCategory) setSelectedSubCategory(draftData.selectedSubCategory);
           if (draftData.selectedDivision) setSelectedDivision(draftData.selectedDivision);
@@ -188,6 +200,17 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           image_type: item.image_type,
           image_size: item.image_size,
         })
+
+        // Set autoFilledData from item's existing data
+        const itemTypeCode = item.sku_type_code || (currentSku.includes('-') ? currentSku.split('-')[0] : currentSku.substring(0, 2).toUpperCase()) || 'FG'
+        setAutoFilledData({
+          itemType: itemTypeCode,
+          itemTypeName: itemTypeCode, // Will be updated when itemTypesList loads
+          hsnCode: item.hsn_code || '',
+          gstRate: item.gst_rate || 5,
+          defaultUom: item.uom || 'PCS',
+        })
+        console.log('[EDIT MODE] Set autoFilledData with itemType:', itemTypeCode)
 
         // Load category hierarchy with proper async handling to ensure dropdowns are populated
         const loadCategoryHierarchy = async () => {
@@ -306,6 +329,16 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
             }
             console.log('[EDIT MODE] Using specifications from item object:', directSpecs)
             setSpecifications(directSpecs)
+          }
+
+          // Also set initial color/size names from item if available
+          if (item.color_name) {
+            setSpecColorName(item.color_name)
+            console.log('[EDIT MODE] Set initial color name:', item.color_name)
+          }
+          if (item.size_name) {
+            setSpecSizeName(item.size_name)
+            console.log('[EDIT MODE] Set initial size name:', item.size_name)
           }
         }
         loadSpecifications()
@@ -474,6 +507,21 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
     }
   }, [isOpen, isEditMode, item])
   
+  // Set initial item type when provided (from PR form)
+  useEffect(() => {
+    if (initialItemType && !isEditMode) {
+      // Find the item type in the list and set it
+      const foundItemType = itemTypesList.find(it => it.code === initialItemType)
+      if (foundItemType) {
+        setAutoFilledData(prev => ({
+          ...prev,
+          itemType: foundItemType.code,
+          itemTypeName: foundItemType.name
+        }))
+      }
+    }
+  }, [initialItemType, itemTypesList, isEditMode])
+  
   // Fetch next available SKU with colour and size - generates full hierarchical format with specifications
   const fetchNextSku = async (itemTypeCode, categoryCode = null, colorName = null, sizeName = null) => {
     try {
@@ -569,6 +617,21 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
       console.error('Error fetching item types:', error)
     }
   }
+
+  // Update itemTypeName in autoFilledData when itemTypesList loads (for edit mode)
+  useEffect(() => {
+    if (itemTypesList.length > 0 && autoFilledData.itemType && autoFilledData.itemTypeName === autoFilledData.itemType) {
+      // Find the full name for the item type code
+      const foundType = itemTypesList.find(t => t.value === autoFilledData.itemType || t.code === autoFilledData.itemType)
+      if (foundType) {
+        setAutoFilledData(prev => ({
+          ...prev,
+          itemTypeName: foundType.name || foundType.label || prev.itemTypeName
+        }))
+        console.log('[ITEM TYPE] Updated itemTypeName from list:', foundType.name || foundType.label)
+      }
+    }
+  }, [itemTypesList, autoFilledData.itemType])
 
   // Search for categories and hierarchy levels (debounced)
   useEffect(() => {
@@ -1324,8 +1387,20 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
       }
 
       if (!isEditMode) resetForm()
-      onSuccess?.()
-      onClose()
+      
+      // Call onSuccess callback with created/updated item data if provided
+      if (onSuccess && response?.data) {
+        onSuccess(response.data)
+      } else {
+        onSuccess?.()
+      }
+      
+      // Close modal if onCancel is provided (from PR form), otherwise use onClose
+      if (onCancel) {
+        onCancel()
+      } else {
+        onClose()
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || error.message || 'Failed to create item')
       console.error('Error creating item:', error)
@@ -1386,7 +1461,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Package className="w-6 h-6" />
-            <h2 className="text-xl font-bold">{isEditMode ? 'Edit Item' : 'Create New Item'}</h2>
+            <h2 className="text-xl font-bold">
+              {isEditMode ? 'Edit Item' : (isPRMode ? 'Add Line Item' : 'Create New Item')}
+            </h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1535,6 +1612,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   <option value="">Select Level 1</option>
+                  {/* Include selected category if not in list (for edit mode timing) */}
+                  {selectedCategory && !categories.find(c => c.code === selectedCategory.code) && (
+                    <option key={selectedCategory.code} value={selectedCategory.code}>
+                      {selectedCategory.name}
+                    </option>
+                  )}
                   {categories.map(cat => (
                     <option key={cat.code} value={cat.code}>
                       {cat.name}
@@ -1543,8 +1626,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </select>
               </div>
 
-              {/* Level 2 - visible only when sub-categories exist */}
-              {subCategories.length > 0 && (
+              {/* Level 2 - visible when sub-categories exist OR selectedSubCategory is set (edit mode) */}
+              {(subCategories.length > 0 || selectedSubCategory) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
                   <select
@@ -1557,6 +1640,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 2</option>
+                    {/* Include selected sub-category if not in list (for edit mode timing) */}
+                    {selectedSubCategory && !subCategories.find(c => c.code === selectedSubCategory.code) && (
+                      <option key={selectedSubCategory.code} value={selectedSubCategory.code}>
+                        {selectedSubCategory.name}
+                      </option>
+                    )}
                     {subCategories.map(subCat => (
                       <option key={subCat.code} value={subCat.code}>
                         {subCat.name}
@@ -1566,8 +1655,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </div>
               )}
 
-              {/* Level 3 - visible only when divisions exist */}
-              {divisions.length > 0 && (
+              {/* Level 3 - visible when divisions exist OR selectedDivision is set (edit mode) */}
+              {(divisions.length > 0 || selectedDivision) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
                   <select
@@ -1580,6 +1669,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 3</option>
+                    {/* Include selected division if not in list (for edit mode timing) */}
+                    {selectedDivision && !divisions.find(d => d.code === selectedDivision.code) && (
+                      <option key={selectedDivision.code} value={selectedDivision.code}>
+                        {selectedDivision.name}
+                      </option>
+                    )}
                     {divisions.map(div => (
                       <option key={div.code} value={div.code}>
                         {div.name}
@@ -1589,8 +1684,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </div>
               )}
 
-              {/* Level 4 - visible only when classes exist */}
-              {classes.length > 0 && (
+              {/* Level 4 - visible when classes exist OR selectedClass is set (edit mode) */}
+              {(classes.length > 0 || selectedClass) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
                   <select
@@ -1603,6 +1698,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 4</option>
+                    {/* Include selected class if not in list (for edit mode timing) */}
+                    {selectedClass && !classes.find(c => c.code === selectedClass.code) && (
+                      <option key={selectedClass.code} value={selectedClass.code}>
+                        {selectedClass.name}
+                      </option>
+                    )}
                     {classes.map(cls => (
                       <option key={cls.code} value={cls.code}>
                         {cls.name}
@@ -1612,8 +1713,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </div>
               )}
 
-              {/* Level 5 - visible only when sub-classes exist */}
-              {subClasses.length > 0 && (
+              {/* Level 5 - visible when sub-classes exist OR selectedSubClass is set (edit mode) */}
+              {(subClasses.length > 0 || selectedSubClass) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
                   <select
@@ -1626,6 +1727,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 5</option>
+                    {/* Include selected sub-class if not in list (for edit mode timing) */}
+                    {selectedSubClass && !subClasses.find(c => c.code === selectedSubClass.code) && (
+                      <option key={selectedSubClass.code} value={selectedSubClass.code}>
+                        {selectedSubClass.name}
+                      </option>
+                    )}
                     {subClasses.map(subCls => (
                       <option key={subCls.code} value={subCls.code}>
                         {subCls.name}
@@ -1746,24 +1853,26 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   />
                 </div>
 
-                {/* Opening Stock */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                    {isEditMode ? 'Current Stock' : 'Opening Stock'}
-                    <span className="text-xs text-gray-500 ml-2">
-                      {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.opening_stock}
-                    onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
-                    placeholder="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
-                </div>
+                {/* Opening Stock - Only show for full mode */}
+                {isFullMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      {isEditMode ? 'Current Stock' : 'Opening Stock'}
+                      <span className="text-xs text-gray-500 ml-2">
+                        {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.opening_stock}
+                      onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                )}
 
                 {/* Created Date (Edit Mode) */}
                 {isEditMode && item?.created_at && (
@@ -1805,15 +1914,17 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => handleSubmit(true)}
-            disabled={saving}
-            className="px-5 py-2.5 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition flex items-center gap-2 disabled:opacity-50"
-          >
-            <FileText className="w-4 h-4" />
-            Save as Draft
-          </button>
+          {isFullMode && (
+            <button
+              type="button"
+              onClick={() => handleSubmit(true)}
+              disabled={saving}
+              className="px-5 py-2.5 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition flex items-center gap-2 disabled:opacity-50"
+            >
+              <FileText className="w-4 h-4" />
+              Save as Draft
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleSubmit(false)}
@@ -1821,7 +1932,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            {saving ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update' : 'Create')}
+            {saving ? (isEditMode ? 'Updating...' : (isPRMode ? 'Adding...' : 'Creating...')) : (isEditMode ? 'Update' : (isPRMode ? 'Add' : 'Create'))}
           </button>
         </div>
       </div>
@@ -1836,7 +1947,9 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Package className="w-6 h-6" />
-            <h2 className="text-xl font-bold">{isEditMode ? 'Edit Item' : 'Create New Item'}</h2>
+            <h2 className="text-xl font-bold">
+              {isEditMode ? 'Edit Item' : (isPRMode ? 'Add Line Item' : 'Create New Item')}
+            </h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1980,6 +2093,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   <option value="">Select Level 1</option>
+                  {/* Include selected category if not in list (for edit mode timing) */}
+                  {selectedCategory && !categories.find(c => c.code === selectedCategory.code) && (
+                    <option key={selectedCategory.code} value={selectedCategory.code}>
+                      {selectedCategory.name}
+                    </option>
+                  )}
                   {categories.map(cat => (
                     <option key={cat.code} value={cat.code}>
                       {cat.name}
@@ -1988,8 +2107,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </select>
               </div>
 
-              {/* Level 2 - visible only when sub-categories exist */}
-              {subCategories.length > 0 && (
+              {/* Level 2 - visible when sub-categories exist OR selectedSubCategory is set (edit mode) */}
+              {(subCategories.length > 0 || selectedSubCategory) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 2</label>
                   <select
@@ -2002,6 +2121,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 2</option>
+                    {/* Include selected sub-category if not in list (for edit mode timing) */}
+                    {selectedSubCategory && !subCategories.find(c => c.code === selectedSubCategory.code) && (
+                      <option key={selectedSubCategory.code} value={selectedSubCategory.code}>
+                        {selectedSubCategory.name}
+                      </option>
+                    )}
                     {subCategories.map(subCat => (
                       <option key={subCat.code} value={subCat.code}>
                         {subCat.name}
@@ -2011,8 +2136,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </div>
               )}
 
-              {/* Level 3 - visible only when divisions exist */}
-              {divisions.length > 0 && (
+              {/* Level 3 - visible when divisions exist OR selectedDivision is set (edit mode) */}
+              {(divisions.length > 0 || selectedDivision) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 3</label>
                   <select
@@ -2025,6 +2150,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 3</option>
+                    {/* Include selected division if not in list (for edit mode timing) */}
+                    {selectedDivision && !divisions.find(d => d.code === selectedDivision.code) && (
+                      <option key={selectedDivision.code} value={selectedDivision.code}>
+                        {selectedDivision.name}
+                      </option>
+                    )}
                     {divisions.map(div => (
                       <option key={div.code} value={div.code}>
                         {div.name}
@@ -2034,8 +2165,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </div>
               )}
 
-              {/* Level 4 - visible only when classes exist */}
-              {classes.length > 0 && (
+              {/* Level 4 - visible when classes exist OR selectedClass is set (edit mode) */}
+              {(classes.length > 0 || selectedClass) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 4</label>
                   <select
@@ -2048,6 +2179,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 4</option>
+                    {/* Include selected class if not in list (for edit mode timing) */}
+                    {selectedClass && !classes.find(c => c.code === selectedClass.code) && (
+                      <option key={selectedClass.code} value={selectedClass.code}>
+                        {selectedClass.name}
+                      </option>
+                    )}
                     {classes.map(cls => (
                       <option key={cls.code} value={cls.code}>
                         {cls.name}
@@ -2057,8 +2194,8 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                 </div>
               )}
 
-              {/* Level 5 - visible only when sub-classes exist */}
-              {subClasses.length > 0 && (
+              {/* Level 5 - visible when sub-classes exist OR selectedSubClass is set (edit mode) */}
+              {(subClasses.length > 0 || selectedSubClass) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Level 5</label>
                   <select
@@ -2071,6 +2208,12 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Level 5</option>
+                    {/* Include selected sub-class if not in list (for edit mode timing) */}
+                    {selectedSubClass && !subClasses.find(c => c.code === selectedSubClass.code) && (
+                      <option key={selectedSubClass.code} value={selectedSubClass.code}>
+                        {selectedSubClass.name}
+                      </option>
+                    )}
                     {subClasses.map(subCls => (
                       <option key={subCls.code} value={subCls.code}>
                         {subCls.name}
@@ -2192,24 +2335,26 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
                   />
                 </div>
 
-                {/* Opening Stock */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                    {isEditMode ? 'Current Stock' : 'Opening Stock'}
-                    <span className="text-xs text-gray-500 ml-2">
-                      {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.opening_stock}
-                    onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
-                    placeholder="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
-                </div>
+                {/* Opening Stock - Only show for full mode */}
+                {isFullMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      {isEditMode ? 'Current Stock' : 'Opening Stock'}
+                      <span className="text-xs text-gray-500 ml-2">
+                        {isEditMode ? '(Inventory quantity)' : '(Initial inventory quantity)'}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.opening_stock}
+                      onChange={(e) => setFormData({ ...formData, opening_stock: e.target.value })}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -2243,15 +2388,17 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => handleSubmit(true)}
-            disabled={saving}
-            className="px-5 py-2.5 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition flex items-center gap-2 disabled:opacity-50"
-          >
-            <FileText className="w-4 h-4" />
-            Save as Draft
-          </button>
+          {isFullMode && (
+            <button
+              type="button"
+              onClick={() => handleSubmit(true)}
+              disabled={saving}
+              className="px-5 py-2.5 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition flex items-center gap-2 disabled:opacity-50"
+            >
+              <FileText className="w-4 h-4" />
+              Save as Draft
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleSubmit(false)}
@@ -2259,7 +2406,7 @@ export default function ItemCreateForm({ isOpen, onClose, onSuccess, variant = '
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            {saving ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update' : 'Create')}
+            {saving ? (isEditMode ? 'Updating...' : (isPRMode ? 'Adding...' : 'Creating...')) : (isEditMode ? 'Update' : (isPRMode ? 'Add' : 'Create'))}
           </button>
         </div>
       </div>

@@ -157,6 +157,15 @@ async def create_or_update_specifications(
     data: CategorySpecificationsRequest
 ):
     """Create or update specifications for a category"""
+    logger.info(f"[SAVE SPECS] Received request for category: {category_code}")
+    logger.info(f"[SAVE SPECS] Specifications data: {data.specifications}")
+    
+    # Log the groups for each field
+    if data.specifications:
+        for field_key, field_config in data.specifications.items():
+            if field_config:
+                logger.info(f"[SAVE SPECS] Field '{field_key}': enabled={field_config.enabled}, groups={getattr(field_config, 'groups', None)}")
+    
     # Check if exists
     existing = await CategorySpecifications.find_one(
         CategorySpecifications.category_code == category_code.upper()
@@ -199,6 +208,12 @@ async def create_or_update_specifications(
             existing.specifications.vendor = spec_dict.get("vendor")
             existing.specifications.brand = spec_dict.get("brand")
             existing.specifications.supplier = spec_dict.get("supplier")
+
+            # Log what was saved
+            if existing.specifications.colour:
+                logger.info(f"[SAVE SPECS UPDATE] Colour groups saved: {existing.specifications.colour.groups}")
+            if existing.specifications.size:
+                logger.info(f"[SAVE SPECS UPDATE] Size groups saved: {existing.specifications.size.groups}")
 
         # Update custom fields
         if data.custom_fields:
@@ -619,25 +634,51 @@ async def get_field_values(category_code: str, field_key: str):
 
         if field_config.source == FieldSource.COLOUR_MASTER:
             query = {"is_active": True}
+            logger.info(f"[COLOUR] Category: {category_code}, field_config.groups: {field_config.groups}")
+            
             if field_config.groups:
-                query["colour_group"] = {"$in": field_config.groups}
+                # Support both colour_groups (new format) and colour_group (legacy format)
+                query["$or"] = [
+                    {"colour_groups": {"$in": field_config.groups}},  # New format - multiple groups
+                    {"colour_group": {"$in": field_config.groups}}     # Legacy format - single group
+                ]
+                logger.info(f"[COLOUR] Applied group filter: colour_groups OR colour_group in {field_config.groups}")
 
+            logger.info(f"[COLOUR] Executing query: {query}")
             colours = await ColourMaster.find(query).sort("+display_order").to_list()
+            logger.info(f"[COLOUR] Found {len(colours)} colours")
+            for c in colours:
+                colour_groups = getattr(c, 'colour_groups', []) or []
+                colour_group = getattr(c, 'colour_group', '') or ''
+                logger.info(f"  - {c.colour_name} ({c.colour_code}): colour_groups={colour_groups}, colour_group={colour_group}")
+            
             options = [
                 FieldOption(
                     code=c.colour_code,
                     name=c.colour_name,
-                    additional_info={"hex": c.colour_hex, "group": c.colour_group}
+                    additional_info={"hex": c.colour_hex, "group": getattr(c, 'colour_group', '') or ''}
                 )
                 for c in colours
             ]
 
         elif field_config.source == FieldSource.SIZE_MASTER:
             query = {"is_active": True}
+            logger.info(f"[SIZE] Category: {category_code}, field_config.groups: {field_config.groups}")
+            
             if field_config.groups:
-                query["size_group"] = {"$in": field_config.groups}
+                # Support both size_groups and size_group
+                query["$or"] = [
+                    {"size_groups": {"$in": field_config.groups}},  # New format
+                    {"size_group": {"$in": field_config.groups}}     # Current format
+                ]
+                logger.info(f"[SIZE] Applied group filter: size_groups OR size_group in {field_config.groups}")
 
+            logger.info(f"[SIZE] Executing query: {query}")
             sizes = await SizeMaster.find(query).sort("+display_order").to_list()
+            logger.info(f"[SIZE] Found {len(sizes)} sizes")
+            for s in sizes:
+                logger.info(f"  - {s.size_name} ({s.size_code}): size_group={s.size_group}")
+            
             options = [
                 FieldOption(
                     code=s.size_code,
@@ -649,15 +690,27 @@ async def get_field_values(category_code: str, field_key: str):
 
         elif field_config.source == FieldSource.UOM_MASTER:
             query = {"is_active": True}
+            logger.info(f"[UOM] Category: {category_code}, field_config.groups: {field_config.groups}")
+            
             if field_config.groups:
-                query["uom_group"] = {"$in": field_config.groups}
+                # Support both uom_groups and uom_group
+                query["$or"] = [
+                    {"uom_groups": {"$in": field_config.groups}},  # New format
+                    {"uom_group": {"$in": field_config.groups}}     # Current format
+                ]
+                logger.info(f"[UOM] Applied group filter: uom_groups OR uom_group in {field_config.groups}")
 
+            logger.info(f"[UOM] Executing query: {query}")
             uoms = await UOMMaster.find(query).sort("+display_order").to_list()
+            logger.info(f"[UOM] Found {len(uoms)} UOMs")
+            for u in uoms:
+                logger.info(f"  - {u.uom_name} ({u.uom_code}): uom_group={getattr(u, 'uom_group', '')}")
+            
             options = [
                 FieldOption(
                     code=u.uom_code,
                     name=f"{u.uom_name} ({u.uom_symbol})",
-                    additional_info={"symbol": u.uom_symbol, "group": u.uom_group}
+                    additional_info={"symbol": u.uom_symbol, "group": getattr(u, 'uom_group', '')}
                 )
                 for u in uoms
             ]

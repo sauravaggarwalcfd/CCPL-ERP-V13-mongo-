@@ -11,6 +11,7 @@ from ..models.item import ItemMaster, ItemMasterCreate, ItemMasterUpdate, Invent
 from ..models.category_hierarchy import ItemSubClass
 from ..models.inventory_management import InventoryStock, StockLevel, StockMovement, MovementType
 from ..models.item_type import ItemType
+from ..models.specifications import ItemSpecifications
 from ..services.sku_service import SKUService, generate_complete_sku
 from ..core.dependencies import get_current_user
 
@@ -344,11 +345,17 @@ async def list_items(
         inventory_stocks = await InventoryStock.find(
             {"item_code": {"$in": item_codes}}
         ).to_list()
+        # Also fetch specifications for all items
+        item_specs = await ItemSpecifications.find(
+            {"item_code": {"$in": item_codes}}
+        ).to_list()
     else:
         inventory_stocks = []
+        item_specs = []
 
-    # Create a lookup dict for inventory stock
+    # Create lookup dicts
     stock_lookup = {s.item_code: s for s in inventory_stocks}
+    specs_lookup = {s.item_code: s for s in item_specs}
 
     return [
         {
@@ -397,6 +404,16 @@ async def list_items(
             "image_base64": i.image_base64,
             "image_type": i.image_type,
             "is_active": i.is_active,
+            # Include specifications from ItemSpecifications document
+            "specifications": {
+                "colour_code": specs_lookup.get(i.item_code).colour_code if specs_lookup.get(i.item_code) else None,
+                "size_code": specs_lookup.get(i.item_code).size_code if specs_lookup.get(i.item_code) else None,
+                "uom_code": specs_lookup.get(i.item_code).uom_code if specs_lookup.get(i.item_code) else None,
+                "vendor_code": specs_lookup.get(i.item_code).vendor_code if specs_lookup.get(i.item_code) else None,
+                "brand_code": specs_lookup.get(i.item_code).brand_code if specs_lookup.get(i.item_code) else None,
+                "supplier_code": specs_lookup.get(i.item_code).supplier_code if specs_lookup.get(i.item_code) else None,
+                "custom_field_values": specs_lookup.get(i.item_code).custom_field_values if specs_lookup.get(i.item_code) else {}
+            }
         }
         for i in items
     ]
@@ -407,7 +424,7 @@ async def get_item(
     item_code: str,
     current_user = Depends(get_current_user)
 ):
-    """Get a specific item by code"""
+    """Get a specific item by code with specifications"""
     
     item = await ItemMaster.find_one(ItemMaster.item_code == item_code)
     if not item:
@@ -416,7 +433,17 @@ async def get_item(
             detail=f"Item '{item_code}' not found"
         )
     
-    return {
+    # Fetch item specifications if they exist
+    specs = None
+    try:
+        specs = await ItemSpecifications.find_one(
+            ItemSpecifications.item_code == item_code.upper()
+        )
+    except Exception as e:
+        logger.warning(f"Could not fetch specifications for item {item_code}: {str(e)}")
+    
+    # Build response with specifications
+    response = {
         "id": str(item.id),
         "uid": getattr(item, 'uid', None),  # Unique Identifier (immutable)
         "item_code": item.item_code,
@@ -464,6 +491,7 @@ async def get_item(
         "reorder_point": item.reorder_point,
         "reorder_quantity": item.reorder_quantity,
         "current_stock": item.current_stock,
+        "opening_stock": item.opening_stock,
         "barcode": item.barcode,
         "serial_tracked": item.serial_tracked,
         "batch_tracked": item.batch_tracked,
@@ -477,7 +505,19 @@ async def get_item(
         "is_active": item.is_active,
         "created_at": item.created_at,
         "updated_at": item.updated_at,
+        # Add specifications if they exist
+        "specifications": {
+            "colour_code": specs.colour_code if specs else None,
+            "size_code": specs.size_code if specs else None,
+            "uom_code": specs.uom_code if specs else None,
+            "vendor_code": specs.vendor_code if specs else None,
+            "brand_code": specs.brand_code if specs else None,
+            "supplier_code": specs.supplier_code if specs else None,
+            "custom_field_values": specs.custom_field_values if specs else {}
+        }
     }
+    
+    return response
 
 
 @router.put("/{item_code}")

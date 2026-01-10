@@ -358,14 +358,8 @@ export default function ItemMaster() {
 
         {/* Right: Actions */}
         <div className="flex gap-2">
-          <button
-            onClick={() => { setSidebarView('create'); setSidebarOpen(true) }}
-            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition whitespace-nowrap text-sm sm:text-base"
-          >
-            <Plus size={18} className="sm:w-5 sm:h-5" /> 
-            <span className="hidden xs:inline">Add Item</span>
-            <span className="xs:hidden">Add</span>
-          </button>
+          {/* Removed "Add Item" button - Items are created from Purchase Request form */}
+          {/* Items in Item Master are created with 0 inventory from PR and edited here to add opening stock */}
           <button
             onClick={handleOpenBin}
             className="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
@@ -386,8 +380,10 @@ export default function ItemMaster() {
               <div className="p-8 text-center text-gray-500">Loading items...</div>
             ) : filteredItems.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
+                <Package size={32} className="mx-auto text-gray-400 mb-3" />
                 <p>No items found</p>
-                <p className="text-sm mt-2">Create your first item using the "Add Item" button</p>
+                <p className="text-sm mt-2">Items are created from Purchase Request form with 0 inventory</p>
+                <p className="text-xs mt-3 text-gray-400">Use the edit option to add opening stock to items</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -526,7 +522,7 @@ export default function ItemMaster() {
             <div className="bg-white rounded-lg shadow-md border border-gray-200 h-full overflow-hidden">
               {/* Mobile close button */}
               <div className="lg:hidden sticky top-0 bg-white z-10 p-3 border-b flex justify-between items-center">
-                <h3 className="font-semibold text-gray-800">{sidebarView === 'create' ? 'Add Item' : sidebarView === 'edit' ? 'Edit Item' : 'Item Details'}</h3>
+                <h3 className="font-semibold text-gray-800">{sidebarView === 'edit' ? 'Edit Item' : 'Item Details'}</h3>
                 <button
                   onClick={() => { setSidebarOpen(false); setSidebarView('none') }}
                   className="p-2 hover:bg-gray-100 rounded-lg"
@@ -535,14 +531,6 @@ export default function ItemMaster() {
                 </button>
               </div>
               
-              {sidebarView === 'create' && (
-                <ItemCreateForm
-                  isOpen={true}
-                  onClose={() => { setSidebarOpen(false); setSidebarView('none') }}
-                  onSuccess={fetchItems}
-                  variant="panel"
-                />
-              )}
               {sidebarView === 'edit' && selectedItem && (
                 <ItemCreateForm
                   isOpen={true}
@@ -550,6 +538,7 @@ export default function ItemMaster() {
                   onSuccess={fetchItems}
                   item={selectedItem}
                   variant="panel"
+                  purpose="full"
                 />
               )}
               {sidebarView === 'view' && selectedItem && (

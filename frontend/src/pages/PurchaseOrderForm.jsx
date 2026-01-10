@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useLayout } from '../context/LayoutContext'
 import {
   Plus, Trash2, Save, X, Calculator, Package, User, MapPin,
-  CreditCard, FileText, Calendar, ArrowLeft
+  CreditCard, FileText, Calendar, ArrowLeft, Search, AlertCircle, ChevronRight
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { purchaseOrders, suppliers, items as itemsAPI } from '../services/api'
+import { purchaseOrders, suppliers, items as itemsAPI, categoryHierarchy } from '../services/api'
 import { purchaseRequestApi } from '../services/purchaseRequestApi'
 
 const PurchaseOrderForm = () => {
@@ -17,9 +17,9 @@ const PurchaseOrderForm = () => {
   const isEditMode = !!poNumber
   
   // Check if coming from PR conversion
-  const fromPR = location.state?.fromPR
-  const prCode = location.state?.prCode
-  const prData = location.state?.prData
+  const fromPR = location.state?.fromPR || false
+  const prCode = location.state?.prCode || null
+  const prData = location.state?.prData || null
 
   useEffect(() => {
     if (fromPR && prCode) {
@@ -56,6 +56,21 @@ const PurchaseOrderForm = () => {
   const [error, setError] = useState(null)
   const [loadError, setLoadError] = useState(null)
 
+  // Category hierarchy for line items
+  const [categories, setCategories] = useState([])
+  const [lineItemCategories, setLineItemCategories] = useState({}) // per line item
+  const [lineItemSubCategories, setLineItemSubCategories] = useState({})
+  const [lineItemDivisions, setLineItemDivisions] = useState({})
+  const [lineItemClasses, setLineItemClasses] = useState({})
+  const [lineItemSubClasses, setLineItemSubClasses] = useState({})
+  
+  // Search for categories in line items
+  const [showLineItemSearch, setShowLineItemSearch] = useState(null) // lineItemId
+  const [lineItemSearchTerm, setLineItemSearchTerm] = useState('')
+  const [lineItemSearchResults, setLineItemSearchResults] = useState([])
+  const [showLineItemSearchResults, setShowLineItemSearchResults] = useState(false)
+  const lineItemSearchTimeoutRef = useRef(null)
+
   // Calculated summary
   const [summary, setSummary] = useState({
     subtotal: 0,
@@ -64,6 +79,19 @@ const PurchaseOrderForm = () => {
     total_gst: 0,
     grand_total: 0
   })
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryHierarchy.getCategories({ is_active: true })
+        setCategories(response.data || [])
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+      }
+    }
+    fetchCategories()
+  }, [])
 
   // Fetch suppliers
   useEffect(() => {
@@ -199,8 +227,9 @@ const PurchaseOrderForm = () => {
 
   // Add new line item
   const addLineItem = () => {
+    const newItemId = Date.now()
     const newItem = {
-      id: Date.now(),
+      id: newItemId,
       item_code: '',
       item_name: '',
       item_description: '',
@@ -217,6 +246,198 @@ const PurchaseOrderForm = () => {
       notes: ''
     }
     setLineItems([...lineItems, newItem])
+    
+    // Initialize state objects for this line item
+    setLineItemCategories(prev => ({ ...prev, [newItemId]: null }))
+    setLineItemSubCategories(prev => ({ ...prev, [newItemId]: [] }))
+    setLineItemDivisions(prev => ({ ...prev, [newItemId]: [] }))
+    setLineItemClasses(prev => ({ ...prev, [newItemId]: [] }))
+    setLineItemSubClasses(prev => ({ ...prev, [newItemId]: [] }))
+  }
+
+  // Handle hierarchy selection from search - EXACT SAME LOGIC AS ItemCreateForm/PurchaseRequestForm
+  const handleSelectLineItemHierarchy = async (lineItemId, result) => {
+    try {
+      setShowLineItemSearch(null)
+      setLineItemSearchResults([])
+      setLineItemSearchTerm('')
+
+      // Reset selections for this line item
+      setLineItemCategories(prev => ({ ...prev, [lineItemId]: null }))
+      setLineItemSubCategories(prev => ({ ...prev, [lineItemId]: null }))
+      setLineItemDivisions(prev => ({ ...prev, [lineItemId]: null }))
+      setLineItemClasses(prev => ({ ...prev, [lineItemId]: null }))
+      setLineItemSubClasses(prev => ({ ...prev, [lineItemId]: null }))
+
+      // Find and set Level 1 (Category)
+      const category = categories.find(c => c.code === result.category_code) ||
+                      (result.level === 1 ? result.data : null)
+
+      if (!category) {
+        toast.error('Category not found')
+        return
+      }
+
+      setLineItemCategories(prev => ({ ...prev, [lineItemId]: category }))
+
+      // If search result is at level 1, fetch sub-categories but don't auto-select
+      if (result.level === 1) {
+        const subCatsResponse = await categoryHierarchy.getSubCategories({
+          category_code: category.code,
+          is_active: true
+        })
+        setLineItemSubCategories(prev => ({
+          ...prev,
+          [lineItemId]: subCatsResponse.data || []
+        }))
+        toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+        return
+      }
+
+      // If level >= 2, fetch and select sub-category
+      const subCategoryCode = result.level === 2 ? result.code : result.sub_category_code
+      if (result.level >= 2 && subCategoryCode) {
+        const subCatsResponse = await categoryHierarchy.getSubCategories({
+          category_code: category.code,
+          is_active: true
+        })
+        const subCats = subCatsResponse.data || []
+        setLineItemSubCategories(prev => ({
+          ...prev,
+          [lineItemId]: subCats
+        }))
+
+        const subCat = subCats.find(sc => sc.code === subCategoryCode)
+        if (subCat) {
+          setLineItemSubCategories(prev => ({
+            ...prev,
+            [lineItemId]: [subCat, ...subCats.filter(sc => sc.code !== subCat.code)]
+          }))
+
+          // If search result is at level 2, fetch divisions but don't auto-select
+          if (result.level === 2) {
+            const divsResponse = await categoryHierarchy.getDivisions({
+              category_code: category.code,
+              sub_category_code: subCat.code,
+              is_active: true
+            })
+            setLineItemDivisions(prev => ({
+              ...prev,
+              [lineItemId]: divsResponse.data || []
+            }))
+            toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+            return
+          }
+
+          // If level >= 3, fetch and select division
+          if (result.level >= 3 && result.division_code) {
+            const divsResponse = await categoryHierarchy.getDivisions({
+              category_code: category.code,
+              sub_category_code: subCat.code,
+              is_active: true
+            })
+            const divs = divsResponse.data || []
+            setLineItemDivisions(prev => ({
+              ...prev,
+              [lineItemId]: divs
+            }))
+
+            const div = divs.find(d => d.code === result.division_code)
+            if (div) {
+              setLineItemDivisions(prev => ({
+                ...prev,
+                [lineItemId]: [div, ...divs.filter(d => d.code !== div.code)]
+              }))
+
+              // If search result is at level 3, fetch classes but don't auto-select
+              if (result.level === 3) {
+                const classesResponse = await categoryHierarchy.getClasses({
+                  category_code: category.code,
+                  sub_category_code: subCat.code,
+                  division_code: div.code,
+                  is_active: true
+                })
+                setLineItemClasses(prev => ({
+                  ...prev,
+                  [lineItemId]: classesResponse.data || []
+                }))
+                toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+                return
+              }
+
+              // If level >= 4, fetch and select class
+              if (result.level >= 4 && result.class_code) {
+                const classesResponse = await categoryHierarchy.getClasses({
+                  category_code: category.code,
+                  sub_category_code: subCat.code,
+                  division_code: div.code,
+                  is_active: true
+                })
+                const clss = classesResponse.data || []
+                setLineItemClasses(prev => ({
+                  ...prev,
+                  [lineItemId]: clss
+                }))
+
+                const cls = clss.find(c => c.code === result.class_code)
+                if (cls) {
+                  setLineItemClasses(prev => ({
+                    ...prev,
+                    [lineItemId]: [cls, ...clss.filter(c => c.code !== cls.code)]
+                  }))
+
+                  // If search result is at level 4, fetch sub-classes but don't auto-select
+                  if (result.level === 4) {
+                    const subClassesResponse = await categoryHierarchy.getSubClasses({
+                      category_code: category.code,
+                      sub_category_code: subCat.code,
+                      division_code: div.code,
+                      class_code: cls.code,
+                      is_active: true
+                    })
+                    setLineItemSubClasses(prev => ({
+                      ...prev,
+                      [lineItemId]: subClassesResponse.data || []
+                    }))
+                    toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+                    return
+                  }
+
+                  // If level === 5, fetch and select sub-class
+                  if (result.level === 5 && result.data) {
+                    const subClassesResponse = await categoryHierarchy.getSubClasses({
+                      category_code: category.code,
+                      sub_category_code: subCat.code,
+                      division_code: div.code,
+                      class_code: cls.code,
+                      is_active: true
+                    })
+                    const subClss = subClassesResponse.data || []
+                    setLineItemSubClasses(prev => ({
+                      ...prev,
+                      [lineItemId]: subClss
+                    }))
+
+                    const subCls = subClss.find(sc => sc.code === result.data.code)
+                    if (subCls) {
+                      setLineItemSubClasses(prev => ({
+                        ...prev,
+                        [lineItemId]: [subCls, ...subClss.filter(sc => sc.code !== subCls.code)]
+                      }))
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      toast.success(`✓ Selected: ${result.path}`, { duration: 3000 })
+    } catch (error) {
+      console.error('Error selecting category hierarchy:', error)
+      toast.error('Error selecting category')
+    }
   }
 
   // Remove line item
@@ -529,27 +750,305 @@ const PurchaseOrderForm = () => {
                   </button>
 
                   <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                    {/* Item Selection */}
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Item <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={item.item_code}
-                        onChange={(e) => handleItemSelect(item.id, e.target.value)}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">Select Item</option>
-                        {itemsList.map((itm) => (
-                          <option key={itm.id} value={itm.code}>
-                            {itm.name} ({itm.code})
-                          </option>
-                        ))}
-                      </select>
+                    {/* Category Search + Hierarchy Selection */}
+                    <div className="md:col-span-3 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Category <span className="text-red-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowLineItemSearch(item.id)}
+                          className="w-full text-left flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg hover:border-blue-500 transition"
+                        >
+                          <span className="text-sm">
+                            {lineItemCategories[item.id]?.name || 'Select Category'}
+                          </span>
+                          <Search size={16} className="text-gray-400" />
+                        </button>
+                      </div>
+
+                      {/* Search Modal */}
+                      {showLineItemSearch === item.id && (
+                        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                          <div className="w-full max-w-3xl">
+                            <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
+                              {/* Header */}
+                              <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <Search className="w-6 h-6" />
+                                  <h3 className="text-base font-semibold">Quick Search Categories</h3>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowLineItemSearch(null)
+                                    setLineItemSearchResults([])
+                                    setLineItemSearchTerm('')
+                                  }}
+                                  className="p-2 hover:bg-white/20 rounded-lg transition"
+                                >
+                                  <X className="w-6 h-6" />
+                                </button>
+                              </div>
+
+                              {/* Search Input */}
+                              <div className="p-6 border-b">
+                                <input
+                                  type="text"
+                                  placeholder="Search categories by name or code (Level 1-5)..."
+                                  value={lineItemSearchTerm}
+                                  onChange={(e) => {
+                                    const searchValue = e.target.value
+                                    setLineItemSearchTerm(searchValue)
+                                    
+                                    if (lineItemSearchTimeoutRef.current) {
+                                      clearTimeout(lineItemSearchTimeoutRef.current)
+                                    }
+                                    
+                                    if (searchValue.trim().length >= 2) {
+                                      lineItemSearchTimeoutRef.current = setTimeout(async () => {
+                                        try {
+                                          const searchLower = searchValue.toLowerCase()
+                                          const results = []
+
+                                          // Search Categories (Level 1)
+                                          const matchingCategories = categories.filter(c =>
+                                            c.name.toLowerCase().includes(searchLower) ||
+                                            c.code.toLowerCase().includes(searchLower)
+                                          )
+                                          matchingCategories.forEach(c => {
+                                            results.push({
+                                              id: c.id,
+                                              level: 1,
+                                              levelName: 'Level 1',
+                                              code: c.code,
+                                              name: c.name,
+                                              path: c.name,
+                                              data: c
+                                            })
+                                          })
+
+                                          // Search Sub-Categories (Level 2)
+                                          const subCatsResponse = await categoryHierarchy.getSubCategories({ is_active: true })
+                                          const allSubCategories = subCatsResponse.data || []
+                                          const matchingSubCats = allSubCategories.filter(sc =>
+                                            sc.name.toLowerCase().includes(searchLower) ||
+                                            sc.code.toLowerCase().includes(searchLower)
+                                          )
+                                          matchingSubCats.forEach(sc => {
+                                            const cat = categories.find(c => c.code === sc.category_code)
+                                            results.push({
+                                              id: sc.id,
+                                              level: 2,
+                                              levelName: 'Level 2',
+                                              code: sc.code,
+                                              name: sc.name,
+                                              path: `${cat?.name || sc.category_code} > ${sc.name}`,
+                                              category_code: sc.category_code,
+                                              data: sc
+                                            })
+                                          })
+
+                                          // Search Divisions (Level 3)
+                                          const divsResponse = await categoryHierarchy.getDivisions({ is_active: true })
+                                          const allDivisions = divsResponse.data || []
+                                          const matchingDivs = allDivisions.filter(d =>
+                                            d.name.toLowerCase().includes(searchLower) ||
+                                            d.code.toLowerCase().includes(searchLower)
+                                          )
+                                          matchingDivs.forEach(d => {
+                                            results.push({
+                                              id: d.id,
+                                              level: 3,
+                                              levelName: 'Level 3',
+                                              code: d.code,
+                                              name: d.name,
+                                              path: d.path_name || `${d.category_code} > ${d.sub_category_code} > ${d.name}`,
+                                              category_code: d.category_code,
+                                              sub_category_code: d.sub_category_code,
+                                              data: d
+                                            })
+                                          })
+
+                                          // Search Classes (Level 4)
+                                          const classesResponse = await categoryHierarchy.getClasses({ is_active: true })
+                                          const allClasses = classesResponse.data || []
+                                          const matchingClasses = allClasses.filter(cls =>
+                                            cls.name.toLowerCase().includes(searchLower) ||
+                                            cls.code.toLowerCase().includes(searchLower)
+                                          )
+                                          matchingClasses.forEach(cls => {
+                                            results.push({
+                                              id: cls.id,
+                                              level: 4,
+                                              levelName: 'Level 4',
+                                              code: cls.code,
+                                              name: cls.name,
+                                              path: cls.path_name || `${cls.category_code} > ${cls.sub_category_code} > ${cls.division_code} > ${cls.name}`,
+                                              category_code: cls.category_code,
+                                              sub_category_code: cls.sub_category_code,
+                                              division_code: cls.division_code,
+                                              data: cls
+                                            })
+                                          })
+
+                                          // Search Sub-Classes (Level 5)
+                                          const subClassesResponse = await categoryHierarchy.getSubClasses({ is_active: true })
+                                          const allSubClasses = subClassesResponse.data || []
+                                          const matchingSubClasses = allSubClasses.filter(sc =>
+                                            sc.name.toLowerCase().includes(searchLower) ||
+                                            sc.code.toLowerCase().includes(searchLower)
+                                          )
+                                          matchingSubClasses.forEach(sc => {
+                                            results.push({
+                                              id: sc.id,
+                                              level: 5,
+                                              levelName: 'Level 5',
+                                              code: sc.code,
+                                              name: sc.name,
+                                              path: sc.path_name || `Full hierarchy path`,
+                                              category_code: sc.category_code,
+                                              sub_category_code: sc.sub_category_code,
+                                              division_code: sc.division_code,
+                                              class_code: sc.class_code,
+                                              data: sc
+                                            })
+                                          })
+
+                                          setLineItemSearchResults(results.slice(0, 10))
+                                          setShowLineItemSearchResults(results.length > 0)
+                                        } catch (error) {
+                                          console.error('Error searching categories:', error)
+                                          setLineItemSearchResults([])
+                                          setShowLineItemSearchResults(false)
+                                        }
+                                      }, 300)
+                                    } else {
+                                      setLineItemSearchResults([])
+                                      setShowLineItemSearchResults(false)
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    if (lineItemSearchResults.length > 0) setShowLineItemSearchResults(true)
+                                  }}
+                                  autoFocus
+                                  className="w-full px-4 py-3.5 text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+
+                              {/* Results */}
+                              {showLineItemSearchResults && (
+                                <div className="mt-4 bg-white border-2 border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                                  {lineItemSearchResults.length === 0 && (
+                                    <div className="p-6 text-center text-gray-500">
+                                      <AlertCircle className="w-6 h-6 inline-block mb-2" />
+                                      <div className="text-base">No categories found</div>
+                                      <p className="text-sm mt-1">Try a different search term</p>
+                                    </div>
+                                  )}
+
+                                  {lineItemSearchResults.length > 0 && (
+                                    <>
+                                      <div className="p-3 bg-blue-50 border-b-2 border-blue-200 text-sm font-semibold text-blue-800">
+                                        Found {lineItemSearchResults.length} categor{lineItemSearchResults.length > 1 ? 'ies' : 'y'} - Click to auto-select
+                                      </div>
+                                      {lineItemSearchResults.map((result) => (
+                                        <div
+                                          key={result.id}
+                                          onClick={() => handleSelectLineItemHierarchy(item.id, result)}
+                                          className="p-4 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition"
+                                        >
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-semibold text-gray-900">{result.name}</span>
+                                                <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">
+                                                  {result.code}
+                                                </span>
+                                              </div>
+                                              <div className="text-sm text-gray-600 mt-1">
+                                                {result.path}
+                                              </div>
+                                            </div>
+                                            <div className="ml-3">
+                                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                                                {result.levelName}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Level 2 */}
+                      {(lineItemSubCategories[item.id] || []).length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Level 2</label>
+                          <select
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          >
+                            <option value="">Select</option>
+                            {(lineItemSubCategories[item.id] || []).map(subCat => (
+                              <option key={subCat.code} value={subCat.code}>{subCat.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Level 3 */}
+                      {(lineItemDivisions[item.id] || []).length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Level 3</label>
+                          <select
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          >
+                            <option value="">Select</option>
+                            {(lineItemDivisions[item.id] || []).map(div => (
+                              <option key={div.code} value={div.code}>{div.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Quantity */}
+                    {/* Item Code & Description */}
+                    <div className="md:col-span-3 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Item Code
+                        </label>
+                        <input
+                          type="text"
+                          value={item.item_code}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Item Name
+                        </label>
+                        <input
+                          type="text"
+                          value={item.item_name}
+                          onChange={(e) => updateLineItem(item.id, 'item_name', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quantity and other fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mt-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Quantity <span className="text-red-500">*</span>

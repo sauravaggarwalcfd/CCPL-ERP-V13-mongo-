@@ -6,6 +6,7 @@ import { useAuth } from './hooks/useAuth'
 import MainLayout from './components/layout/MainLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Approvals from './pages/Approvals'
 import ProductsList from './pages/products/ProductsList'
 import InventoryList from './pages/inventory/InventoryList'
 import SuppliersList from './pages/suppliers/SuppliersList'
@@ -65,6 +66,11 @@ function App() {
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/approvals" element={
+              <ProtectedRoute>
+                <Approvals />
               </ProtectedRoute>
             } />
             <Route path="/products" element={

@@ -3,7 +3,7 @@
  * Generic field renderer that supports multiple input types
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useFieldValues } from '../../hooks/useSpecifications';
 import { colourApi, sizeApi, uomApi } from '../../services/variantApi';
@@ -27,6 +27,35 @@ const FieldInput = ({ field, value, onChange, categoryCode, error, onSaveDraft, 
   const [newItemData, setNewItemData] = useState({});
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  // Get pre-selected groups from category configuration
+  const getSelectedGroupsFromSpec = () => {
+    if (!specifications) return [];
+    
+    if (field_key === 'colour_code' && specifications.colour?.groups) {
+      return specifications.colour.groups;
+    } else if (field_key === 'size_code' && specifications.size?.groups) {
+      return specifications.size.groups;
+    } else if (field_key === 'uom_code' && specifications.uom?.groups) {
+      return specifications.uom.groups;
+    } else if (field_key === 'vendor_code' && (specifications.supplier_group?.groups || specifications.vendor?.groups)) {
+      return specifications.supplier_group?.groups || specifications.vendor?.groups || [];
+    } else if (field_key === 'supplier_code' && (specifications.supplier_group?.groups || specifications.vendor?.groups)) {
+      return specifications.supplier_group?.groups || specifications.vendor?.groups || [];
+    } else if (field_key === 'brand_code' && specifications.brand?.groups) {
+      return specifications.brand.groups;
+    }
+    
+    console.log('[SPEC DEBUG] No groups found for field:', field_key, 'specifications:', specifications);
+    return [];
+  };
+
+  // Log on mount and when specifications change
+  useEffect(() => {
+    console.log(`[FieldInput] ${field_key} - specifications:`, specifications);
+    const groups = getSelectedGroupsFromSpec();
+    console.log(`[FieldInput] ${field_key} - extracted groups:`, groups);
+  }, [field_key, specifications]);
 
   // Fetch values for SELECT fields from masters
   const shouldFetchValues = field_type === 'SELECT' && source && categoryCode;
@@ -52,24 +81,6 @@ const FieldInput = ({ field, value, onChange, categoryCode, error, onSaveDraft, 
       g: parseInt(result[2], 16),
       b: parseInt(result[3], 16)
     } : { r: 0, g: 0, b: 0 };
-  };
-
-  // Get pre-selected groups from category configuration
-  const getSelectedGroupsFromSpec = () => {
-    if (!specifications) return [];
-    
-    if (field_key === 'colour_code' && specifications.colour?.groups) {
-      return specifications.colour.groups;
-    } else if (field_key === 'size_code' && specifications.size?.groups) {
-      return specifications.size.groups;
-    } else if (field_key === 'uom_code' && specifications.uom?.groups) {
-      return specifications.uom.groups;
-    } else if (field_key === 'supplier_code' && specifications.supplier_group?.groups) {
-      return specifications.supplier_group.groups;
-    } else if (field_key === 'brand_code' && specifications.brand?.groups) {
-      return specifications.brand.groups;
-    }
-    return [];
   };
 
   const handleAddNew = () => {

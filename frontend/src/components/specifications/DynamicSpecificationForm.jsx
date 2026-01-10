@@ -20,6 +20,30 @@ const DynamicSpecificationForm = ({
   const [values, setValues] = useState(initialValues || {});
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Log what we received from the hook
+  useEffect(() => {
+    if (specifications) {
+      console.log('[DynamicSpecificationForm] specifications object:', specifications);
+      console.log('[DynamicSpecificationForm] extracted specs.specifications:', specifications?.specifications);
+    }
+  }, [specifications]);
+
+  // Update values when initialValues change (for edit mode where data loads async)
+  useEffect(() => {
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      setValues(prev => {
+        // Merge initialValues into current values, but only for non-empty initial values
+        const newValues = { ...prev };
+        Object.entries(initialValues).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            newValues[key] = value;
+          }
+        });
+        return newValues;
+      });
+    }
+  }, [initialValues]);
+
   // Update values when formFields change (category changed), but preserve existing values
   useEffect(() => {
     if (formFields && formFields.length > 0) {
@@ -198,7 +222,7 @@ const DynamicSpecificationForm = ({
             categoryCode={categoryCode}
             error={fieldErrors[field.field_key]}
             onSaveDraft={onSaveDraft}
-            specifications={specifications}
+            specifications={specifications?.specifications || specifications}
           />
         ))}
       </div>

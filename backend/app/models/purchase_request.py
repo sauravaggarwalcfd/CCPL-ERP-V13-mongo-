@@ -31,15 +31,26 @@ class PRPriority(str, Enum):
 class PRLineItem(BaseModel):
     """Line item in Purchase Request"""
     line_number: int
-    item_code: str
+    item_code: Optional[str] = None
     item_name: str
     item_description: Optional[str] = None
     item_category: Optional[str] = None
+    category_path: Optional[str] = None
+    category_code: Optional[str] = None
+    sub_category_code: Optional[str] = None
+    division_code: Optional[str] = None
+    class_code: Optional[str] = None
+    sub_class_code: Optional[str] = None
     quantity: float
     unit: str = "PCS"
     estimated_unit_rate: Optional[float] = None
     estimated_amount: Optional[float] = None
     required_date: Optional[date] = None
+    # Specifications
+    colour_code: Optional[str] = None
+    size_code: Optional[str] = None
+    uom_code: Optional[str] = None
+    specifications: Optional[dict] = None
     # Recommended Supplier
     suggested_supplier_code: Optional[str] = None
     suggested_supplier_name: Optional[str] = None
@@ -47,6 +58,7 @@ class PRLineItem(BaseModel):
     suggested_brand_code: Optional[str] = None
     suggested_brand_name: Optional[str] = None
     notes: Optional[str] = None
+    is_new_item: Optional[bool] = False
     is_approved: bool = False
     approved_quantity: Optional[float] = None
     rejection_reason: Optional[str] = None
@@ -132,14 +144,25 @@ class PurchaseRequest(Document):
 
 class PRLineItemCreate(BaseModel):
     """Schema for creating PR line item"""
-    item_code: str
+    item_code: Optional[str] = None
     item_name: str
     item_description: Optional[str] = None
     item_category: Optional[str] = None
+    category_path: Optional[str] = None
+    category_code: Optional[str] = None
+    sub_category_code: Optional[str] = None
+    division_code: Optional[str] = None
+    class_code: Optional[str] = None
+    sub_class_code: Optional[str] = None
     quantity: float
     unit: str = "PCS"
     estimated_unit_rate: Optional[float] = None
     required_date: Optional[date] = None
+    # Specifications
+    colour_code: Optional[str] = None
+    size_code: Optional[str] = None
+    uom_code: Optional[str] = None
+    specifications: Optional[dict] = None
     # Recommended Supplier
     suggested_supplier_code: Optional[str] = None
     suggested_supplier_name: Optional[str] = None
@@ -147,6 +170,7 @@ class PRLineItemCreate(BaseModel):
     suggested_brand_code: Optional[str] = None
     suggested_brand_name: Optional[str] = None
     notes: Optional[str] = None
+    is_new_item: Optional[bool] = False
 
 
 class PurchaseRequestCreate(BaseModel):
