@@ -358,8 +358,15 @@ export default function ItemMaster() {
 
         {/* Right: Actions */}
         <div className="flex gap-2">
-          {/* Removed "Add Item" button - Items are created from Purchase Request form */}
-          {/* Items in Item Master are created with 0 inventory from PR and edited here to add opening stock */}
+          {/* Create New Item Button */}
+          <button
+            onClick={() => { setSidebarOpen(true); setSidebarView('create') }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
+            title="Create New Item"
+          >
+            <Plus size={18} className="sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Create Item</span>
+          </button>
           <button
             onClick={handleOpenBin}
             className="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition"
@@ -531,6 +538,15 @@ export default function ItemMaster() {
                 </button>
               </div>
               
+              {sidebarView === 'create' && (
+                <ItemCreateForm
+                  isOpen={true}
+                  onClose={() => { setSidebarOpen(false); setSidebarView('none') }}
+                  onSuccess={fetchItems}
+                  variant="panel"
+                  purpose="full"
+                />
+              )}
               {sidebarView === 'edit' && selectedItem && (
                 <ItemCreateForm
                   isOpen={true}

@@ -523,6 +523,42 @@ async def delete_custom_field(category_code: str, field_code: str):
     return {"message": "Custom field deleted successfully"}
 
 
+# ==================== GET AVAILABLE CUSTOM FIELDS ====================
+
+@router.get("/specifications/available/custom-fields")
+async def get_available_custom_fields():
+    """Get all available custom fields from all categories (used for the custom specification modal)"""
+    try:
+        # Fetch all categories with custom fields
+        specs = await CategorySpecifications.find_all().to_list()
+        
+        # Collect unique custom fields across all categories
+        custom_fields_map = {}  # key: field_code, value: field config
+        
+        for spec in specs:
+            if spec.custom_fields:
+                for field in spec.custom_fields:
+                    field_code = field.field_code
+                    # Use first occurrence to avoid duplicates
+                    if field_code not in custom_fields_map:
+                        custom_fields_map[field_code] = {
+                            "_id": str(field.id) if hasattr(field, 'id') else field_code,
+                            "spec_code": field.field_code,
+                            "spec_name": field.field_name,
+                            "spec_type": field.field_type,
+                            "description": getattr(field, 'description', '') or field.field_name,
+                            "options": field.options or [],
+                            "is_mandatory": getattr(field, 'required', False),
+                            "is_active": True
+                        }
+        
+        # Return as list
+        return list(custom_fields_map.values())
+    except Exception as e:
+        logger.error(f"Error fetching available custom fields: {e}")
+        return []
+
+
 # ==================== FORM FIELDS RETRIEVAL ====================
 
 @router.get("/specifications/{category_code}/form-fields", response_model=List[FormField])

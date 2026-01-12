@@ -95,6 +95,10 @@ class ItemSubCategory(Document):
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
     
+    # UOM Configuration
+    storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
+    purchase_uom: str = "PCS"  # Unit for purchase orders
+    
     icon: str = "Users"
     color_code: str = "#3b82f6"
     sort_order: int = 0
@@ -138,6 +142,10 @@ class ItemDivision(Document):
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
+    
+    # UOM Configuration
+    storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
+    purchase_uom: str = "PCS"  # Unit for purchase orders
     
     icon: str = "Layers"
     color_code: str = "#8b5cf6"
@@ -187,6 +195,10 @@ class ItemClass(Document):
     
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
+    
+    # UOM Configuration
+    storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
+    purchase_uom: str = "PCS"  # Unit for purchase orders
     
     icon: str = "Tag"
     color_code: str = "#ec4899"
@@ -242,6 +254,10 @@ class ItemSubClass(Document):
 
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
+    
+    # UOM Configuration
+    storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
+    purchase_uom: str = "PCS"  # Unit for purchase orders
     
     icon: str = "Hash"
     color_code: str = "#f59e0b"
@@ -307,6 +323,8 @@ class ItemSubCategoryCreate(BaseModel):
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
+    storage_uom: str = "PCS"
+    purchase_uom: str = "PCS"
     icon: str = "Users"
     color_code: str = "#3b82f6"
     sort_order: int = 0
@@ -327,6 +345,8 @@ class ItemDivisionCreate(BaseModel):
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
+    storage_uom: str = "PCS"
+    purchase_uom: str = "PCS"
     icon: str = "Layers"
     color_code: str = "#8b5cf6"
     sort_order: int = 0
@@ -350,6 +370,8 @@ class ItemClassCreate(BaseModel):
     has_fabric: Optional[bool] = None
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
+    storage_uom: str = "PCS"
+    purchase_uom: str = "PCS"
     icon: str = "Tag"
     color_code: str = "#ec4899"
     sort_order: int = 0
@@ -374,6 +396,8 @@ class ItemSubClassCreate(BaseModel):
     has_fabric: Optional[bool] = None
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
+    storage_uom: str = "PCS"
+    purchase_uom: str = "PCS"
     icon: str = "Hash"
     color_code: str = "#f59e0b"
     sort_order: int = 0
@@ -414,6 +438,8 @@ class ItemSubCategoryUpdate(BaseModel):
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
+    storage_uom: Optional[str] = None
+    purchase_uom: Optional[str] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None
@@ -427,6 +453,8 @@ class ItemDivisionUpdate(BaseModel):
     has_color: Optional[bool] = None
     has_size: Optional[bool] = None
     has_fabric: Optional[bool] = None
+    storage_uom: Optional[str] = None
+    purchase_uom: Optional[str] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None
@@ -442,6 +470,8 @@ class ItemClassUpdate(BaseModel):
     has_fabric: Optional[bool] = None
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
+    storage_uom: Optional[str] = None
+    purchase_uom: Optional[str] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None
@@ -457,6 +487,8 @@ class ItemSubClassUpdate(BaseModel):
     has_fabric: Optional[bool] = None
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
+    storage_uom: Optional[str] = None
+    purchase_uom: Optional[str] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None

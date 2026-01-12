@@ -8,9 +8,9 @@ import './SpecificationSection.css'
  * SpecificationSection - Professional UI for managing category variant specifications
  *
  * Props:
- * - specifications: current specification state { colour, size, uom, vendor, brand, supplier_group }
+ * - specifications: current specification state { colour, size, vendor, brand, supplier_group }
  * - setSpecifications: state setter for specifications
- * - variantGroups: available groups { colour: [], size: [], uom: [], vendor: [], brand: [], supplier_group: [] }
+ * - variantGroups: available groups { colour: [], size: [], vendor: [], brand: [], supplier_group: [] }
  * - customFields: array of custom field configurations
  * - setCustomFields: state setter for custom fields
  * - categoryCode: current category code (for API calls)
@@ -28,7 +28,6 @@ export default function SpecificationSection({
   const [expandedSections, setExpandedSections] = useState({
     colour: false,
     size: false,
-    uom: false,
     supplier: false,
     brand: false,
     custom: false
@@ -40,13 +39,12 @@ export default function SpecificationSection({
       setExpandedSections({
         colour: specifications.colour?.enabled || false,
         size: specifications.size?.enabled || false,
-        uom: specifications.uom?.enabled || false,
         supplier: specifications.supplier_group?.enabled || specifications.vendor?.enabled || false,
         brand: specifications.brand?.enabled || false,
         custom: customFields && customFields.length > 0
       })
     }
-  }, [specifications?.colour?.enabled, specifications?.size?.enabled, specifications?.uom?.enabled, specifications?.supplier_group?.enabled, specifications?.vendor?.enabled, specifications?.brand?.enabled, customFields?.length])
+  }, [specifications?.colour?.enabled, specifications?.size?.enabled, specifications?.supplier_group?.enabled, specifications?.vendor?.enabled, specifications?.brand?.enabled, customFields?.length])
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -87,15 +85,23 @@ export default function SpecificationSection({
   }
 
   const handleAddCustomSpec = (spec) => {
-    setCustomFields(prev => [...prev, {
-      field_code: spec.spec_code,
-      field_name: spec.spec_name,
-      field_type: spec.spec_type,
-      enabled: true,
-      required: spec.is_required || false,
+    // Check if already exists
+    if (customFields.find(f => f.field_code === spec.field_code)) {
+      return
+    }
+
+    const newField = {
+      field_code: spec.field_code || spec.spec_code,
+      field_name: spec.field_name || spec.spec_name,
+      field_type: spec.field_type || spec.spec_type,
+      enabled: spec.enabled !== undefined ? spec.enabled : true,
+      required: spec.required !== undefined ? spec.required : (spec.is_required || spec.is_mandatory || false),
       options: spec.options || [],
       display_order: customFields.length
-    }])
+    }
+
+    console.log('[SpecificationSection] Adding custom field:', newField)
+    setCustomFields(prev => [...prev, newField])
   }
 
   const handleRemoveCustomSpec = (fieldCode) => {
@@ -106,7 +112,6 @@ export default function SpecificationSection({
     const groupTypePaths = {
       colour: '/variant-master?tab=colours',
       size: '/variant-master?tab=sizes',
-      uom: '/variant-master?tab=uoms',
       supplier_group: '/masters/suppliers',
       brand: '/masters/brands'
     };
@@ -114,7 +119,6 @@ export default function SpecificationSection({
     const groupTypeNames = {
       colour: 'Colour',
       size: 'Size',
-      uom: 'UOM',
       supplier_group: 'Supplier',
       brand: 'Brand'
     };
@@ -259,49 +263,6 @@ export default function SpecificationSection({
                 <div className="spec-groups-container">
                   <label className="spec-field-label">Select Size Groups:</label>
                   {renderGroupSelector('size', variantGroups.size, specifications.size?.groups)}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* UOM Group */}
-      <div className="spec-group variant-uom">
-        <div
-          className="spec-group-header"
-          onClick={() => toggleSection('uom')}
-        >
-          <div className="spec-title">
-            <Scale size={20} className="spec-icon" />
-            <span>UOM Group</span>
-          </div>
-          <button type="button" className="spec-expand-btn">
-            {expandedSections.uom ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          </button>
-        </div>
-
-        {expandedSections.uom && (
-          <div className="spec-card">
-            <p className="spec-description">
-              Select which unit of measure groups are available for items in this category (PCS, KG, MTR, etc.).
-            </p>
-
-            <div className="spec-content">
-              <label className="spec-toggle">
-                <input
-                  type="checkbox"
-                  checked={specifications.uom?.enabled || false}
-                  onChange={(e) => handleToggleSpec('uom', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-                <span className="toggle-label">Enable UOM Variants</span>
-              </label>
-
-              {specifications.uom?.enabled && (
-                <div className="spec-groups-container">
-                  <label className="spec-field-label">Select UOM Groups:</label>
-                  {renderGroupSelector('uom', variantGroups.uom, specifications.uom?.groups)}
                 </div>
               )}
             </div>

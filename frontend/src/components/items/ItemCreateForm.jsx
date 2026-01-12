@@ -4,24 +4,8 @@ import toast from 'react-hot-toast'
 import api, { categoryHierarchy, itemTypes, items, brands, suppliers } from '../../services/api'
 import DynamicSpecificationForm from '../specifications/DynamicSpecificationForm'
 import { itemSpecificationApi, specificationApi } from '../../services/specificationApi'
-import { colourApi, sizeApi, uomApi } from '../../services/variantApi'
+import { colourApi, sizeApi } from '../../services/variantApi'
 import ImageUploadField from '../ImageUploadField'
-
-// UOM Options
-const UOM_OPTIONS = [
-  { code: 'PCS', name: 'Pieces', conversionBase: 1 },
-  { code: 'DOZ', name: 'Dozen', conversionBase: 12 },
-  { code: 'PKT', name: 'Packet', conversionBase: 1 },
-  { code: 'BOX', name: 'Box', conversionBase: 1 },
-  { code: 'KG', name: 'Kilogram', conversionBase: 1 },
-  { code: 'GM', name: 'Gram', conversionBase: 0.001 },
-  { code: 'MTR', name: 'Meter', conversionBase: 1 },
-  { code: 'CM', name: 'Centimeter', conversionBase: 0.01 },
-  { code: 'LTR', name: 'Liter', conversionBase: 1 },
-  { code: 'ML', name: 'Milliliter', conversionBase: 0.001 },
-  { code: 'SET', name: 'Set', conversionBase: 1 },
-  { code: 'PAIR', name: 'Pair', conversionBase: 2 },
-]
 
 // Generate next SKU
 const generateSKU = (itemType = 'FG', sequence = 1) => {
@@ -79,6 +63,8 @@ export default function ItemCreateForm({
     hsnCode: '',
     gstRate: 5,
     defaultUom: 'PCS',
+    storageUom: 'PCS',
+    purchaseUom: 'PCS',
   })
   
   // Form data
@@ -86,9 +72,6 @@ export default function ItemCreateForm({
     uid: '',  // Unique Identifier - immutable, auto-generated
     sku: '',  // SKU - can change based on item attributes
     itemName: '',
-    stockUom: 'PCS',
-    purchaseUom: 'PCS',
-    conversionFactor: 1,
     opening_stock: 0,
     image_id: null,
     image_url: null,
@@ -188,9 +171,6 @@ export default function ItemCreateForm({
           uid: item.uid || '',  // UID is immutable, load from item
           sku: currentSku,  // SKU can change based on item attributes
           itemName: item.item_name,
-          stockUom: item.uom || 'PCS',
-          purchaseUom: 'PCS',
-          conversionFactor: 1,
           opening_stock: item.opening_stock || 0,
           image_id: item.image_id,
           image_url: item.image_url,
@@ -209,6 +189,8 @@ export default function ItemCreateForm({
           hsnCode: item.hsn_code || '',
           gstRate: item.gst_rate || 5,
           defaultUom: item.uom || 'PCS',
+          storageUom: item.storage_uom || 'PCS',
+          purchaseUom: item.purchase_uom || 'PCS',
         })
         console.log('[EDIT MODE] Set autoFilledData with itemType:', itemTypeCode)
 
@@ -795,7 +777,7 @@ export default function ItemCreateForm({
       }
 
       setSelectedCategory(category)
-      updateAutoFilledData(category)
+      await updateAutoFilledData(category)
 
       // If search result is at level 1, fetch sub-categories but don't auto-select
       if (result.level === 1) {
@@ -1021,29 +1003,50 @@ export default function ItemCreateForm({
   }
 
   // Update auto-filled data based on category selection
-  const updateAutoFilledData = (category) => {
-    const itemType = itemTypesList.find(t => t.value === category.item_type)
-    
-    setAutoFilledData({
-      itemType: category.item_type || 'FG',
-      itemTypeName: itemType?.name || category.item_type || 'Finished Goods',
-      hsnCode: category.default_hsn_code || '',
-      gstRate: category.default_gst_rate || 5,
-      defaultUom: category.default_uom || 'PCS',
-    })
+  const updateAutoFilledData = async (category) => {
+    try {
+      // Fetch full category data including storage_uom and purchase_uom
+      const fullCategoryResponse = await categoryHierarchy.getCategory(category.code)
+      const fullCategory = fullCategoryResponse.data || category
+      
+      const itemType = itemTypesList.find(t => t.value === fullCategory.item_type)
+      
+      setAutoFilledData({
+        itemType: fullCategory.item_type || 'FG',
+        itemTypeName: itemType?.name || fullCategory.item_type || 'Finished Goods',
+        hsnCode: fullCategory.default_hsn_code || '',
+        gstRate: fullCategory.default_gst_rate || 5,
+        defaultUom: fullCategory.default_uom || 'PCS',
+        storageUom: fullCategory.storage_uom || 'PCS',
+        purchaseUom: fullCategory.purchase_uom || 'PCS',
+      })
 
-    // Fetch next available SKU for this item type (ONLY in create mode)
-    if (!isEditMode) {
-      // Get the deepest level category code for SKU generation
-      const categoryCode = category.code
-      fetchNextSku(category.item_type || 'FG', categoryCode)
+      // Fetch next available SKU for this item type (ONLY in create mode)
+      if (!isEditMode) {
+        // Get the deepest level category code for SKU generation
+        const categoryCode = fullCategory.code
+        fetchNextSku(fullCategory.item_type || 'FG', categoryCode)
+      }
+
+      // Update stock UOM
+      setFormData(prev => ({
+        ...prev,
+        stockUom: fullCategory.default_uom || 'PCS',
+      }))
+    } catch (error) {
+      console.error('Error fetching full category data:', error)
+      // Fallback to the provided category object
+      const itemType = itemTypesList.find(t => t.value === category.item_type)
+      setAutoFilledData({
+        itemType: category.item_type || 'FG',
+        itemTypeName: itemType?.name || category.item_type || 'Finished Goods',
+        hsnCode: category.default_hsn_code || '',
+        gstRate: category.default_gst_rate || 5,
+        defaultUom: category.default_uom || 'PCS',
+        storageUom: category.storage_uom || 'PCS',
+        purchaseUom: category.purchase_uom || 'PCS',
+      })
     }
-
-    // Update stock UOM
-    setFormData(prev => ({
-      ...prev,
-      stockUom: category.default_uom || 'PCS',
-    }))
   }
 
   // Build hierarchy path
@@ -1183,18 +1186,6 @@ export default function ItemCreateForm({
         }
       }
 
-      // Fetch UOM name if uom_code is specified
-      if (specifications.uom_code) {
-        try {
-          const uomRes = await uomApi.get(specifications.uom_code);
-          if (uomRes.data) {
-            names.uom_name = uomRes.data.uom_name;
-          }
-        } catch (error) {
-          console.warn('Failed to fetch UOM name:', error);
-        }
-      }
-
       // Fetch brand name if brand_code is specified
       if (specifications.brand_code) {
         try {
@@ -1292,7 +1283,7 @@ export default function ItemCreateForm({
         brand_name: specNames.brand_name || null,
         supplier_id: specifications.supplier_code || null,
         supplier_name: specNames.supplier_name || null,
-        uom: formData.stockUom || specNames.uom_name,
+        uom: autoFilledData.defaultUom || 'PCS',  // Use category's default UOM
         hsn_code: autoFilledData.hsnCode,
         gst_rate: autoFilledData.gstRate,
         inventory_type: 'stocked',
@@ -1430,9 +1421,6 @@ export default function ItemCreateForm({
     setFormData({
       sku: '',
       itemName: '',
-      stockUom: 'PCS',
-      purchaseUom: 'PCS',
-      conversionFactor: 1,
       opening_stock: 0,
       image_id: null,
       image_url: null,
@@ -1443,12 +1431,6 @@ export default function ItemCreateForm({
       image_size: null,
     })
     setSearchTerm('')
-  }
-
-  // Get UOM name
-  const getUomName = (code) => {
-    const uom = UOM_OPTIONS.find(u => u.code === code)
-    return uom ? `${uom.code} - ${uom.name}` : code
   }
 
   if (!isOpen) return null
@@ -1853,6 +1835,37 @@ export default function ItemCreateForm({
                   />
                 </div>
 
+                {/* UOM Display from Category */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Storage UOM</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={autoFilledData.storageUom || 'PCS'}
+                        readOnly
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed text-sm"
+                      />
+                      <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Purchase UOM</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={autoFilledData.purchaseUom || 'PCS'}
+                        readOnly
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed text-sm"
+                      />
+                      <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                  </div>
+                </div>
+
                 {/* Opening Stock - Only show for full mode */}
                 {isFullMode && (
                   <div>
@@ -1871,6 +1884,7 @@ export default function ItemCreateForm({
                       placeholder="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Unit: {autoFilledData.storageUom || 'PCS'}</p>
                   </div>
                 )}
 
@@ -2335,6 +2349,37 @@ export default function ItemCreateForm({
                   />
                 </div>
 
+                {/* UOM Display from Category */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Storage UOM</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={autoFilledData.storageUom || 'PCS'}
+                        readOnly
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed text-sm"
+                      />
+                      <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Purchase UOM</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={autoFilledData.purchaseUom || 'PCS'}
+                        readOnly
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-green-50 text-gray-700 cursor-not-allowed text-sm"
+                      />
+                      <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                  </div>
+                </div>
+
                 {/* Opening Stock - Only show for full mode */}
                 {isFullMode && (
                   <div>
@@ -2353,6 +2398,7 @@ export default function ItemCreateForm({
                       placeholder="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Unit: {autoFilledData.storageUom || 'PCS'}</p>
                   </div>
                 )}
               </div>

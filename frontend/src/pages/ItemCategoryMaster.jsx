@@ -42,6 +42,8 @@ const DEFAULT_FORM = {
   has_size: true,
   has_fabric: false,
   has_brand: true,
+  storage_uom: 'PCS',
+  purchase_uom: 'PCS',
   default_hsn_code: '',
   default_gst_rate: 5.0,
   icon: 'Package',
@@ -149,7 +151,6 @@ export default function ItemCategoryMaster() {
   const [variantGroups, setVariantGroups] = useState({
     colour: [],
     size: [],
-    uom: [],
     vendor: [],
     brand: [],
     supplier_group: []
@@ -157,7 +158,6 @@ export default function ItemCategoryMaster() {
   const [specifications, setSpecifications] = useState({
     colour: { enabled: false, required: false, groups: [] },
     size: { enabled: false, required: false, groups: [] },
-    uom: { enabled: false, required: false, groups: [] },
     vendor: { enabled: false, required: false, groups: [] },
     brand: { enabled: false, required: false, groups: [] },
     supplier_group: { enabled: false, required: false, groups: [] }
@@ -288,18 +288,16 @@ export default function ItemCategoryMaster() {
 
   const fetchVariantGroups = useCallback(async () => {
     try {
-      // Fetch colour groups, size groups, UOM groups, brand groups, and supplier groups in parallel
-      const [colourGroupsRes, sizeGroupsRes, uomGroupsRes, brandGroupsRes, supplierGroupsRes] = await Promise.all([
+      // Fetch colour groups, size groups, brand groups, and supplier groups in parallel
+      const [colourGroupsRes, sizeGroupsRes, brandGroupsRes, supplierGroupsRes] = await Promise.all([
         colourApi.getGroups().catch(() => ({ data: [] })),
         sizeApi.getGroups().catch(() => ({ data: [] })),
-        uomApi.getGroups().catch(() => ({ data: [] })),
         brands.groups.list().catch(() => ({ data: [] })),
         suppliers.groups.list().catch(() => ({ data: [] }))
       ])
 
       const colourGroups = colourGroupsRes.data || []
       const sizeGroups = sizeGroupsRes.data || []
-      const uomGroups = uomGroupsRes.data || []
       const brandGroups = brandGroupsRes.data || []
       const supplierGroups = supplierGroupsRes.data || []
 
@@ -315,14 +313,6 @@ export default function ItemCategoryMaster() {
         })),
         // Map size groups to consistent format
         size: sizeGroups.map(g => ({
-          id: g._id || g.id,
-          group_code: g.group_code || g.code || g,
-          group_name: g.group_name || g.name || g,
-          code: g.group_code || g.code || g,
-          name: g.group_name || g.name || g
-        })),
-        // Map UOM groups to consistent format
-        uom: uomGroups.map(g => ({
           id: g._id || g.id,
           group_code: g.group_code || g.code || g,
           group_name: g.group_name || g.name || g,
@@ -525,7 +515,6 @@ export default function ItemCategoryMaster() {
     setSpecifications({
       colour: { enabled: false, required: false, groups: [] },
       size: { enabled: false, required: false, groups: [] },
-      uom: { enabled: false, required: false, groups: [] },
       vendor: { enabled: false, required: false, groups: [] },
       brand: { enabled: false, required: false, groups: [] },
       supplier_group: { enabled: false, required: false, groups: [] }
@@ -597,6 +586,8 @@ export default function ItemCategoryMaster() {
       has_brand: item.has_brand ?? true,
       default_hsn_code: item.default_hsn_code || '',
       default_gst_rate: item.default_gst_rate || 5.0,
+      storage_uom: item.storage_uom || 'PCS',
+      purchase_uom: item.purchase_uom || 'PCS',
       icon: item.icon || 'Package',
       color_code: item.color_code || '#10b981',
       sort_order: item.sort_order || 0,
@@ -630,11 +621,6 @@ export default function ItemCategoryMaster() {
             required: specs.size.required || false, 
             groups: specs.size.groups || [] 
           } : { enabled: false, required: false, groups: [] },
-          uom: specs.uom ? { 
-            enabled: specs.uom.enabled || false, 
-            required: specs.uom.required || false, 
-            groups: specs.uom.groups || [] 
-          } : { enabled: false, required: false, groups: [] },
           vendor: specs.vendor ? { 
             enabled: specs.vendor.enabled || false, 
             required: specs.vendor.required || false, 
@@ -658,7 +644,6 @@ export default function ItemCategoryMaster() {
         setSpecifications({
           colour: { enabled: false, required: false, groups: [] },
           size: { enabled: false, required: false, groups: [] },
-          uom: { enabled: false, required: false, groups: [] },
           vendor: { enabled: false, required: false, groups: [] },
           brand: { enabled: false, required: false, groups: [] },
           supplier_group: { enabled: false, required: false, groups: [] }
@@ -671,7 +656,6 @@ export default function ItemCategoryMaster() {
       setSpecifications({
         colour: { enabled: false, required: false, groups: [] },
         size: { enabled: false, required: false, groups: [] },
-        uom: { enabled: false, required: false, groups: [] },
         vendor: { enabled: false, required: false, groups: [] },
         brand: { enabled: false, required: false, groups: [] },
         supplier_group: { enabled: false, required: false, groups: [] }
@@ -989,6 +973,8 @@ export default function ItemCategoryMaster() {
         icon: formData.icon,
         color_code: formData.color_code,
         sort_order: formData.sort_order,
+        storage_uom: formData.storage_uom,
+        purchase_uom: formData.purchase_uom,
       }
       
       // Add level-specific fields for Level 1
@@ -1043,11 +1029,6 @@ export default function ItemCategoryMaster() {
               enabled: specifications.size.enabled,
               required: specifications.size.required,
               groups: specifications.size.groups
-            } : undefined,
-            uom: specifications.uom.enabled ? {
-              enabled: specifications.uom.enabled,
-              required: specifications.uom.required,
-              groups: specifications.uom.groups
             } : undefined,
             vendor: specifications.vendor.enabled ? {
               enabled: specifications.vendor.enabled,
@@ -2164,41 +2145,99 @@ export default function ItemCategoryMaster() {
                 </div>
               </div>
 
-              {/* Settings */}
-              <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Display Settings
-                </label>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Color</label>
-                    <input
-                      type="color"
-                      value={formData.color_code}
-                      onChange={(e) => setFormData(prev => ({ ...prev, color_code: e.target.value }))}
-                      className="w-full h-8 rounded cursor-pointer"
-                    />
+              {/* Display Settings Section */}
+              <div className="mb-6 border-t border-gray-200 pt-6">
+                <div className={`grid gap-5 ${formData.level === 1 ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
+                  {/* Color Picker */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Category Color
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={formData.color_code}
+                        onChange={(e) => setFormData(prev => ({ ...prev, color_code: e.target.value }))}
+                        className="w-12 h-12 rounded-lg cursor-pointer border-2 border-gray-200 hover:border-emerald-400 transition-colors"
+                        title="Click to select category color"
+                      />
+                      <span className="text-xs text-gray-500 font-mono">{formData.color_code}</span>
+                    </div>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Sort Order</label>
+                  {/* Sort Order */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Sort Order
+                    </label>
                     <input
                       type="number"
                       value={formData.sort_order}
                       onChange={(e) => setFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
                       min="0"
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="0"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                   </div>
                   
+                  {/* Storage UOM - Available for ALL Levels */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Storage UOM
+                    </label>
+                    <select
+                      value={formData.storage_uom}
+                      onChange={(e) => setFormData(prev => ({ ...prev, storage_uom: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
+                    >
+                      <option value="PCS">PCS (Pieces)</option>
+                      <option value="DOZ">DOZ (Dozen)</option>
+                      <option value="KG">KG (Kilogram)</option>
+                      <option value="GM">GM (Gram)</option>
+                      <option value="MTR">MTR (Meter)</option>
+                      <option value="CM">CM (Centimeter)</option>
+                      <option value="LTR">LTR (Liter)</option>
+                      <option value="ML">ML (Milliliter)</option>
+                      <option value="BOX">BOX</option>
+                      <option value="SET">SET</option>
+                      <option value="PAIR">PAIR</option>
+                    </select>
+                  </div>
+
+                  {/* Purchase UOM - Available for ALL Levels */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Purchase UOM
+                    </label>
+                    <select
+                      value={formData.purchase_uom}
+                      onChange={(e) => setFormData(prev => ({ ...prev, purchase_uom: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
+                    >
+                      <option value="PCS">PCS (Pieces)</option>
+                      <option value="DOZ">DOZ (Dozen)</option>
+                      <option value="KG">KG (Kilogram)</option>
+                      <option value="GM">GM (Gram)</option>
+                      <option value="MTR">MTR (Meter)</option>
+                      <option value="CM">CM (Centimeter)</option>
+                      <option value="LTR">LTR (Liter)</option>
+                      <option value="ML">ML (Milliliter)</option>
+                      <option value="BOX">BOX</option>
+                      <option value="SET">SET</option>
+                      <option value="PAIR">PAIR</option>
+                    </select>
+                  </div>
+
+                  {/* Default GST % - Level 1 Only */}
                   {formData.level === 1 && (
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Default GST %</label>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Default GST %
+                      </label>
                       <select
                         value={formData.default_gst_rate}
                         onChange={(e) => setFormData(prev => ({ ...prev, default_gst_rate: parseFloat(e.target.value) }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
                       >
                         <option value={0}>0%</option>
                         <option value={5}>5%</option>

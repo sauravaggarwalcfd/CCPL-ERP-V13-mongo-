@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Plus, Settings, FileText, Hash, CheckSquare, List, Link, ExternalLink } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { specificationApi } from '../../services/specificationApi'
 import './CustomSpecModal.css'
 
@@ -45,60 +46,14 @@ export default function CustomSpecModal({
   const fetchAvailableSpecs = async () => {
     setLoading(true)
     try {
-      // For now, we'll use a mock list. In production, this would fetch from API
-      // const response = await axiosInstance.get('/api/specifications/custom-specifications')
-      // setAvailableSpecs(response.data)
-
-      // Mock data for demonstration
-      setAvailableSpecs([
-        {
-          _id: '1',
-          spec_code: 'FIT_TYPE',
-          spec_name: 'Fit Type',
-          spec_type: 'DROPDOWN',
-          description: 'Garment fit style',
-          options: [
-            { code: 'SLIM', value: 'Slim Fit' },
-            { code: 'REGULAR', value: 'Regular Fit' },
-            { code: 'LOOSE', value: 'Loose Fit' }
-          ]
-        },
-        {
-          _id: '2',
-          spec_code: 'FABRIC_COMP',
-          spec_name: 'Fabric Composition',
-          spec_type: 'TEXT',
-          description: 'Material composition percentage',
-          options: []
-        },
-        {
-          _id: '3',
-          spec_code: 'WASH_CARE',
-          spec_name: 'Wash Care',
-          spec_type: 'DROPDOWN',
-          description: 'Washing instructions',
-          options: [
-            { code: 'MACHINE', value: 'Machine Wash' },
-            { code: 'HAND', value: 'Hand Wash Only' },
-            { code: 'DRY', value: 'Dry Clean Only' }
-          ]
-        },
-        {
-          _id: '4',
-          spec_code: 'SLEEVE_LEN',
-          spec_name: 'Sleeve Length',
-          spec_type: 'DROPDOWN',
-          description: 'Length of sleeves',
-          options: [
-            { code: 'FULL', value: 'Full Sleeve' },
-            { code: 'HALF', value: 'Half Sleeve' },
-            { code: 'SHORT', value: 'Short Sleeve' },
-            { code: 'SLEEVELESS', value: 'Sleeveless' }
-          ]
-        }
-      ])
+      // Fetch from API
+      const response = await specificationApi.getAvailableCustomFields()
+      console.log('[CustomSpecModal] Fetched available custom fields:', response.data)
+      setAvailableSpecs(response.data || [])
     } catch (error) {
-      console.error('Error fetching specifications:', error)
+      console.error('[CustomSpecModal] Error fetching specifications:', error)
+      // Fallback to empty list
+      setAvailableSpecs([])
     } finally {
       setLoading(false)
     }
@@ -107,11 +62,13 @@ export default function CustomSpecModal({
   const handleSelectSpec = (spec) => {
     if (!selectedSpecs.find(s => s.field_code === spec.spec_code)) {
       onAdd({
-        spec_code: spec.spec_code,
-        spec_name: spec.spec_name,
-        spec_type: spec.spec_type,
-        is_required: false,
-        options: spec.options || []
+        field_code: spec.spec_code,
+        field_name: spec.spec_name,
+        field_type: spec.spec_type,
+        required: spec.is_mandatory || false,
+        options: spec.options || [],
+        enabled: true,
+        display_order: selectedSpecs.length
       })
       onClose()
     }
@@ -142,23 +99,34 @@ export default function CustomSpecModal({
 
   const handleCreateSpec = async () => {
     if (!newSpec.spec_code || !newSpec.spec_name) {
-      alert('Please fill in code and name')
+      toast.error('Please fill in code and name')
       return
     }
 
     setCreating(true)
     try {
-      // In production, save to backend
-      // await axiosInstance.post('/api/specifications/custom-specifications', newSpec)
-
-      // Add to selected specs
-      onAdd({
+      // Create the new specification object
+      const newSpecObj = {
         spec_code: newSpec.spec_code.toUpperCase(),
         spec_name: newSpec.spec_name,
         spec_type: newSpec.spec_type,
-        is_required: newSpec.is_mandatory,
-        options: newSpec.options
-      })
+        description: newSpec.description || newSpec.spec_name,
+        options: newSpec.options || [],
+        is_mandatory: newSpec.is_mandatory,
+        is_active: true
+      }
+
+      // Add to the available specs list so it appears immediately
+      setAvailableSpecs(prev => [
+        ...prev,
+        {
+          _id: `new_${Date.now()}`,
+          ...newSpecObj
+        }
+      ])
+
+      // Callback to add to selected specs
+      onAdd(newSpecObj)
 
       // Reset form
       setNewSpec({
@@ -170,10 +138,11 @@ export default function CustomSpecModal({
         is_mandatory: false
       })
 
+      toast.success('Specification created and added successfully')
       onClose()
     } catch (error) {
       console.error('Error creating specification:', error)
-      alert('Failed to create specification')
+      toast.error('Failed to create specification')
     } finally {
       setCreating(false)
     }

@@ -45,6 +45,10 @@ export const specificationApi = {
   // Get field values/options for a specific field
   getFieldValues: (categoryCode, fieldKey) =>
     api.get(`/specifications/${categoryCode}/field-values/${fieldKey}`),
+
+  // Get all available custom fields from all categories
+  getAvailableCustomFields: () =>
+    api.get('/specifications/available/custom-fields'),
 };
 
 // ==================== ITEM SPECIFICATIONS ====================
