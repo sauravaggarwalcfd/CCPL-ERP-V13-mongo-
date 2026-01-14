@@ -130,15 +130,23 @@ async def create_item(
             detail=f"Item with code '{data.item_code}' already exists"
         )
 
-    # Build hierarchy path if sub_class_code provided
+    # Build hierarchy path if sub_class_code provided and inherit UOM settings
     hierarchy_path = None
     hierarchy_path_name = None
+    # UOM fields - inherited from category (sub_class level)
+    storage_uom = data.storage_uom if hasattr(data, 'storage_uom') and data.storage_uom else "PCS"
+    purchase_uom = data.purchase_uom if hasattr(data, 'purchase_uom') and data.purchase_uom else "PCS"
+    uom_conversion_factor = data.uom_conversion_factor if hasattr(data, 'uom_conversion_factor') and data.uom_conversion_factor else 1.0
 
     if data.sub_class_code:
         sub_class = await ItemSubClass.find_one(ItemSubClass.sub_class_code == data.sub_class_code.upper())
         if sub_class:
             hierarchy_path = sub_class.path
             hierarchy_path_name = sub_class.path_name
+            # Inherit UOM from category (sub_class) - these override any user-provided values
+            storage_uom = getattr(sub_class, 'storage_uom', 'PCS') or 'PCS'
+            purchase_uom = getattr(sub_class, 'purchase_uom', 'PCS') or 'PCS'
+            uom_conversion_factor = getattr(sub_class, 'uom_conversion_factor', 1.0) or 1.0
 
     # Determine the best category code to use for UID/SKU
     # Priority: sub_class_code > class_code > division_code > sub_category_code > category_code
@@ -204,7 +212,11 @@ async def create_item(
         size_name=data.size_name,
         brand_id=data.brand_id,
         brand_name=data.brand_name,
-        uom=data.uom,
+        # UOM - inherited from category (sub_class), read-only at item level
+        uom=storage_uom,  # For backwards compatibility, uom = storage_uom
+        storage_uom=storage_uom,
+        purchase_uom=purchase_uom,
+        uom_conversion_factor=uom_conversion_factor,
         inventory_type=data.inventory_type,
         cost_price=data.cost_price,
         selling_price=data.selling_price,
@@ -235,6 +247,7 @@ async def create_item(
             inventory_stock = InventoryStock(
                 item_code=data.item_code,
                 item_name=data.item_name,
+                uom=storage_uom,  # Always storage UOM
                 opening_stock=opening_stock,
                 current_stock=opening_stock,
                 reserved_stock=0,
@@ -265,11 +278,16 @@ async def create_item(
                 item_name=data.item_name,
                 movement_type=MovementType.OPENING,
                 quantity=opening_stock,
+                # UOM tracking - for opening stock, source and target are the same (storage UOM)
+                source_uom=storage_uom,
+                target_uom=storage_uom,
+                conversion_factor=1.0,
+                source_quantity=opening_stock,
                 balance_before=0,
                 balance_after=opening_stock,
                 reference_type="OPENING",
                 reference_number=data.item_code,
-                remarks=f"Opening stock for new item {data.item_code}",
+                remarks=f"Opening stock for new item {data.item_code} in {storage_uom}",
                 created_by=str(current_user.id) if current_user else None
             )
             await movement.save()
@@ -391,6 +409,9 @@ async def list_items(
             "supplier_id": getattr(i, 'supplier_id', None),
             "supplier_name": getattr(i, 'supplier_name', None),
             "uom": i.uom,
+            "storage_uom": getattr(i, 'storage_uom', i.uom),
+            "purchase_uom": getattr(i, 'purchase_uom', i.uom),
+            "uom_conversion_factor": getattr(i, 'uom_conversion_factor', 1.0),
             "cost_price": i.cost_price,
             "selling_price": i.selling_price,
             "mrp": i.mrp,
@@ -477,6 +498,9 @@ async def get_item(
         "supplier_id": getattr(item, 'supplier_id', None),
         "supplier_name": getattr(item, 'supplier_name', None),
         "uom": item.uom,
+        "storage_uom": getattr(item, 'storage_uom', item.uom),
+        "purchase_uom": getattr(item, 'purchase_uom', item.uom),
+        "uom_conversion_factor": getattr(item, 'uom_conversion_factor', 1.0),
         "inventory_type": item.inventory_type,
         "cost_price": item.cost_price,
         "selling_price": item.selling_price,

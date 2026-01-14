@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useLayout } from '../context/LayoutContext'
 import {
   Plus, Trash2, Save, X, Calculator, Package, User, MapPin,
-  CreditCard, FileText, Calendar, ArrowLeft, Search, AlertCircle, ChevronRight
+  CreditCard, FileText, Calendar, ArrowLeft, Search, AlertCircle, ChevronRight, Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { purchaseOrders, suppliers, items as itemsAPI, categoryHierarchy } from '../services/api'
@@ -242,6 +242,8 @@ const PurchaseOrderForm = () => {
       item_category: '',
       quantity: 1,
       unit: 'PCS',
+      storage_uom: 'PCS',
+      uom_conversion_factor: 1.0,
       unit_rate: 0,
       discount_percent: 0,
       hsn_code: '',
@@ -499,6 +501,7 @@ const PurchaseOrderForm = () => {
   // Handle selecting an item from search results
   const handleSelectItemFromSearch = (lineItemId, selectedItem) => {
     // Update the line item with selected item data
+    // UOM is locked to item's purchase_uom (inherited from category)
     setLineItems(lineItems.map(item => {
       if (item.id === lineItemId) {
         return {
@@ -508,7 +511,10 @@ const PurchaseOrderForm = () => {
           item_description: selectedItem.description || selectedItem.item_description || '',
           hsn_code: selectedItem.hsn_code || '',
           gst_percent: selectedItem.gst_rate || selectedItem.gst_percent || 18,
-          unit: selectedItem.uom || selectedItem.unit || 'PCS',
+          // UOM - locked to item's purchase_uom (from category), cannot be changed
+          unit: selectedItem.purchase_uom || selectedItem.uom || selectedItem.unit || 'PCS',
+          storage_uom: selectedItem.storage_uom || selectedItem.uom || 'PCS',
+          uom_conversion_factor: selectedItem.uom_conversion_factor || 1.0,
           unit_rate: selectedItem.purchase_price || selectedItem.unit_rate || 0
         }
       }
@@ -559,6 +565,8 @@ const PurchaseOrderForm = () => {
           item_category: item.item_category,
           quantity: parseFloat(item.quantity),
           unit: item.unit,
+          storage_uom: item.storage_uom || 'PCS',
+          uom_conversion_factor: parseFloat(item.uom_conversion_factor || 1.0),
           unit_rate: parseFloat(item.unit_rate),
           discount_percent: parseFloat(item.discount_percent || 0),
           hsn_code: item.hsn_code,
@@ -762,8 +770,8 @@ const PurchaseOrderForm = () => {
               >
                 <option value="">Select Supplier</option>
                 {suppliersList.map((supplier) => (
-                  <option key={supplier.id} value={supplier.code}>
-                    {supplier.company_name} ({supplier.code})
+                  <option key={supplier.id} value={supplier.supplier_code}>
+                    {supplier.supplier_name} ({supplier.supplier_code})
                   </option>
                 ))}
               </select>
@@ -773,15 +781,51 @@ const PurchaseOrderForm = () => {
 
         {/* Line Items */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
               <Package size={20} className="text-blue-600" />
               <h2 className="text-lg font-semibold text-gray-900">Line Items</h2>
             </div>
+            
+            {/* Quick Add from Existing Items Dropdown */}
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  const selectedItem = itemsList.find(item => item.item_code === e.target.value)
+                  if (selectedItem) {
+                    // Add item to line items
+                    const newLineItem = {
+                      id: Date.now(),
+                      item_code: selectedItem.item_code,
+                      item_name: selectedItem.item_name,
+                      category_code: selectedItem.category_code,
+                      quantity: 1,
+                      unit_price: 0,
+                      discount_percent: 0,
+                      tax_percent: 0,
+                      notes: ''
+                    }
+                    setLineItems([...lineItems, newLineItem])
+                    // Reset dropdown
+                    e.target.value = ''
+                  }
+                }
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 max-w-xs"
+            >
+              <option value="">Search and select an item...</option>
+              {itemsList.map(item => (
+                <option key={item.item_code} value={item.item_code}>
+                  {item.item_name} ({item.item_code})
+                </option>
+              ))}
+            </select>
+
             <button
               type="button"
               onClick={addLineItem}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition whitespace-nowrap"
             >
               <Plus size={18} />
               Add Item
@@ -1237,23 +1281,23 @@ const PurchaseOrderForm = () => {
                       />
                     </div>
 
-                    {/* Unit */}
+                    {/* Unit - Locked to item's purchase UOM */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1 items-center gap-1">
+                        <Lock className="w-3 h-3 text-gray-400" />
                         Unit
                       </label>
-                      <select
-                        value={item.unit}
-                        onChange={(e) => updateLineItem(item.id, 'unit', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="PCS">PCS</option>
-                        <option value="KG">KG</option>
-                        <option value="MTR">MTR</option>
-                        <option value="LTR">LTR</option>
-                        <option value="BOX">BOX</option>
-                        <option value="SET">SET</option>
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={item.unit || 'PCS'}
+                          readOnly
+                          className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                          title="UOM is set by item category and cannot be changed"
+                        />
+                        <Lock className="absolute right-2 top-2.5 w-4 h-4 text-gray-400" />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">From item</p>
                     </div>
 
                     {/* Unit Rate */}

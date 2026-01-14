@@ -70,7 +70,9 @@ class POLineItem(BaseModel):
     item_description: Optional[str] = None
     item_category: Optional[str] = None
     quantity: float
-    unit: str = "PCS"
+    unit: str = "PCS"  # Purchase UOM - locked to item's purchase_uom
+    storage_uom: str = "PCS"  # Storage UOM for reference during goods receipt
+    uom_conversion_factor: float = 1.0  # For conversion at goods receipt
     unit_rate: float
     line_amount: float  # Qty × Rate
     discount_percent: float = 0
@@ -222,7 +224,9 @@ class POLineItemCreate(BaseModel):
     item_description: Optional[str] = None
     item_category: Optional[str] = None
     quantity: float
-    unit: str = "PCS"
+    unit: str = "PCS"  # Will be overridden by item's purchase_uom
+    storage_uom: str = "PCS"  # Will be set from item's storage_uom
+    uom_conversion_factor: float = 1.0  # Will be set from item's conversion factor
     unit_rate: float
     discount_percent: float = 0
     hsn_code: Optional[str] = None

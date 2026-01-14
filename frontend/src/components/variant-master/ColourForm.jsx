@@ -74,12 +74,15 @@ const ColourForm = ({ colour, groups, onSubmit, onCancel, initialGroup }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Ensure colour_groups is set
+    // Ensure colour_groups is set and colour_group is set to first selected group
     const submitData = {
       ...formData,
       colour_groups: formData.colour_groups.length > 0 
         ? formData.colour_groups 
         : (formData.colour_group ? [formData.colour_group] : []),
+      colour_group: formData.colour_groups.length > 0 
+        ? formData.colour_groups[0] 
+        : (formData.colour_group || ''),
     };
     onSubmit(submitData);
   };

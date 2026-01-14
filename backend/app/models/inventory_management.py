@@ -46,6 +46,9 @@ class InventoryStock(Document):
     item_code: Indexed(str, unique=True)
     item_name: Optional[str] = None
 
+    # UOM - Always storage UOM
+    uom: str = "PCS"  # Storage UOM - all quantities are in this unit
+
     # Stock quantities
     opening_stock: float = 0
     current_stock: float = 0
@@ -82,9 +85,15 @@ class StockMovement(Document):
     item_name: Optional[str] = None
 
     movement_type: MovementType
-    quantity: float
+    quantity: float  # Quantity in target/storage UOM
     unit_cost: float = 0
     total_value: float = 0
+
+    # UOM Conversion Tracking (for goods receipt from purchase)
+    source_uom: Optional[str] = None  # UOM of source (e.g., purchase_uom)
+    target_uom: Optional[str] = None  # UOM of target (storage_uom)
+    conversion_factor: float = 1.0  # Applied conversion factor
+    source_quantity: Optional[float] = None  # Quantity in source UOM (before conversion)
 
     # Before/After balances
     balance_before: float = 0

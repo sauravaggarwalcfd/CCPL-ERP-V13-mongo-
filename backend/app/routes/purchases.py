@@ -184,64 +184,105 @@ async def receive_goods(
     items: List[dict],
     current_user = Depends(get_current_user),
 ):
-    """Receive goods for purchase order"""
+    """
+    Receive goods for purchase order with automatic UOM conversion.
+
+    The received quantity is entered in Purchase UOM (the unit on the PO).
+    The inventory is updated in Storage UOM using the conversion factor.
+
+    Example: If item has conversion_factor=12 (1 BOX = 12 PCS)
+    - Received 5 BOX (purchase_uom)
+    - Inventory updated with 60 PCS (storage_uom)
+    """
     from app.models.inventory import Inventory
     from app.models.stock_movement import StockMovement
-    
+    from app.models.item import ItemMaster
+
     po = await PurchaseOrder.get(po_id)
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
-    
+
     for receive_item in items:
         po_item = next((i for i in po.items if i.get("product_id") == receive_item["product_id"]), None)
         if not po_item:
             continue
-        
-        # Update received quantity
-        po_item["received_qty"] += receive_item["received_qty"]
-        
-        # Update inventory
+
+        # Get the received quantity in purchase UOM
+        received_qty_purchase = receive_item["received_qty"]
+
+        # Get UOM conversion info from PO item or Item Master
+        purchase_uom = po_item.get("unit", "PCS")
+        storage_uom = po_item.get("storage_uom", purchase_uom)
+        conversion_factor = po_item.get("uom_conversion_factor", 1.0) or 1.0
+
+        # If UOM info not on PO item, fetch from Item Master
+        if storage_uom == purchase_uom and conversion_factor == 1.0:
+            item_master = await ItemMaster.find_one(ItemMaster.item_code == po_item.get("product_id"))
+            if item_master:
+                purchase_uom = getattr(item_master, 'purchase_uom', item_master.uom)
+                storage_uom = getattr(item_master, 'storage_uom', item_master.uom)
+                conversion_factor = getattr(item_master, 'uom_conversion_factor', 1.0)
+
+        # Convert from purchase UOM to storage UOM
+        received_qty_storage = received_qty_purchase * conversion_factor
+
+        # Update received quantity on PO (in purchase UOM)
+        po_item["received_qty"] += received_qty_purchase
+
+        # Update inventory (in storage UOM)
         inventory = await Inventory.find_one(
             (Inventory.product.id == po_item["product_id"]) &
             (Inventory.warehouse.id == po.warehouse["id"])
         )
-        
+
         if inventory:
-            inventory.quantity += receive_item["received_qty"]
+            inventory.quantity += received_qty_storage  # Add in storage UOM
             await inventory.save()
         else:
             inventory = Inventory(
                 product={"id": po_item["product_id"]},
                 variant={"id": po_item["variant_id"]},
                 warehouse=po.warehouse,
-                quantity=receive_item["received_qty"],
+                quantity=received_qty_storage,  # Store in storage UOM
             )
             await inventory.insert()
-        
-        # Create stock movement
+
+        # Create stock movement with UOM conversion tracking
+        conversion_remarks = ""
+        if conversion_factor != 1.0:
+            conversion_remarks = f" (Converted: {received_qty_purchase} {purchase_uom} -> {received_qty_storage} {storage_uom})"
+
         await StockMovement(
             product={"id": po_item["product_id"]},
             variant={"id": po_item["variant_id"]},
             warehouse=po.warehouse,
             movement_type="PURCHASE_IN",
-            quantity=receive_item["received_qty"],
-            reference={"type": "purchase_order", "id": str(po.id), "number": po.po_number},
+            quantity=received_qty_storage,  # Store quantity in storage UOM
+            reference={
+                "type": "purchase_order",
+                "id": str(po.id),
+                "number": po.po_number,
+                "source_uom": purchase_uom,
+                "target_uom": storage_uom,
+                "conversion_factor": conversion_factor,
+                "source_quantity": received_qty_purchase
+            },
             created_by={"id": str(current_user.id), "name": current_user.full_name},
         ).insert()
-    
+
     # Update PO status
     all_received = all(i.get("received_qty", 0) >= i.get("ordered_qty", 0) for i in po.items)
     any_received = any(i.get("received_qty", 0) > 0 for i in po.items)
-    
+
     if all_received:
         po.status = "received"
         po.received_date = datetime.utcnow()
     elif any_received:
         po.status = "partial"
-    
+
     po.updated_at = datetime.utcnow()
     await po.save()
-    
+
     return po
 
 

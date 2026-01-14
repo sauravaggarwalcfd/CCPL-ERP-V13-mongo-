@@ -230,6 +230,43 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
     fetchSubClasses()
   }, [lineItemClass])
 
+  // Load line item data when editing
+  useEffect(() => {
+    if (editingItemCode && showLineItemForm) {
+      const itemToEdit = lineItems.find(li => li.item_code === editingItemCode)
+      if (itemToEdit) {
+        // Set form data
+        setLineItemFormData({
+          item_name: itemToEdit.item_name || '',
+          item_description: itemToEdit.item_description || '',
+          quantity: itemToEdit.quantity || 1,
+          unit: itemToEdit.unit || 'PCS',
+          estimated_unit_rate: itemToEdit.estimated_unit_rate || '',
+          required_date: itemToEdit.required_date || formData.required_by_date || '',
+          notes: itemToEdit.notes || '',
+        })
+
+        // Set specifications
+        setLineItemSpecs({
+          colour_code: itemToEdit.colour_code || null,
+          size_code: itemToEdit.size_code || null,
+          uom_code: itemToEdit.uom_code || null,
+          brand_code: itemToEdit.suggested_brand_code || null,
+          supplier_code: itemToEdit.suggested_supplier_code || null,
+          custom_field_values: itemToEdit.specifications?.custom_field_values || {}
+        })
+
+        // Set category hierarchy if available
+        if (itemToEdit.item_category) {
+          const category = categories?.find(c => c.code === itemToEdit.item_category)
+          if (category) {
+            setLineItemCategory(category)
+          }
+        }
+      }
+    }
+  }, [editingItemCode, showLineItemForm])
+
   // Get effective category code (deepest level)
   const getEffectiveCategoryCode = () => {
     return lineItemSubClass?.code || lineItemClass?.code || lineItemDivision?.code ||
@@ -688,10 +725,10 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
       unit: lineItemFormData.unit || 'PCS',
       estimated_unit_rate: lineItemFormData.estimated_unit_rate ? parseFloat(lineItemFormData.estimated_unit_rate) : null,
       required_date: lineItemFormData.required_date || formData.required_by_date || null,
-      suggested_supplier_code: lineItemSpecs.supplier_code,
-      suggested_supplier_name: suppliers.find(s => s.code === lineItemSpecs.supplier_code)?.name || null,
-      suggested_brand_code: lineItemSpecs.brand_code,
-      suggested_brand_name: brands.find(b => b.code === lineItemSpecs.brand_code)?.name || null,
+      suggested_supplier_code: lineItemSpecs.supplier_code || null,
+      suggested_supplier_name: suppliers.find(s => s.supplier_code === lineItemSpecs.supplier_code)?.supplier_name || null,
+      suggested_brand_code: lineItemSpecs.brand_code || null,
+      suggested_brand_name: brands.find(b => b.brand_code === lineItemSpecs.brand_code)?.brand_name || null,
       colour_code: lineItemSpecs.colour_code,
       colour_name: null, // Will be filled when displayed
       size_code: lineItemSpecs.size_code,
@@ -797,60 +834,114 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
 
     setLoading(true)
     try {
+      // Helper to convert date format from DD-MMM-YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr) => {
+        if (!dateStr) return null
+        
+        // Handle DD-MMM-YYYY format (e.g., "12-Jan-2026")
+        const monthMap = {
+          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+          'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+          'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        }
+        
+        const ddMmmYyyyRegex = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/
+        const match = dateStr.match(ddMmmYyyyRegex)
+        
+        if (match) {
+          const [, day, month, year] = match
+          const monthNum = monthMap[month] || monthMap[month.charAt(0).toUpperCase() + month.slice(1).toLowerCase()]
+          if (!monthNum) return null
+          return `${year}-${monthNum}-${String(day).padStart(2, '0')}`
+        }
+        
+        // Check if already in YYYY-MM-DD format
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          return dateStr
+        }
+        
+        return null
+      }
+
       const payload = {
-        pr_date: formData.pr_date || null,
-        department: formData.department || null,
-        priority: formData.priority || 'NORMAL',
-        required_by_date: formData.required_by_date || null,
-        purpose: formData.purpose || null,
-        justification: formData.justification || null,
-        notes: formData.notes || null,
+        pr_date: convertDateFormat(formData.pr_date) || null,
+        department: (formData.department && formData.department.trim()) || null,
+        priority: (formData.priority || 'NORMAL').toUpperCase(),
+        required_by_date: convertDateFormat(formData.required_by_date) || null,
+        purpose: (formData.purpose && formData.purpose.trim()) || null,
+        justification: (formData.justification && formData.justification.trim()) || null,
+        notes: (formData.notes && formData.notes.trim()) || null,
         items: lineItems.map(item => {
-          // Build specifications object - only include keys that have values
+          const quantity = Number(item.quantity) || 0
+          if (quantity <= 0) {
+            throw new Error(`Invalid quantity for item: ${item.item_name}`)
+          }
+
+          // Build minimal specifications object
           const specifications = {}
-          if (item.colour_code) specifications.colour_code = item.colour_code
-          if (item.size_code) specifications.size_code = item.size_code
-          if (item.uom_code) specifications.uom_code = item.uom_code
-          if (item.specifications?.supplier_code) specifications.supplier_code = item.specifications.supplier_code
-          if (item.specifications?.brand_code) specifications.brand_code = item.specifications.brand_code
-          if (item.specifications?.custom_field_values) specifications.custom_field_values = item.specifications.custom_field_values
+          if (item.colour_code) specifications.colour_code = String(item.colour_code).trim()
+          if (item.size_code) specifications.size_code = String(item.size_code).trim()
+          if (item.uom_code) specifications.uom_code = String(item.uom_code).trim()
 
           return {
-            item_code: item.item_code || null,
-            item_name: item.item_name || '',
-            item_description: item.item_description || '',
-            item_category: item.item_category || null,
-            category_path: item.category_path || '',
-            category_code: item.category_code || null,
-            sub_category_code: item.sub_category_code || null,
-            division_code: item.division_code || null,
-            class_code: item.class_code || null,
-            sub_class_code: item.sub_class_code || null,
-            quantity: parseFloat(item.quantity) || 0,
-            unit: item.unit || 'PCS',
-            estimated_unit_rate: item.estimated_unit_rate ? parseFloat(item.estimated_unit_rate) : null,
-            required_date: item.required_date && item.required_date !== '' ? item.required_date : null,
-            colour_code: item.colour_code || null,
-            size_code: item.size_code || null,
-            uom_code: item.uom_code || null,
-            suggested_supplier_code: item.suggested_supplier_code || null,
-            suggested_supplier_name: item.suggested_supplier_name || null,
-            suggested_brand_code: item.suggested_brand_code || null,
-            suggested_brand_name: item.suggested_brand_name || null,
+            item_code: item.item_code ? String(item.item_code).trim() : null,
+            item_name: String(item.item_name || '').trim(),
+            item_description: item.item_description ? String(item.item_description).trim() : '',
+            item_category: item.item_category ? String(item.item_category).trim() : null,
+            category_path: item.category_path ? String(item.category_path).trim() : '',
+            category_code: item.category_code ? String(item.category_code).trim() : null,
+            sub_category_code: item.sub_category_code ? String(item.sub_category_code).trim() : null,
+            division_code: item.division_code ? String(item.division_code).trim() : null,
+            class_code: item.class_code ? String(item.class_code).trim() : null,
+            sub_class_code: item.sub_class_code ? String(item.sub_class_code).trim() : null,
+            quantity: quantity,
+            unit: String(item.unit || 'PCS').trim(),
+            estimated_unit_rate: item.estimated_unit_rate ? Number(item.estimated_unit_rate) : null,
+            required_date: item.required_date ? convertDateFormat(item.required_date) : null,
+            colour_code: item.colour_code ? String(item.colour_code).trim() : null,
+            size_code: item.size_code ? String(item.size_code).trim() : null,
+            uom_code: item.uom_code ? String(item.uom_code).trim() : null,
+            suggested_supplier_code: item.suggested_supplier_code ? String(item.suggested_supplier_code).trim() : null,
+            suggested_supplier_name: item.suggested_supplier_name ? String(item.suggested_supplier_name).trim() : null,
+            suggested_brand_code: item.suggested_brand_code ? String(item.suggested_brand_code).trim() : null,
+            suggested_brand_name: item.suggested_brand_name ? String(item.suggested_brand_name).trim() : null,
             specifications: specifications,
-            notes: item.notes || '',
-            is_new_item: item.is_new_item || false,
+            notes: item.notes ? String(item.notes).trim() : '',
+            is_new_item: Boolean(item.is_new_item)
           }
         })
       }
 
-      console.log('PR Payload:', payload)
+      // Validate and serialize payload
+      let jsonPayload
+      try {
+        jsonPayload = JSON.stringify(payload)
+        console.log('PR Payload (raw):', payload)
+        console.log('PR Payload (JSON string length):', jsonPayload.length)
+        console.log('PR Payload (JSON):', jsonPayload)
+      } catch (e) {
+        console.error('Payload is not JSON serializable:', e)
+        toast.error('Invalid data format in form. Please check all fields.')
+        setLoading(false)
+        return
+      }
+
+      // Parse it back to ensure clean object (removes any non-JSON values)
+      const cleanPayload = JSON.parse(jsonPayload)
+      console.log('Clean Payload:', cleanPayload)
+
+      // Log the exact request being made (for debugging)
+      console.log('=== Submitting PR ===')
+      console.log('Items count:', cleanPayload.items?.length)
+      if (cleanPayload.items?.[0]) {
+        console.log('First item:', cleanPayload.items[0].item_name, 'qty:', cleanPayload.items[0].quantity)
+      }
 
       if (pr) {
-        await api.put(`/purchase/purchase-requests/${pr.pr_code}`, payload)
+        await api.put(`/purchase/purchase-requests/${pr.pr_code}`, cleanPayload)
         toast.success('Purchase Request updated successfully')
       } else {
-        await api.post('/purchase/purchase-requests', payload)
+        await api.post('/purchase/purchase-requests', cleanPayload)
         toast.success('Purchase Request created successfully')
       }
 
@@ -858,13 +949,17 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
     } catch (error) {
       console.error('Error saving PR:', error)
       console.error('Error response:', error.response?.data)
+      console.error('Error message:', error.message)
+      console.error('Error status:', error.response?.status)
 
       // Show detailed validation errors if available
       if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
         const errorMessages = error.response.data.errors.map(e => `${e.field}: ${e.message}`).join('\n')
         toast.error(`Validation Error:\n${errorMessages}`, { duration: 5000 })
+      } else if (error.response?.data?.detail) {
+        toast.error(String(error.response.data.detail), { duration: 5000 })
       } else {
-        toast.error(error.response?.data?.detail || 'Failed to save Purchase Request')
+        toast.error(error.message || 'Failed to save Purchase Request', { duration: 5000 })
       }
     } finally {
       setLoading(false)
@@ -986,22 +1081,42 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
 
           {/* Line Items Section */}
           <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-4 mb-4">
               <h3 className="text-lg font-medium text-gray-900">Line Items</h3>
+              
+              {/* Quick Add from Existing Items Dropdown */}
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const selectedItem = items.find(item => item.item_code === e.target.value)
+                    if (selectedItem) {
+                      addLineItemFromSearch(selectedItem)
+                    }
+                  }
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 max-w-xs"
+              >
+                <option value="">Search and select an item...</option>
+                {items.map(item => (
+                  <option key={item.item_code} value={item.item_code}>
+                    {item.item_name} ({item.item_code})
+                  </option>
+                ))}
+              </select>
+
               <button
                 type="button"
                 onClick={() => {
                   setEditingItemCode(null)
                   setShowLineItemForm(true)
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
                 Add Line Item
               </button>
             </div>
-
-            {/* Line Items Table */}
             {lineItems.length > 0 ? (
               <div className="border rounded-lg overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -1079,42 +1194,24 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <select
-                            value={item.suggested_supplier_code || ''}
-                            onChange={(e) => {
-                              const filteredSuppliers = getFilteredSuppliers(item.id)
-                              const supplier = filteredSuppliers.find(s => s.supplier_code === e.target.value)
-                              updateLineItem(index, 'suggested_supplier_code', e.target.value)
-                              updateLineItem(index, 'suggested_supplier_name', supplier?.supplier_name || '')
-                            }}
-                            className={`w-full px-2 py-1 border rounded text-sm ${hasLineItemFilters(item.id) ? 'border-blue-300 bg-blue-50' : ''}`}
-                          >
-                            <option value="">Select</option>
-                            {getFilteredSuppliers(item.id).map(s => (
-                              <option key={s.supplier_code} value={s.supplier_code}>
-                                {s.supplier_name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="flex flex-col gap-1">
+                            <div className="text-sm font-medium">
+                              {item.suggested_supplier_name || 'Not Selected'}
+                            </div>
+                            {item.suggested_supplier_code && (
+                              <div className="text-xs text-gray-500">{item.suggested_supplier_code}</div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
-                          <select
-                            value={item.suggested_brand_code || ''}
-                            onChange={(e) => {
-                              const filteredBrands = getFilteredBrands(item.id)
-                              const brand = filteredBrands.find(b => b.brand_code === e.target.value)
-                              updateLineItem(index, 'suggested_brand_code', e.target.value)
-                              updateLineItem(index, 'suggested_brand_name', brand?.brand_name || '')
-                            }}
-                            className={`w-full px-2 py-1 border rounded text-sm ${hasLineItemFilters(item.id) ? 'border-blue-300 bg-blue-50' : ''}`}
-                          >
-                            <option value="">Select</option>
-                            {getFilteredBrands(item.id).map(b => (
-                              <option key={b.brand_code} value={b.brand_code}>
-                                {b.brand_name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="flex flex-col gap-1">
+                            <div className="text-sm font-medium">
+                              {item.suggested_brand_name || 'Not Selected'}
+                            </div>
+                            {item.suggested_brand_code && (
+                              <div className="text-xs text-gray-500">{item.suggested_brand_code}</div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           <input
@@ -1134,7 +1231,10 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
                           <div className="flex gap-2 justify-center">
                             <button
                               type="button"
-                              onClick={() => setEditingItemCode(item.item_code)}
+                              onClick={() => {
+                                setEditingItemCode(item.item_code)
+                                setShowLineItemForm(true)
+                              }}
                               className="p-1 text-blue-500 hover:bg-blue-50 rounded"
                               title="Edit item details"
                             >

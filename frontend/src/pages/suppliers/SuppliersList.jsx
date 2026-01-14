@@ -140,8 +140,8 @@ export default function SuppliersList() {
                 <tbody className="divide-y divide-gray-200">
                   {supplierList.map((supplier) => (
                     <tr key={supplier.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 font-mono text-gray-600">{supplier.code}</td>
-                      <td className="px-6 py-4 font-medium text-gray-900">{supplier.company_name}</td>
+                      <td className="px-6 py-4 font-mono text-gray-600">{supplier.supplier_code}</td>
+                      <td className="px-6 py-4 font-medium text-gray-900">{supplier.supplier_name}</td>
                       <td className="px-6 py-4 text-gray-600">{supplier.contact_person || '-'}</td>
                       <td className="px-6 py-4 text-gray-600">{supplier.phone}</td>
                       <td className="px-6 py-4 text-gray-600">{supplier.gst_number || '-'}</td>

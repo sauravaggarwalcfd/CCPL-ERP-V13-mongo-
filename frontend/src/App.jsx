@@ -310,14 +310,14 @@ function App() {
                 <WorkInProgress title="General Settings" description="Configure system-wide preferences and defaults." />
               </ProtectedRoute>
             } />
-
-            {/* Catch-all for any undefined routes */}
-            <Route path="*" element={
-              <ProtectedRoute>
-                <WorkInProgress title="Page Not Found" description="The page you're looking for doesn't exist or is still under development." />
-              </ProtectedRoute>
-            } />
           </Route>
+
+          {/* Catch-all for any undefined routes */}
+          <Route path="*" element={
+            <ProtectedRoute>
+              <WorkInProgress title="Page Not Found" description="The page you're looking for doesn't exist or is still under development." />
+            </ProtectedRoute>
+          } />
         </Routes>
         </BrowserRouter>
         <Toaster position="top-right" />

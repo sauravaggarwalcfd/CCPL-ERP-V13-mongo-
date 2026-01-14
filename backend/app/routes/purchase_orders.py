@@ -81,28 +81,49 @@ async def get_supplier_info(supplier_code: str) -> POSupplierInfo:
 
 
 async def get_item_info(item_code: str) -> dict:
-    """Get item information from Item Master"""
-    # TODO: Replace with actual Item model import
-    # For now, return basic info - integrate with your Item Master
-    try:
-        # from ..models.item import Item
-        # item = await Item.find_one(Item.code == item_code)
-        # if not item:
-        #     raise HTTPException(404, f"Item {item_code} not found")
+    """Get item information from Item Master including UOM settings"""
+    from ..models.item import ItemMaster
 
-        # Return item details including HSN, GST, etc.
+    try:
+        item = await ItemMaster.find_one(ItemMaster.item_code == item_code)
+        if item:
+            return {
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "item_description": item.item_description or "",
+                "item_category": item.category_name or "",
+                "hsn_code": item.hsn_code or "",
+                "gst_percent": item.gst_rate or 18.0,
+                "unit": getattr(item, 'purchase_uom', item.uom) or "PCS",  # Use purchase_uom for PO
+                "storage_uom": getattr(item, 'storage_uom', item.uom) or "PCS",
+                "uom_conversion_factor": getattr(item, 'uom_conversion_factor', 1.0) or 1.0
+            }
+
+        # Fallback if item not found
         return {
             "item_code": item_code,
             "item_name": f"Item {item_code}",
             "item_description": "",
             "item_category": "",
             "hsn_code": "",
-            "gst_percent": 18.0,  # Default GST
-            "unit": "PCS"
+            "gst_percent": 18.0,
+            "unit": "PCS",
+            "storage_uom": "PCS",
+            "uom_conversion_factor": 1.0
         }
     except Exception as e:
         logger.error(f"Error fetching item: {e}")
-        raise HTTPException(404, f"Item {item_code} not found")
+        return {
+            "item_code": item_code,
+            "item_name": f"Item {item_code}",
+            "item_description": "",
+            "item_category": "",
+            "hsn_code": "",
+            "gst_percent": 18.0,
+            "unit": "PCS",
+            "storage_uom": "PCS",
+            "uom_conversion_factor": 1.0
+        }
 
 
 def calculate_line_item(item: POLineItemCreate, line_number: int, supplier_state: str = "DELHI") -> POLineItem:
@@ -146,7 +167,9 @@ def calculate_line_item(item: POLineItemCreate, line_number: int, supplier_state
         item_description=item.item_description,
         item_category=item.item_category,
         quantity=item.quantity,
-        unit=item.unit,
+        unit=item.unit,  # Purchase UOM - locked from item master
+        storage_uom=getattr(item, 'storage_uom', item.unit) or item.unit,  # For goods receipt conversion
+        uom_conversion_factor=getattr(item, 'uom_conversion_factor', 1.0) or 1.0,  # For goods receipt conversion
         unit_rate=item.unit_rate,
         line_amount=line_amount,
         discount_percent=item.discount_percent,
@@ -245,7 +268,7 @@ async def create_purchase_order(
 
         # Create tracking info
         tracking = POTracking(
-            created_by=current_user.get("email", "unknown")
+            created_by=current_user.email if hasattr(current_user, 'email') and current_user.email else "unknown"
         )
 
         # Create approval info
@@ -448,7 +471,7 @@ async def update_purchase_order(
                 setattr(po, field, value)
 
         # Update tracking
-        po.tracking.last_modified_by = current_user.get("email", "unknown")
+        po.tracking.last_modified_by = current_user.email if hasattr(current_user, 'email') and current_user.email else "unknown"
         po.tracking.last_modified_date = datetime.utcnow()
 
         await po.save()
@@ -508,7 +531,7 @@ async def update_po_status(
         elif status_data.status == POStatus.CLOSED:
             po.tracking.po_closed_date = datetime.utcnow()
 
-        po.tracking.last_modified_by = current_user.get("email", "unknown")
+        po.tracking.last_modified_by = current_user.email if hasattr(current_user, 'email') and current_user.email else "unknown"
         po.tracking.last_modified_date = datetime.utcnow()
 
         await po.save()
@@ -553,7 +576,7 @@ async def approve_purchase_order(
         else:
             po.po_status = POStatus.DRAFT  # Send back to draft
 
-        po.tracking.last_modified_by = current_user.get("email", "unknown")
+        po.tracking.last_modified_by = current_user.email if hasattr(current_user, 'email') and current_user.email else "unknown"
         po.tracking.last_modified_date = datetime.utcnow()
 
         await po.save()
@@ -590,7 +613,7 @@ async def delete_purchase_order(
         # Soft delete
         po.is_deleted = True
         po.is_active = False
-        po.tracking.last_modified_by = current_user.get("email", "unknown")
+        po.tracking.last_modified_by = current_user.email if hasattr(current_user, 'email') and current_user.email else "unknown"
         po.tracking.last_modified_date = datetime.utcnow()
 
         await po.save()

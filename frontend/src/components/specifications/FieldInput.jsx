@@ -137,8 +137,14 @@ const FieldInput = ({ field, value, onChange, categoryCode, error, onSaveDraft, 
           setSaving(false);
           return;
         }
+        if (!newItemData.colour_groups || newItemData.colour_groups.length === 0) {
+          toast.error('Please select at least one colour group');
+          setSaving(false);
+          return;
+        }
         response = await colourApi.create({
           ...newItemData,
+          colour_group: newItemData.colour_groups[0], // Ensure colour_group is set to first selected group
           rgb_value: hexToRgb(newItemData.colour_hex)
         });
         toast.success('Colour created successfully!');

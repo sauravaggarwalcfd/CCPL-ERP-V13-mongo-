@@ -44,6 +44,7 @@ const DEFAULT_FORM = {
   has_brand: true,
   storage_uom: 'PCS',
   purchase_uom: 'PCS',
+  uom_conversion_factor: 1.0,
   default_hsn_code: '',
   default_gst_rate: 5.0,
   icon: 'Package',
@@ -2227,6 +2228,40 @@ export default function ItemCategoryMaster() {
                       <option value="PAIR">PAIR</option>
                     </select>
                   </div>
+
+                  {/* UOM Conversion Factor - For Level 5 (Sub-Class) */}
+                  {formData.level === 5 && (
+                    <div className="space-y-2 col-span-2">
+                      <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        UOM Conversion Factor <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <span className="text-sm font-medium text-gray-600">1</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">
+                          {formData.purchase_uom || 'Purchase UOM'}
+                        </span>
+                        <span className="text-sm text-gray-500">=</span>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          value={formData.uom_conversion_factor || 1}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            uom_conversion_factor: parseFloat(e.target.value) || 1
+                          }))}
+                          className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                          required
+                        />
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm font-medium">
+                          {formData.storage_uom || 'Storage UOM'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Example: 1 BOX = 12 PCS, 1 DOZ = 12 PCS, 1 KG = 1000 GM
+                      </p>
+                    </div>
+                  )}
 
                   {/* Default GST % - Level 1 Only */}
                   {formData.level === 1 && (

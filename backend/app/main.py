@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
 import json
+import traceback
 from .database import connect_to_mongo, close_mongo_connection
 from .routes import (
     auth,
@@ -109,6 +110,60 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "errors": error_details
         }
     )
+
+
+# Add handler for HTTPException to log detailed error info
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # Log the full exception details for debugging
+    if exc.status_code == 400 and "parsing the body" in str(exc.detail):
+        logger.error(f"Body parsing error on {request.url.path}")
+        logger.error(f"Content-Type: {request.headers.get('content-type')}")
+        logger.error(f"Exception cause: {exc.__cause__}")
+        if exc.__cause__:
+            logger.error(f"Cause traceback: {''.join(traceback.format_exception(type(exc.__cause__), exc.__cause__, exc.__cause__.__traceback__))}")
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+
+# Debug middleware to log request bodies for purchase-requests endpoint
+# NOTE: This middleware is disabled to avoid consuming the request body
+# Uncomment for debugging if needed
+# @app.middleware("http")
+# async def debug_request_middleware(request: Request, call_next):
+#     if "purchase-requests" in request.url.path and request.method in ["POST", "PUT"]:
+#         # Read the body
+#         body = await request.body()
+#         logger.info(f"[DEBUG] Request to {request.url.path}")
+#         logger.info(f"[DEBUG] Method: {request.method}")
+#         logger.info(f"[DEBUG] Content-Type: {request.headers.get('content-type')}")
+#         logger.info(f"[DEBUG] Body length: {len(body)} bytes")
+#
+#         # Try to parse as JSON to see if it's valid
+#         if body:
+#             try:
+#                 body_str = body.decode('utf-8')
+#                 logger.info(f"[DEBUG] Body (first 2000 chars): {body_str[:2000]}")
+#                 parsed = json.loads(body_str)
+#                 logger.info(f"[DEBUG] JSON parsed successfully")
+#             except json.JSONDecodeError as e:
+#                 logger.error(f"[DEBUG] JSON decode error: {e}")
+#             except Exception as e:
+#                 logger.error(f"[DEBUG] Error parsing body: {e}")
+#         else:
+#             logger.warning(f"[DEBUG] Empty body received!")
+#
+#         # Reconstruct request with body for downstream handlers
+#         async def receive():
+#             return {"type": "http.request", "body": body}
+#
+#         request = Request(request.scope, receive)
+#
+#     response = await call_next(request)
+#     return response
 
 
 # Include routers

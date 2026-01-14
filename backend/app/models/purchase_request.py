@@ -4,7 +4,7 @@ PR system for requesting items before creating Purchase Orders
 """
 
 from beanie import Document, Indexed
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
@@ -144,6 +144,8 @@ class PurchaseRequest(Document):
 
 class PRLineItemCreate(BaseModel):
     """Schema for creating PR line item"""
+    model_config = ConfigDict(populate_by_name=True)
+
     item_code: Optional[str] = None
     item_name: str
     item_description: Optional[str] = None
@@ -154,9 +156,9 @@ class PRLineItemCreate(BaseModel):
     division_code: Optional[str] = None
     class_code: Optional[str] = None
     sub_class_code: Optional[str] = None
-    quantity: float
+    quantity: float = Field(..., gt=0, description="Quantity must be greater than 0")
     unit: str = "PCS"
-    estimated_unit_rate: Optional[float] = None
+    estimated_unit_rate: Optional[float] = Field(default=None, ge=0)
     required_date: Optional[date] = None
     # Specifications
     colour_code: Optional[str] = None
@@ -172,6 +174,21 @@ class PRLineItemCreate(BaseModel):
     notes: Optional[str] = None
     is_new_item: Optional[bool] = False
 
+    @field_validator('item_name')
+    @classmethod
+    def validate_item_name(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Item name cannot be empty')
+        return v.strip()
+
+    @field_validator('suggested_supplier_code', 'suggested_brand_code', mode='before')
+    @classmethod
+    def clean_placeholder_values(cls, v):
+        """Convert placeholder values like 'Select' to None"""
+        if v in (None, '', 'Select', 'undefined', 'null'):
+            return None
+        return v
+
 
 class PurchaseRequestCreate(BaseModel):
     """Schema for creating Purchase Request"""
@@ -183,7 +200,7 @@ class PurchaseRequestCreate(BaseModel):
     required_by_date: Optional[date] = None
     purpose: Optional[str] = None
     justification: Optional[str] = None
-    line_items: List[PRLineItemCreate] = Field(default=[], alias='items')
+    items: List[PRLineItemCreate] = Field(default=[])
     notes: Optional[str] = None
 
 
@@ -196,7 +213,7 @@ class PurchaseRequestUpdate(BaseModel):
     required_by_date: Optional[date] = None
     purpose: Optional[str] = None
     justification: Optional[str] = None
-    line_items: Optional[List[PRLineItemCreate]] = Field(default=None, alias='items')
+    items: Optional[List[PRLineItemCreate]] = Field(default=None)
     notes: Optional[str] = None
 
 

@@ -65,6 +65,7 @@ export default function ItemCreateForm({
     defaultUom: 'PCS',
     storageUom: 'PCS',
     purchaseUom: 'PCS',
+    uomConversionFactor: 1.0,
   })
   
   // Form data
@@ -1019,6 +1020,7 @@ export default function ItemCreateForm({
         defaultUom: fullCategory.default_uom || 'PCS',
         storageUom: fullCategory.storage_uom || 'PCS',
         purchaseUom: fullCategory.purchase_uom || 'PCS',
+        uomConversionFactor: fullCategory.uom_conversion_factor || 1.0,
       })
 
       // Fetch next available SKU for this item type (ONLY in create mode)
@@ -1045,6 +1047,7 @@ export default function ItemCreateForm({
         defaultUom: category.default_uom || 'PCS',
         storageUom: category.storage_uom || 'PCS',
         purchaseUom: category.purchase_uom || 'PCS',
+        uomConversionFactor: category.uom_conversion_factor || 1.0,
       })
     }
   }
@@ -1848,9 +1851,9 @@ export default function ItemCreateForm({
                       />
                       <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                    <p className="text-xs text-gray-500 mt-1">From category (inventory unit)</p>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">Purchase UOM</label>
                     <div className="relative">
@@ -1862,9 +1865,23 @@ export default function ItemCreateForm({
                       />
                       <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                    <p className="text-xs text-gray-500 mt-1">From category (buying unit)</p>
                   </div>
                 </div>
+
+                {/* UOM Conversion Factor Display */}
+                {autoFilledData.uomConversionFactor && autoFilledData.uomConversionFactor !== 1.0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Lock className="w-4 h-4 text-blue-600" />
+                      <span className="text-blue-700 font-medium">Conversion:</span>
+                      <span className="text-blue-800">
+                        1 {autoFilledData.purchaseUom || 'PCS'} = {autoFilledData.uomConversionFactor} {autoFilledData.storageUom || 'PCS'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">Auto-converts during goods receipt</p>
+                  </div>
+                )}
 
                 {/* Opening Stock - Only show for full mode */}
                 {isFullMode && (
@@ -2362,9 +2379,9 @@ export default function ItemCreateForm({
                       />
                       <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                    <p className="text-xs text-gray-500 mt-1">From category (inventory unit)</p>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">Purchase UOM</label>
                     <div className="relative">
@@ -2376,9 +2393,23 @@ export default function ItemCreateForm({
                       />
                       <Lock className="absolute right-3 top-2.5 w-4 h-4 text-green-600" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">From category</p>
+                    <p className="text-xs text-gray-500 mt-1">From category (buying unit)</p>
                   </div>
                 </div>
+
+                {/* UOM Conversion Factor Display */}
+                {autoFilledData.uomConversionFactor && autoFilledData.uomConversionFactor !== 1.0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Lock className="w-4 h-4 text-blue-600" />
+                      <span className="text-blue-700 font-medium">Conversion:</span>
+                      <span className="text-blue-800">
+                        1 {autoFilledData.purchaseUom || 'PCS'} = {autoFilledData.uomConversionFactor} {autoFilledData.storageUom || 'PCS'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">Auto-converts during goods receipt</p>
+                  </div>
+                )}
 
                 {/* Opening Stock - Only show for full mode */}
                 {isFullMode && (

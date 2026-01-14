@@ -335,7 +335,12 @@ const PurchaseOrderList = () => {
                 {poList.map((po) => (
                   <tr key={po.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{po.po_number}</div>
+                      <button
+                        onClick={() => navigate(`/purchase-orders/${po.po_number}`)}
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition"
+                      >
+                        {po.po_number}
+                      </button>
                       <div className="text-xs text-gray-500">
                         By: {po.created_by}
                       </div>

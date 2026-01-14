@@ -190,11 +190,11 @@ const PurchaseOrderDetail = () => {
           <div className="space-y-2">
             <div>
               <span className="text-sm text-gray-500">Company Name</span>
-              <p className="font-medium text-gray-900">{po.supplier_name || 'N/A'}</p>
+              <p className="font-medium text-gray-900">{po.supplier?.name || 'N/A'}</p>
             </div>
             <div>
               <span className="text-sm text-gray-500">Supplier Code</span>
-              <p className="font-medium text-gray-900">{po.supplier_code}</p>
+              <p className="font-medium text-gray-900">{po.supplier?.code || 'N/A'}</p>
             </div>
           </div>
         </div>
@@ -218,7 +218,7 @@ const PurchaseOrderDetail = () => {
             </div>
             <div>
               <span className="text-sm text-gray-500">Created By</span>
-              <p className="font-medium text-gray-900">{po.created_by}</p>
+              <p className="font-medium text-gray-900">{po.tracking?.created_by || 'N/A'}</p>
             </div>
           </div>
         </div>
@@ -232,15 +232,15 @@ const PurchaseOrderDetail = () => {
           <div className="space-y-2">
             <div>
               <span className="text-sm text-gray-500">Location</span>
-              <p className="font-medium text-gray-900">{po.delivery_location}</p>
+              <p className="font-medium text-gray-900">{po.delivery?.location || 'N/A'}</p>
             </div>
             <div>
               <span className="text-sm text-gray-500">Method</span>
-              <p className="font-medium text-gray-900">{po.delivery_method}</p>
+              <p className="font-medium text-gray-900">{po.delivery?.method || 'N/A'}</p>
             </div>
             <div>
               <span className="text-sm text-gray-500">Lead Time</span>
-              <p className="font-medium text-gray-900">{po.lead_time_days} days</p>
+              <p className="font-medium text-gray-900">{po.delivery?.lead_time_days || 0} days</p>
             </div>
           </div>
         </div>
@@ -303,23 +303,23 @@ const PurchaseOrderDetail = () => {
           <div className="w-full max-w-md space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Subtotal:</span>
-              <span className="font-medium">₹{po.subtotal?.toFixed(2) || '0.00'}</span>
+              <span className="font-medium">₹{po.summary?.subtotal?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Discount:</span>
-              <span className="font-medium text-red-600">-₹{po.total_discount?.toFixed(2) || '0.00'}</span>
+              <span className="font-medium text-red-600">-₹{po.summary?.total_discount?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Taxable Amount:</span>
-              <span className="font-medium">₹{po.total_taxable?.toFixed(2) || '0.00'}</span>
+              <span className="font-medium">₹{po.summary?.total_taxable?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Total GST:</span>
-              <span className="font-medium">₹{po.total_gst?.toFixed(2) || '0.00'}</span>
+              <span className="font-medium">₹{po.summary?.total_gst?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex justify-between text-lg font-bold border-t pt-2">
               <span className="text-gray-900">Grand Total:</span>
-              <span className="text-blue-600">₹{po.grand_total?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</span>
+              <span className="text-blue-600">₹{po.summary?.grand_total?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</span>
             </div>
           </div>
         </div>
@@ -334,15 +334,15 @@ const PurchaseOrderDetail = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-sm text-gray-500">Payment Terms</span>
-            <p className="font-medium text-gray-900">{po.payment_terms}</p>
+            <p className="font-medium text-gray-900">{po.payment?.terms || 'N/A'}</p>
           </div>
           <div>
             <span className="text-sm text-gray-500">Payment Method</span>
-            <p className="font-medium text-gray-900">{po.payment_method}</p>
+            <p className="font-medium text-gray-900">{po.payment?.method || 'N/A'}</p>
           </div>
           <div>
             <span className="text-sm text-gray-500">Currency</span>
-            <p className="font-medium text-gray-900">{po.currency}</p>
+            <p className="font-medium text-gray-900">{po.payment?.currency || 'INR'}</p>
           </div>
         </div>
       </div>

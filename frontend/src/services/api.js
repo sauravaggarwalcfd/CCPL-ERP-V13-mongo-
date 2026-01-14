@@ -21,12 +21,35 @@ const api = axios.create({
   withCredentials: false
 })
 
-// Request interceptor to add Bearer token
+// Request interceptor to add Bearer token and debug logging
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  // Debug logging for purchase-requests
+  if (config.url && config.url.includes('purchase-requests')) {
+    console.log('=== Axios Request Debug ===')
+    console.log('URL:', config.url)
+    console.log('Method:', config.method)
+    console.log('Headers:', config.headers)
+    console.log('Data type:', typeof config.data)
+    console.log('Data:', config.data)
+    if (typeof config.data === 'string') {
+      console.log('Data is already stringified, length:', config.data.length)
+    } else if (config.data) {
+      try {
+        const stringified = JSON.stringify(config.data)
+        console.log('Data stringified length:', stringified.length)
+        console.log('Data stringified (first 1000):', stringified.substring(0, 1000))
+      } catch (e) {
+        console.error('Cannot stringify data:', e)
+      }
+    }
+    console.log('=== End Axios Debug ===')
+  }
+
   return config
 }, (error) => {
   return Promise.reject(error)

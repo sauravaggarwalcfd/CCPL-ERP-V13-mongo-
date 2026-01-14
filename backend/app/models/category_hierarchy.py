@@ -255,10 +255,11 @@ class ItemSubClass(Document):
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
     
-    # UOM Configuration
+    # UOM Configuration - MANDATORY at Level 5 (Sub-Class)
     storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
     purchase_uom: str = "PCS"  # Unit for purchase orders
-    
+    uom_conversion_factor: float = 1.0  # 1 purchase_uom = X storage_uom (e.g., 1 BOX = 12 PCS)
+
     icon: str = "Hash"
     color_code: str = "#f59e0b"
     sort_order: int = 0
@@ -398,10 +399,11 @@ class ItemSubClassCreate(BaseModel):
     gst_rate: Optional[float] = None
     storage_uom: str = "PCS"
     purchase_uom: str = "PCS"
+    uom_conversion_factor: float = Field(default=1.0, gt=0, description="1 purchase_uom = X storage_uom")
     icon: str = "Hash"
     color_code: str = "#f59e0b"
     sort_order: int = 0
-    
+
     @field_validator('sub_class_code', 'category_code', 'sub_category_code', 'division_code', 'class_code')
     @classmethod
     def validate_code(cls, v):
@@ -489,6 +491,7 @@ class ItemSubClassUpdate(BaseModel):
     gst_rate: Optional[float] = None
     storage_uom: Optional[str] = None
     purchase_uom: Optional[str] = None
+    uom_conversion_factor: Optional[float] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None

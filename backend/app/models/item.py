@@ -72,8 +72,11 @@ class ItemMaster(Document):
     supplier_id: Optional[str] = None
     supplier_name: Optional[str] = None
     
-    # UOM and Inventory
-    uom: str = "PCS"
+    # UOM and Inventory - Inherited from category (read-only at item level)
+    uom: str = "PCS"  # Keep for backwards compatibility (= storage_uom)
+    storage_uom: str = "PCS"      # Storage/inventory UOM (inherited from category)
+    purchase_uom: str = "PCS"     # Purchase UOM (inherited from category)
+    uom_conversion_factor: float = 1.0  # 1 purchase_uom = X storage_uom (inherited from category)
     inventory_type: InventoryType = InventoryType.STOCKED
     
     # Pricing
@@ -176,7 +179,10 @@ class ItemMasterCreate(BaseModel):
     brand_name: Optional[str] = None
     supplier_id: Optional[str] = None
     supplier_name: Optional[str] = None
-    uom: str = "PCS"
+    uom: str = "PCS"  # For backwards compatibility
+    storage_uom: str = "PCS"
+    purchase_uom: str = "PCS"
+    uom_conversion_factor: float = 1.0
     inventory_type: InventoryType = InventoryType.STOCKED
     cost_price: float = 0.0
     selling_price: float = 0.0
@@ -214,7 +220,8 @@ class ItemMasterUpdate(BaseModel):
     size_name: Optional[str] = None
     brand_id: Optional[str] = None
     brand_name: Optional[str] = None
-    uom: Optional[str] = None
+    # Note: uom, storage_uom, purchase_uom, uom_conversion_factor are NOT updatable
+    # They are inherited from category and cannot be changed
     inventory_type: Optional[InventoryType] = None
     cost_price: Optional[float] = None
     selling_price: Optional[float] = None
@@ -254,6 +261,9 @@ class ItemMasterResponse(BaseModel):
     hierarchy_path: Optional[str]
     hierarchy_path_name: Optional[str]
     uom: str
+    storage_uom: str = "PCS"
+    purchase_uom: str = "PCS"
+    uom_conversion_factor: float = 1.0
     cost_price: float
     selling_price: float
     mrp: float

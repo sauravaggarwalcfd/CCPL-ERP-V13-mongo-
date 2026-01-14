@@ -208,6 +208,38 @@ async def get_purchase_request(
         raise HTTPException(500, f"Error getting purchase request: {str(e)}")
 
 
+@router.post("/purchase-requests/validate")
+async def validate_purchase_request(
+    pr_data: PurchaseRequestCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Validate purchase request data without creating"""
+    try:
+        logger.info(f"[VALIDATE] PR Data received: {pr_data}")
+        logger.info(f"[VALIDATE] Items count: {len(pr_data.items)}")
+
+        # Return validation success with parsed data
+        return {
+            "valid": True,
+            "parsed_data": {
+                "pr_date": str(pr_data.pr_date) if pr_data.pr_date else None,
+                "department": pr_data.department,
+                "priority": pr_data.priority,
+                "required_by_date": str(pr_data.required_by_date) if pr_data.required_by_date else None,
+                "purpose": pr_data.purpose,
+                "justification": pr_data.justification,
+                "items_count": len(pr_data.items),
+                "first_item": {
+                    "item_name": pr_data.items[0].item_name if pr_data.items else None,
+                    "quantity": pr_data.items[0].quantity if pr_data.items else None,
+                } if pr_data.items else None
+            }
+        }
+    except Exception as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(400, f"Validation error: {str(e)}")
+
+
 @router.post("/purchase-requests", status_code=status.HTTP_201_CREATED)
 async def create_purchase_request(
     pr_data: PurchaseRequestCreate,
@@ -215,17 +247,20 @@ async def create_purchase_request(
 ):
     """Create new purchase request"""
     try:
-        # Debug logging
-        logger.info(f"PR Data received: {pr_data}")
-        logger.info(f"PR Data line_items: {pr_data.line_items}")
-        logger.info(f"Current user: {current_user}, type: {type(current_user)}")
-        
+        # Debug logging - log after successful parsing
+        logger.info(f"[CREATE PR] Successfully parsed request body")
+        logger.info(f"[CREATE PR] PR date: {pr_data.pr_date}, Priority: {pr_data.priority}")
+        logger.info(f"[CREATE PR] Items count: {len(pr_data.items)}")
+        if pr_data.items:
+            logger.info(f"[CREATE PR] First item: {pr_data.items[0].item_name}, qty: {pr_data.items[0].quantity}")
+        logger.info(f"[CREATE PR] Current user type: {type(current_user)}")
+
         # Generate PR number
         pr_code = await generate_pr_number()
-        
+
         # Build line items
         line_items = []
-        for idx, item in enumerate(pr_data.line_items, start=1):
+        for idx, item in enumerate(pr_data.items, start=1):
             estimated_amount = None
             if item.estimated_unit_rate and item.quantity:
                 estimated_amount = item.estimated_unit_rate * item.quantity
@@ -327,9 +362,9 @@ async def update_purchase_request(
             pr.notes = pr_data.notes
 
         # Update items if provided
-        if pr_data.line_items is not None:
+        if pr_data.items is not None:
             line_items = []
-            for idx, item in enumerate(pr_data.line_items, start=1):
+            for idx, item in enumerate(pr_data.items, start=1):
                 estimated_amount = None
                 if item.estimated_unit_rate and item.quantity:
                     estimated_amount = item.estimated_unit_rate * item.quantity
