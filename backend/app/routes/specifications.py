@@ -827,8 +827,8 @@ async def get_item_specifications(item_code: str):
 @router.post("/items/{item_code}/specifications", response_model=ItemSpecificationsResponse)
 async def create_or_update_item_specifications(
     item_code: str,
-    category_code: str,
-    data: ItemSpecificationsRequest
+    data: ItemSpecificationsRequest,
+    category_code: str = Query(..., description="Category code for the item")
 ):
     """Create or update specifications for an item"""
     # Check if exists

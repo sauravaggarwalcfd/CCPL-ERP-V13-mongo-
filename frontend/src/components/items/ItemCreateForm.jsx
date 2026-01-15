@@ -1327,15 +1327,25 @@ export default function ItemCreateForm({
 
         if (hasSpecifications && effectiveCategoryCode) {
           try {
+            // Create a clean specifications object to avoid circular references
+            const cleanSpecifications = {
+              colour_code: specifications.colour_code || null,
+              size_code: specifications.size_code || null,
+              uom_code: specifications.uom_code || null,
+              vendor_code: specifications.vendor_code || null,
+              brand_code: specifications.brand_code || null,
+              supplier_code: specifications.supplier_code || null,
+              custom_field_values: specifications.custom_field_values ? { ...specifications.custom_field_values } : {}
+            };
             console.log('[UPDATE] Saving specifications:', {
               itemCode: formData.sku,
               categoryCode: effectiveCategoryCode,
-              specifications: specifications
+              specifications: cleanSpecifications
             });
             await itemSpecificationApi.createOrUpdate(
               formData.sku,
               effectiveCategoryCode,
-              specifications
+              cleanSpecifications
             );
             console.log('[UPDATE] Specifications saved successfully')
           } catch (specError) {
@@ -1360,10 +1370,20 @@ export default function ItemCreateForm({
 
         if (hasSpecifications && effectiveCategoryCode) {
           try {
+            // Create a clean specifications object to avoid circular references
+            const cleanSpecifications = {
+              colour_code: specifications.colour_code || null,
+              size_code: specifications.size_code || null,
+              uom_code: specifications.uom_code || null,
+              vendor_code: specifications.vendor_code || null,
+              brand_code: specifications.brand_code || null,
+              supplier_code: specifications.supplier_code || null,
+              custom_field_values: specifications.custom_field_values ? { ...specifications.custom_field_values } : {}
+            };
             await itemSpecificationApi.createOrUpdate(
               formData.sku,
               effectiveCategoryCode,
-              specifications
+              cleanSpecifications
             );
           } catch (specError) {
             console.error('Error saving specifications:', specError);

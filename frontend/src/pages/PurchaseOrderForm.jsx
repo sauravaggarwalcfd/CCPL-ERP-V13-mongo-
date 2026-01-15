@@ -499,9 +499,37 @@ const PurchaseOrderForm = () => {
   }
 
   // Handle selecting an item from search results
-  const handleSelectItemFromSearch = (lineItemId, selectedItem) => {
+  const handleSelectItemFromSearch = async (lineItemId, selectedItem) => {
+    // Fetch current UOM settings from item's category (sub-class)
+    let categoryUom = {
+      purchase_uom: selectedItem.purchase_uom || selectedItem.uom || 'PCS',
+      storage_uom: selectedItem.storage_uom || selectedItem.uom || 'PCS',
+      uom_conversion_factor: selectedItem.uom_conversion_factor || 1.0
+    }
+
+    // Try to fetch latest UOM from the item's category (sub-class level 5)
+    const subClassCode = selectedItem.sub_class_code
+    if (subClassCode) {
+      try {
+        const response = await categoryHierarchy.getSubClasses()
+        if (response?.data) {
+          const subClass = response.data.find(sc => sc.code === subClassCode)
+          if (subClass) {
+            categoryUom = {
+              purchase_uom: subClass.purchase_uom || 'PCS',
+              storage_uom: subClass.storage_uom || 'PCS',
+              uom_conversion_factor: subClass.uom_conversion_factor || 1.0
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching category UOM:', error)
+        // Fall back to item's stored UOM
+      }
+    }
+
     // Update the line item with selected item data
-    // UOM is locked to item's purchase_uom (inherited from category)
+    // UOM is locked to category's purchase_uom, cannot be changed
     setLineItems(lineItems.map(item => {
       if (item.id === lineItemId) {
         return {
@@ -511,10 +539,10 @@ const PurchaseOrderForm = () => {
           item_description: selectedItem.description || selectedItem.item_description || '',
           hsn_code: selectedItem.hsn_code || '',
           gst_percent: selectedItem.gst_rate || selectedItem.gst_percent || 18,
-          // UOM - locked to item's purchase_uom (from category), cannot be changed
-          unit: selectedItem.purchase_uom || selectedItem.uom || selectedItem.unit || 'PCS',
-          storage_uom: selectedItem.storage_uom || selectedItem.uom || 'PCS',
-          uom_conversion_factor: selectedItem.uom_conversion_factor || 1.0,
+          // UOM - locked to category's purchase_uom, cannot be changed
+          unit: categoryUom.purchase_uom,
+          storage_uom: categoryUom.storage_uom,
+          uom_conversion_factor: categoryUom.uom_conversion_factor,
           unit_rate: selectedItem.purchase_price || selectedItem.unit_rate || 0
         }
       }
@@ -790,23 +818,56 @@ const PurchaseOrderForm = () => {
             {/* Quick Add from Existing Items Dropdown */}
             <select
               value=""
-              onChange={(e) => {
+              onChange={async (e) => {
                 if (e.target.value) {
                   const selectedItem = itemsList.find(item => item.item_code === e.target.value)
                   if (selectedItem) {
-                    // Add item to line items
+                    // Fetch current UOM settings from item's category (sub-class)
+                    let categoryUom = {
+                      purchase_uom: selectedItem.purchase_uom || selectedItem.uom || 'PCS',
+                      storage_uom: selectedItem.storage_uom || selectedItem.uom || 'PCS',
+                      uom_conversion_factor: selectedItem.uom_conversion_factor || 1.0
+                    }
+
+                    // Try to fetch latest UOM from the item's category (sub-class level 5)
+                    const subClassCode = selectedItem.sub_class_code
+                    if (subClassCode) {
+                      try {
+                        const response = await categoryHierarchy.getSubClasses()
+                        if (response?.data) {
+                          const subClass = response.data.find(sc => sc.code === subClassCode)
+                          if (subClass) {
+                            categoryUom = {
+                              purchase_uom: subClass.purchase_uom || 'PCS',
+                              storage_uom: subClass.storage_uom || 'PCS',
+                              uom_conversion_factor: subClass.uom_conversion_factor || 1.0
+                            }
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error fetching category UOM:', error)
+                      }
+                    }
+
+                    // Add item to line items with category UOM
                     const newLineItem = {
                       id: Date.now(),
                       item_code: selectedItem.item_code,
                       item_name: selectedItem.item_name,
+                      item_description: selectedItem.description || selectedItem.item_description || '',
                       category_code: selectedItem.category_code,
                       quantity: 1,
-                      unit_price: 0,
+                      unit: categoryUom.purchase_uom,
+                      storage_uom: categoryUom.storage_uom,
+                      uom_conversion_factor: categoryUom.uom_conversion_factor,
+                      unit_rate: selectedItem.purchase_price || selectedItem.cost_price || 0,
                       discount_percent: 0,
-                      tax_percent: 0,
+                      hsn_code: selectedItem.hsn_code || '',
+                      gst_percent: selectedItem.gst_rate || selectedItem.gst_percent || 18,
                       notes: ''
                     }
                     setLineItems([...lineItems, newLineItem])
+                    toast.success(`Added: ${selectedItem.item_name}`)
                     // Reset dropdown
                     e.target.value = ''
                   }

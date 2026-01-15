@@ -51,6 +51,7 @@ class ItemCategory(Document):
     # UOM Settings - Fixed per category
     purchase_uom: str = "PCS"  # Unit for purchasing (e.g., PCS, KG, MTR, BOX)
     storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
+    uom_conversion_factor: float = 1.0  # 1 purchase_uom = X storage_uom
 
     icon: str = "Package"
     color_code: str = "#10b981"
@@ -98,7 +99,8 @@ class ItemSubCategory(Document):
     # UOM Configuration
     storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
     purchase_uom: str = "PCS"  # Unit for purchase orders
-    
+    uom_conversion_factor: float = 1.0  # 1 purchase_uom = X storage_uom
+
     icon: str = "Users"
     color_code: str = "#3b82f6"
     sort_order: int = 0
@@ -146,7 +148,8 @@ class ItemDivision(Document):
     # UOM Configuration
     storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
     purchase_uom: str = "PCS"  # Unit for purchase orders
-    
+    uom_conversion_factor: float = 1.0  # 1 purchase_uom = X storage_uom
+
     icon: str = "Layers"
     color_code: str = "#8b5cf6"
     sort_order: int = 0
@@ -199,7 +202,8 @@ class ItemClass(Document):
     # UOM Configuration
     storage_uom: str = "PCS"   # Unit for storage/inventory (e.g., PCS, KG, MTR)
     purchase_uom: str = "PCS"  # Unit for purchase orders
-    
+    uom_conversion_factor: float = 1.0  # 1 purchase_uom = X storage_uom
+
     icon: str = "Tag"
     color_code: str = "#ec4899"
     sort_order: int = 0
@@ -427,6 +431,7 @@ class ItemCategoryUpdate(BaseModel):
     default_gst_rate: Optional[float] = None
     purchase_uom: Optional[str] = None
     storage_uom: Optional[str] = None
+    uom_conversion_factor: Optional[float] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None
@@ -442,6 +447,7 @@ class ItemSubCategoryUpdate(BaseModel):
     has_fabric: Optional[bool] = None
     storage_uom: Optional[str] = None
     purchase_uom: Optional[str] = None
+    uom_conversion_factor: Optional[float] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None
@@ -457,6 +463,7 @@ class ItemDivisionUpdate(BaseModel):
     has_fabric: Optional[bool] = None
     storage_uom: Optional[str] = None
     purchase_uom: Optional[str] = None
+    uom_conversion_factor: Optional[float] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None
@@ -474,6 +481,7 @@ class ItemClassUpdate(BaseModel):
     gst_rate: Optional[float] = None
     storage_uom: Optional[str] = None
     purchase_uom: Optional[str] = None
+    uom_conversion_factor: Optional[float] = None
     icon: Optional[str] = None
     color_code: Optional[str] = None
     sort_order: Optional[int] = None

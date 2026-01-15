@@ -23,8 +23,8 @@ class UOMMaster(Document):
     """UOM Master Document"""
     uom_code: Indexed(str, unique=True)
     uom_name: str
-    uom_group: str  # Changed from Enum to str
-    group_name: str  # Display name
+    uom_group: str = "GENERAL"  # Default group - grouping system simplified
+    group_name: str = "General"  # Display name
     uom_symbol: str  # Symbol for display (kg, m, l, pcs, etc.)
     conversion_to_base: float = 1.0  # Conversion factor to base unit
     is_base_uom: bool = False  # Is this the base unit in the group?
@@ -54,7 +54,7 @@ class UOMMaster(Document):
 class UOMCreate(BaseModel):
     uom_code: str = Field(..., min_length=1, max_length=20)
     uom_name: str
-    uom_group: str
+    uom_group: str = "GENERAL"  # Default group - grouping system removed
     uom_symbol: str
     conversion_to_base: float = 1.0
     is_base_uom: bool = False

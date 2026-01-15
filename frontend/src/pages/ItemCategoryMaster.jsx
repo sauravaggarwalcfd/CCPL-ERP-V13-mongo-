@@ -140,6 +140,17 @@ export default function ItemCategoryMaster() {
   const [divisionOptions, setDivisionOptions] = useState([])
   const [classOptions, setClassOptions] = useState([])
 
+  // UOM options from database (with defaults until loaded)
+  const [uomOptions, setUomOptions] = useState([
+    { code: 'PCS', name: 'Pieces', symbol: 'pcs' },
+    { code: 'DOZ', name: 'Dozen', symbol: 'doz' },
+    { code: 'KG', name: 'Kilogram', symbol: 'kg' },
+    { code: 'GM', name: 'Gram', symbol: 'gm' },
+    { code: 'MTR', name: 'Meter', symbol: 'm' },
+    { code: 'BOX', name: 'Box', symbol: 'box' },
+    { code: 'SET', name: 'Set', symbol: 'set' },
+  ])
+
   // Parent category level names (for inheritance)
   const [parentLevelNames, setParentLevelNames] = useState(null)
   
@@ -352,6 +363,51 @@ export default function ItemCategoryMaster() {
     }
   }, [])
 
+  // Fetch UOMs from database
+  const fetchUOMs = useCallback(async () => {
+    try {
+      const response = await uomApi.list({ is_active: true })
+      console.log('UOM API Response:', response)
+      const uoms = response.data || []
+      console.log('UOMs fetched:', uoms)
+
+      if (uoms.length > 0) {
+        // Map to consistent format for dropdowns
+        const mappedUoms = uoms.map(u => ({
+          code: u.uom_code,
+          name: u.uom_name,
+          symbol: u.uom_symbol
+        }))
+        console.log('Mapped UOMs:', mappedUoms)
+        setUomOptions(mappedUoms)
+      } else {
+        // No UOMs in database, use defaults
+        console.log('No UOMs in database, using defaults')
+        setUomOptions([
+          { code: 'PCS', name: 'Pieces', symbol: 'pcs' },
+          { code: 'DOZ', name: 'Dozen', symbol: 'doz' },
+          { code: 'KG', name: 'Kilogram', symbol: 'kg' },
+          { code: 'GM', name: 'Gram', symbol: 'gm' },
+          { code: 'MTR', name: 'Meter', symbol: 'm' },
+          { code: 'BOX', name: 'Box', symbol: 'box' },
+          { code: 'SET', name: 'Set', symbol: 'set' },
+        ])
+      }
+    } catch (error) {
+      console.error('Fetch UOMs error:', error)
+      // Fallback to default UOMs if fetch fails
+      setUomOptions([
+        { code: 'PCS', name: 'Pieces', symbol: 'pcs' },
+        { code: 'DOZ', name: 'Dozen', symbol: 'doz' },
+        { code: 'KG', name: 'Kilogram', symbol: 'kg' },
+        { code: 'GM', name: 'Gram', symbol: 'gm' },
+        { code: 'MTR', name: 'Meter', symbol: 'm' },
+        { code: 'BOX', name: 'Box', symbol: 'box' },
+        { code: 'SET', name: 'Set', symbol: 'set' },
+      ])
+    }
+  }, [])
+
   // Fetch dropdown options
   const fetchDropdownOptions = useCallback(async (level, parentCodes = {}) => {
     try {
@@ -391,7 +447,8 @@ export default function ItemCategoryMaster() {
     fetchList()
     fetchItemTypes()
     fetchVariantGroups()
-  }, [fetchTree, fetchList, fetchItemTypes, fetchVariantGroups, setTitle])
+    fetchUOMs()
+  }, [fetchTree, fetchList, fetchItemTypes, fetchVariantGroups, fetchUOMs, setTitle])
 
   useEffect(() => {
     fetchList()
@@ -589,6 +646,7 @@ export default function ItemCategoryMaster() {
       default_gst_rate: item.default_gst_rate || 5.0,
       storage_uom: item.storage_uom || 'PCS',
       purchase_uom: item.purchase_uom || 'PCS',
+      uom_conversion_factor: item.uom_conversion_factor || 1,
       icon: item.icon || 'Package',
       color_code: item.color_code || '#10b981',
       sort_order: item.sort_order || 0,
@@ -976,6 +1034,7 @@ export default function ItemCategoryMaster() {
         sort_order: formData.sort_order,
         storage_uom: formData.storage_uom,
         purchase_uom: formData.purchase_uom,
+        uom_conversion_factor: formData.uom_conversion_factor,
       }
       
       // Add level-specific fields for Level 1
@@ -1805,17 +1864,37 @@ export default function ItemCategoryMaster() {
                     </p>
                   )}
                 </div>
-                <button
-                  onClick={() => setShowPanel(false)}
-                  className="p-1 hover:bg-white/20 rounded transition"
-                >
-                  <X size={24} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => document.querySelector('#category-form-main')?.requestSubmit()}
+                    disabled={saving}
+                    className="px-3 py-1.5 bg-white text-emerald-700 rounded-lg hover:bg-emerald-100 transition font-medium flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={16} />
+                        {panelMode === 'create' ? 'Create' : 'Update'}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowPanel(false)}
+                    className="p-1 hover:bg-white/20 rounded transition"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Panel Body */}
-            <form onSubmit={handleSubmit} className="p-4 text-sm">
+            <form id="category-form-main" onSubmit={handleSubmit} className="p-4 text-sm">
               {/* Step 1: Select Item Type */}
               <div className={`mb-6 p-4 rounded-lg border-2 ${
                 formErrors.item_type 
@@ -2181,7 +2260,7 @@ export default function ItemCategoryMaster() {
                     />
                   </div>
                   
-                  {/* Storage UOM - Available for ALL Levels */}
+                  {/* Storage UOM - Available for ALL Levels - From UOM Master */}
                   <div className="space-y-2">
                     <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Storage UOM
@@ -2191,21 +2270,16 @@ export default function ItemCategoryMaster() {
                       onChange={(e) => setFormData(prev => ({ ...prev, storage_uom: e.target.value }))}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
                     >
-                      <option value="PCS">PCS (Pieces)</option>
-                      <option value="DOZ">DOZ (Dozen)</option>
-                      <option value="KG">KG (Kilogram)</option>
-                      <option value="GM">GM (Gram)</option>
-                      <option value="MTR">MTR (Meter)</option>
-                      <option value="CM">CM (Centimeter)</option>
-                      <option value="LTR">LTR (Liter)</option>
-                      <option value="ML">ML (Milliliter)</option>
-                      <option value="BOX">BOX</option>
-                      <option value="SET">SET</option>
-                      <option value="PAIR">PAIR</option>
+                      {uomOptions.map(uom => (
+                        <option key={uom.code} value={uom.code}>
+                          {uom.code} ({uom.name})
+                        </option>
+                      ))}
                     </select>
+                    <p className="text-xs text-gray-500">Manage UOMs in Variant Master → UOM</p>
                   </div>
 
-                  {/* Purchase UOM - Available for ALL Levels */}
+                  {/* Purchase UOM - Available for ALL Levels - From UOM Master */}
                   <div className="space-y-2">
                     <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Purchase UOM
@@ -2215,18 +2289,13 @@ export default function ItemCategoryMaster() {
                       onChange={(e) => setFormData(prev => ({ ...prev, purchase_uom: e.target.value }))}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
                     >
-                      <option value="PCS">PCS (Pieces)</option>
-                      <option value="DOZ">DOZ (Dozen)</option>
-                      <option value="KG">KG (Kilogram)</option>
-                      <option value="GM">GM (Gram)</option>
-                      <option value="MTR">MTR (Meter)</option>
-                      <option value="CM">CM (Centimeter)</option>
-                      <option value="LTR">LTR (Liter)</option>
-                      <option value="ML">ML (Milliliter)</option>
-                      <option value="BOX">BOX</option>
-                      <option value="SET">SET</option>
-                      <option value="PAIR">PAIR</option>
+                      {uomOptions.map(uom => (
+                        <option key={uom.code} value={uom.code}>
+                          {uom.code} ({uom.name})
+                        </option>
+                      ))}
                     </select>
+                    <p className="text-xs text-gray-500">Manage UOMs in Variant Master → UOM</p>
                   </div>
 
                   {/* UOM Conversion Factor - For Level 5 (Sub-Class) */}
@@ -2315,7 +2384,7 @@ export default function ItemCategoryMaster() {
                   >
                     {saving ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                         Saving...
                       </>
                     ) : (

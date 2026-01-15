@@ -180,7 +180,7 @@ class ItemSpecificationsRequest(BaseModel):
     vendor_code: Optional[str] = None
     brand_code: Optional[str] = None
     supplier_code: Optional[str] = None
-    custom_field_values: Dict[str, Any] = {}
+    custom_field_values: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ==================== RESPONSE SCHEMAS ====================

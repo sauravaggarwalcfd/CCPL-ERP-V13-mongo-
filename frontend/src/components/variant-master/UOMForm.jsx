@@ -1,17 +1,16 @@
 /**
  * UOM Form Component
- * Form for creating/editing UOMs with conversion factors
+ * Form for creating/editing UOMs - simplified without grouping
  */
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
+const UOMForm = ({ uom, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     uom_code: '',
     uom_name: '',
     uom_symbol: '',
-    uom_group: '',
     conversion_to_base: 1.0,
     is_base_uom: false,
     description: '',
@@ -24,7 +23,6 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
         uom_code: uom.uom_code || '',
         uom_name: uom.uom_name || '',
         uom_symbol: uom.uom_symbol || '',
-        uom_group: uom.uom_group || '',
         conversion_to_base: uom.conversion_to_base || 1.0,
         is_base_uom: uom.is_base_uom || false,
         description: uom.description || '',
@@ -44,10 +42,16 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Prepare data
+    // Prepare data - exclude uom_code for updates (it's in the URL)
     const submitData = {
-      ...formData,
-      conversion_to_base: parseFloat(formData.conversion_to_base),
+      uom_code: formData.uom_code,  // Only used for create
+      uom_name: formData.uom_name,
+      uom_symbol: formData.uom_symbol,
+      uom_group: 'GENERAL',  // Default group for backward compatibility
+      conversion_to_base: parseFloat(formData.conversion_to_base) || 1.0,
+      is_base_uom: formData.is_base_uom || false,
+      description: formData.description || null,
+      display_order: parseInt(formData.display_order) || 0,
     };
 
     onSubmit(submitData);
@@ -74,7 +78,7 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
           {/* UOM Code */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              UOM Code *
+              UOM Code <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -84,14 +88,17 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
               disabled={!!uom}
               required
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="e.g., KG, M, PCS"
+              placeholder="e.g., KG, MTR, PCS, BOX"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Unique code for this unit (cannot be changed after creation)
+            </p>
           </div>
 
           {/* UOM Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              UOM Name *
+              UOM Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -100,14 +107,14 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., Kilogram, Meter, Pieces"
+              placeholder="e.g., Kilogram, Meter, Pieces, Box"
             />
           </div>
 
           {/* UOM Symbol */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Symbol *
+              Symbol <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -116,53 +123,34 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., kg, m, pcs"
+              placeholder="e.g., kg, m, pcs, box"
             />
-          </div>
-
-          {/* UOM Group */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              UOM Group *
-            </label>
-            <select
-              name="uom_group"
-              value={formData.uom_group}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select Group</option>
-              {groups.map((group) => (
-                <option key={group.code} value={group.code}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Short symbol displayed in forms and reports
+            </p>
           </div>
 
           {/* Conversion Factor */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Conversion to Base *
+              Conversion Factor
             </label>
             <input
               type="number"
               name="conversion_to_base"
               value={formData.conversion_to_base}
               onChange={handleChange}
-              required
               step="0.000001"
-              min="0"
+              min="0.000001"
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Factor to convert to base unit (e.g., 1 kg = 1, 1 g = 0.001)
+              Conversion factor relative to base unit (e.g., 1 BOX = 12 PCS, so BOX conversion = 12)
             </p>
           </div>
 
           {/* Is Base UOM */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             <input
               type="checkbox"
               name="is_base_uom"
@@ -171,8 +159,8 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
               onChange={handleChange}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="is_base_uom" className="ml-2 text-sm text-gray-700">
-              Is Base UOM
+            <label htmlFor="is_base_uom" className="text-sm text-gray-700">
+              Mark as Base Unit
             </label>
           </div>
 
@@ -189,6 +177,9 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
               min="0"
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Order in which this UOM appears in dropdowns (lower = first)
+            </p>
           </div>
 
           {/* Description */}
@@ -200,9 +191,9 @@ const UOMForm = ({ uom, groups, onSubmit, onCancel }) => {
               name="description"
               value={formData.description}
               onChange={handleChange}
-              rows="3"
+              rows="2"
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Optional description"
+              placeholder="Optional description or notes"
             />
           </div>
 

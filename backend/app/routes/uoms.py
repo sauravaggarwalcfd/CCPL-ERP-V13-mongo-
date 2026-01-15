@@ -27,13 +27,13 @@ def uom_to_response(uom: UOMMaster) -> UOMResponse:
         id=str(uom.id),
         uom_code=uom.uom_code,
         uom_name=uom.uom_name,
-        uom_group=uom.uom_group,  # Now a string
-        group_name=uom.group_name,
+        uom_group=uom.uom_group or "GENERAL",
+        group_name=uom.group_name or "General",
         uom_symbol=uom.uom_symbol,
-        conversion_to_base=uom.conversion_to_base,
-        is_base_uom=uom.is_base_uom,
-        is_active=uom.is_active,
-        display_order=uom.display_order,
+        conversion_to_base=uom.conversion_to_base or 1.0,
+        is_base_uom=uom.is_base_uom or False,
+        is_active=uom.is_active if uom.is_active is not None else True,
+        display_order=uom.display_order or 0,
         description=uom.description,
         created_by=uom.created_by,
         created_date=uom.created_date,
@@ -136,35 +136,21 @@ async def create_uom(data: UOMCreate):
             detail=f"UOM with code '{data.uom_code}' already exists"
         )
 
-    # Validate group and get name
-    group = await VariantGroup.find_one(
-        VariantGroup.variant_type == VariantType.UOM,
-        VariantGroup.group_code == data.uom_group
-    )
-    
-    if not group:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid UOM group: '{data.uom_group}'"
+    # Get group name if exists, otherwise use default
+    group_name = "General"
+    if data.uom_group:
+        group = await VariantGroup.find_one(
+            VariantGroup.variant_type == VariantType.UOM,
+            VariantGroup.group_code == data.uom_group
         )
-
-    # If marked as base UOM, ensure no other base exists in this group
-    if data.is_base_uom:
-        existing_base = await UOMMaster.find_one(
-            UOMMaster.uom_group == data.uom_group,
-            UOMMaster.is_base_uom == True
-        )
-        if existing_base:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Base UOM already exists for group '{data.uom_group}': {existing_base.uom_code}"
-            )
+        if group:
+            group_name = group.group_name
 
     uom = UOMMaster(
         uom_code=data.uom_code.upper(),
         uom_name=data.uom_name,
-        uom_group=data.uom_group,
-        group_name=group.group_name,
+        uom_group=data.uom_group or "GENERAL",
+        group_name=group_name,
         uom_symbol=data.uom_symbol,
         conversion_to_base=data.conversion_to_base,
         is_base_uom=data.is_base_uom,
@@ -208,21 +194,23 @@ async def update_uom(code: str, data: UOMUpdate):
                 detail=f"Base UOM already exists for this group: {existing_base.uom_code}"
             )
 
-    # Update group name if group changed
+    # Update group name if group changed, or fix if missing
     if "uom_group" in update_data:
         group = await VariantGroup.find_one(
             VariantGroup.variant_type == VariantType.UOM,
             VariantGroup.group_code == update_data["uom_group"]
         )
-        if not group:
-             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid UOM group: '{update_data['uom_group']}'"
-            )
-        update_data["group_name"] = group.group_name
+        update_data["group_name"] = group.group_name if group else "General"
+    elif not uom.group_name:
+        # Fix missing group_name for legacy records
+        update_data["group_name"] = "General"
 
     for field, value in update_data.items():
         setattr(uom, field, value)
+
+    # Ensure group_name is never None
+    if not uom.group_name:
+        uom.group_name = "General"
 
     uom.last_modified_date = datetime.utcnow()
     await uom.save()

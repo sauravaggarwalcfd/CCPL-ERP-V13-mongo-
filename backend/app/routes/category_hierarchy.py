@@ -861,6 +861,9 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
             "child_count": cat.child_count,
             "level_names": cat.level_names,
             "item_type": cat.item_type,
+            "storage_uom": getattr(cat, 'storage_uom', 'PCS'),
+            "purchase_uom": getattr(cat, 'purchase_uom', 'PCS'),
+            "uom_conversion_factor": getattr(cat, 'uom_conversion_factor', 1.0),
             "children": []
         }
         
@@ -887,6 +890,9 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                 "child_count": subcat.child_count,
                 "item_type": subcat.item_type,
                 "category_code": subcat.category_code,
+                "storage_uom": getattr(subcat, 'storage_uom', 'PCS'),
+                "purchase_uom": getattr(subcat, 'purchase_uom', 'PCS'),
+                "uom_conversion_factor": getattr(subcat, 'uom_conversion_factor', 1.0),
                 "children": []
             }
             
@@ -914,6 +920,9 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                     "item_type": div.item_type,
                     "category_code": div.category_code,
                     "sub_category_code": div.sub_category_code,
+                    "storage_uom": getattr(div, 'storage_uom', 'PCS'),
+                    "purchase_uom": getattr(div, 'purchase_uom', 'PCS'),
+                    "uom_conversion_factor": getattr(div, 'uom_conversion_factor', 1.0),
                     "children": []
                 }
                 
@@ -942,6 +951,9 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                         "category_code": cls.category_code,
                         "sub_category_code": cls.sub_category_code,
                         "division_code": cls.division_code,
+                        "storage_uom": getattr(cls, 'storage_uom', 'PCS'),
+                        "purchase_uom": getattr(cls, 'purchase_uom', 'PCS'),
+                        "uom_conversion_factor": getattr(cls, 'uom_conversion_factor', 1.0),
                         "children": []
                     }
                     
@@ -971,6 +983,9 @@ async def get_hierarchy_tree(is_active: Optional[bool] = True):
                             "sub_category_code": subcls.sub_category_code,
                             "division_code": subcls.division_code,
                             "class_code": subcls.class_code,
+                            "storage_uom": getattr(subcls, 'storage_uom', 'PCS'),
+                            "purchase_uom": getattr(subcls, 'purchase_uom', 'PCS'),
+                            "uom_conversion_factor": getattr(subcls, 'uom_conversion_factor', 1.0),
                             "children": []
                         })
                     

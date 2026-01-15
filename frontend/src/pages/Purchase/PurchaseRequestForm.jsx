@@ -49,6 +49,8 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
     item_description: '',
     quantity: 1,
     unit: 'PCS',
+    storage_uom: 'PCS',
+    uom_conversion_factor: 1.0,
     estimated_unit_rate: '',
     required_date: '',
     notes: '',
@@ -142,15 +144,19 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
     fetchSubCategories()
   }, [lineItemCategory])
 
-  // Update unit when category is selected (UOM is fixed from category)
+  // Update unit when category hierarchy is selected (UOM from most specific level)
   useEffect(() => {
-    if (lineItemCategory) {
+    // Priority: sub-class > class > division > sub-category > category
+    const uomSource = lineItemSubClass || lineItemClass || lineItemDivision || lineItemSubCategory || lineItemCategory
+    if (uomSource) {
       setLineItemFormData(prev => ({
         ...prev,
-        unit: lineItemCategory.purchase_uom || lineItemCategory.default_uom || 'PCS'
+        unit: uomSource.purchase_uom || uomSource.default_uom || 'PCS',
+        storage_uom: uomSource.storage_uom || 'PCS',
+        uom_conversion_factor: uomSource.uom_conversion_factor || 1.0
       }))
     }
-  }, [lineItemCategory?.code])
+  }, [lineItemSubClass?.code, lineItemClass?.code, lineItemDivision?.code, lineItemSubCategory?.code, lineItemCategory?.code])
 
   // Fetch divisions when sub-category changes
   useEffect(() => {
@@ -241,6 +247,8 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
           item_description: itemToEdit.item_description || '',
           quantity: itemToEdit.quantity || 1,
           unit: itemToEdit.unit || 'PCS',
+          storage_uom: itemToEdit.storage_uom || 'PCS',
+          uom_conversion_factor: itemToEdit.uom_conversion_factor || 1.0,
           estimated_unit_rate: itemToEdit.estimated_unit_rate || '',
           required_date: itemToEdit.required_date || formData.required_by_date || '',
           notes: itemToEdit.notes || '',
@@ -606,6 +614,32 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
     const effectiveCategoryCode = item.sub_class_code || item.class_code || item.division_code ||
                                    item.sub_category_code || item.category_code || ''
 
+    // Fetch current UOM settings from item's category (sub-class)
+    let categoryUom = {
+      purchase_uom: item.purchase_uom || item.uom || 'PCS',
+      storage_uom: item.storage_uom || item.uom || 'PCS',
+      uom_conversion_factor: item.uom_conversion_factor || 1.0
+    }
+
+    // Try to fetch latest UOM from the item's category (sub-class level 5)
+    if (item.sub_class_code) {
+      try {
+        const response = await categoryHierarchy.getSubClasses()
+        if (response?.data) {
+          const subClass = response.data.find(sc => sc.code === item.sub_class_code)
+          if (subClass) {
+            categoryUom = {
+              purchase_uom: subClass.purchase_uom || 'PCS',
+              storage_uom: subClass.storage_uom || 'PCS',
+              uom_conversion_factor: subClass.uom_conversion_factor || 1.0
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching category UOM:', error)
+      }
+    }
+
     const newItem = {
       id: `li_${Date.now()}`,
       line_number: lineItems.length + 1,
@@ -617,7 +651,9 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
       item_category: effectiveCategoryCode,
       category_path: item.category_name || '',
       quantity: 1,
-      unit: item.uom || 'PCS',
+      unit: categoryUom.purchase_uom,
+      storage_uom: categoryUom.storage_uom,
+      uom_conversion_factor: categoryUom.uom_conversion_factor,
       estimated_unit_rate: item.purchase_price || null,
       required_date: formData.required_by_date || null,
       suggested_supplier_code: null,
@@ -663,6 +699,8 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
       item_description: '',
       quantity: 1,
       unit: 'PCS',
+      storage_uom: 'PCS',
+      uom_conversion_factor: 1.0,
       estimated_unit_rate: '',
       required_date: formData.required_by_date || '',
       notes: '',
@@ -723,6 +761,8 @@ export default function PurchaseRequestForm({ pr, onClose, onSuccess }) {
       sub_class_name: lineItemSubClass?.name,
       quantity: parseFloat(lineItemFormData.quantity) || 1,
       unit: lineItemFormData.unit || 'PCS',
+      storage_uom: lineItemFormData.storage_uom || 'PCS',
+      uom_conversion_factor: lineItemFormData.uom_conversion_factor || 1.0,
       estimated_unit_rate: lineItemFormData.estimated_unit_rate ? parseFloat(lineItemFormData.estimated_unit_rate) : null,
       required_date: lineItemFormData.required_date || formData.required_by_date || null,
       suggested_supplier_code: lineItemSpecs.supplier_code || null,

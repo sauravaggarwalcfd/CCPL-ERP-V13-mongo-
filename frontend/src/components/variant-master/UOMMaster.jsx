@@ -1,55 +1,32 @@
 /**
  * UOM Master Component
- * Manages UOM variants with grouping and conversion
+ * Manages UOM variants - simplified without grouping
  */
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Search, Calculator, Settings, X, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Calculator, X } from 'lucide-react';
 import { uomApi } from '../../services/variantApi';
 import UOMForm from './UOMForm';
 import UOMConverter from './UOMConverter';
-import GroupedVariantList from './GroupedVariantList';
-import VariantGroupManager from './VariantGroupManager';
 
 const UOMMaster = () => {
   const [uoms, setUoms] = useState([]);
-  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [showConverter, setShowConverter] = useState(false);
-  const [showGroupManager, setShowGroupManager] = useState(false);
   const [editingUOM, setEditingUOM] = useState(null);
-  
-  // Add to group modal state
-  const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
-  const [addToGroupTarget, setAddToGroupTarget] = useState(null);
-  const [selectedUOMsForGroup, setSelectedUOMsForGroup] = useState([]);
 
-  // Load UOMs and groups
+  // Load UOMs
   useEffect(() => {
     loadData();
-  }, [selectedGroup]);
+  }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-
-      // Load groups
-      const groupsRes = await uomApi.getGroups();
-      setGroups(groupsRes.data || []);
-
-      // Load UOMs
-      const params = {
-        is_active: true,
-      };
-      if (selectedGroup !== 'all') {
-        params.group = selectedGroup;
-      }
-
-      const uomsRes = await uomApi.list(params);
+      const uomsRes = await uomApi.list({ is_active: true });
       setUoms(uomsRes.data || []);
     } catch (error) {
       console.error('Error loading UOMs:', error);
@@ -59,29 +36,13 @@ const UOMMaster = () => {
     }
   };
 
-  // Group UOMs by uom_group
-  const groupedUOMs = uoms.reduce((acc, uom) => {
-    const group = uom.uom_group;
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(uom);
-    return acc;
-  }, {});
-
   // Filter UOMs by search term
-  const filteredGroupedUOMs = Object.keys(groupedUOMs).reduce((acc, group) => {
-    const filtered = groupedUOMs[group].filter(
-      (uom) =>
-        uom.uom_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        uom.uom_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        uom.uom_symbol.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    if (filtered.length > 0) {
-      acc[group] = filtered;
-    }
-    return acc;
-  }, {});
+  const filteredUOMs = uoms.filter(
+    (uom) =>
+      uom.uom_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      uom.uom_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      uom.uom_symbol?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleCreate = () => {
     setEditingUOM(null);
@@ -119,7 +80,9 @@ const UOMMaster = () => {
   const handleFormSubmit = async (data) => {
     try {
       if (editingUOM) {
-        await uomApi.update(editingUOM.uom_code, data);
+        // Remove uom_code from update payload - it's not allowed in updates
+        const { uom_code, ...updateData } = data;
+        await uomApi.update(editingUOM.uom_code, updateData);
         toast.success('UOM updated successfully');
       } else {
         await uomApi.create(data);
@@ -130,13 +93,18 @@ const UOMMaster = () => {
       loadData();
     } catch (error) {
       console.error('Error saving UOM:', error);
+      console.error('Error response:', error.response?.data);
       let message = 'Failed to save UOM';
       if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
-          message = error.response.data.detail.map((err) => err.msg).join(', ');
+          message = error.response.data.detail.map((err) => err.msg || err.message || JSON.stringify(err)).join(', ');
         } else if (typeof error.response.data.detail === 'string') {
           message = error.response.data.detail;
+        } else if (typeof error.response.data.detail === 'object') {
+          message = JSON.stringify(error.response.data.detail);
         }
+      } else if (error.message) {
+        message = error.message;
       }
       toast.error(message);
     }
@@ -146,95 +114,6 @@ const UOMMaster = () => {
     setShowForm(false);
     setEditingUOM(null);
   };
-
-  // Handle opening Add to Group modal
-  const handleOpenAddToGroup = (groupCode) => {
-    setAddToGroupTarget(groupCode);
-    setSelectedUOMsForGroup([]);
-    setShowAddToGroupModal(true);
-  };
-
-  // Handle adding UOMs to group
-  const handleAddUOMsToGroup = async () => {
-    if (!addToGroupTarget || selectedUOMsForGroup.length === 0) {
-      toast.error('Please select at least one UOM');
-      return;
-    }
-
-    try {
-      for (const uomCode of selectedUOMsForGroup) {
-        const uom = uoms.find(u => u.uom_code === uomCode);
-        if (uom && uom.uom_group !== addToGroupTarget) {
-          await uomApi.update(uomCode, {
-            ...uom,
-            uom_group: addToGroupTarget
-          });
-        }
-      }
-      
-      toast.success(`Added ${selectedUOMsForGroup.length} UOM(s) to group`);
-      setShowAddToGroupModal(false);
-      setAddToGroupTarget(null);
-      setSelectedUOMsForGroup([]);
-      loadData();
-    } catch (error) {
-      toast.error('Failed to add UOMs to group');
-      console.error(error);
-    }
-  };
-
-  // Get UOMs not in target group
-  const getUOMsNotInGroup = (groupCode) => {
-    return uoms.filter(uom => uom.uom_group !== groupCode);
-  };
-
-  // Toggle UOM selection for adding to group
-  const toggleUOMForGroup = (uomCode) => {
-    setSelectedUOMsForGroup(prev => 
-      prev.includes(uomCode)
-        ? prev.filter(code => code !== uomCode)
-        : [...prev, uomCode]
-    );
-  };
-
-  const renderUOMItem = (uom) => (
-    <div className="flex items-center justify-between p-3 bg-white rounded-lg border hover:shadow-md transition-shadow">
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-900">{uom.uom_name}</span>
-          <span className="text-sm px-2 py-0.5 bg-gray-100 rounded text-gray-700">
-            {uom.uom_symbol}
-          </span>
-          {uom.is_base_uom && (
-            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-              Base
-            </span>
-          )}
-        </div>
-        <div className="text-sm text-gray-500">
-          {uom.uom_code} • Conversion: {uom.conversion_to_base}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => handleEdit(uom)}
-          className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-          title="Edit"
-        >
-          <Edit2 className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => handleDelete(uom)}
-          className="p-2 text-red-600 hover:bg-red-50 rounded"
-          title="Delete"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -252,32 +131,10 @@ const UOMMaster = () => {
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
-          {/* Group Filter */}
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">All Groups</option>
-            {groups.map((group) => (
-              <option key={group.code} value={group.code}>
-                {group.name}
-              </option>
-            ))}
-          </select>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowGroupManager(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-            Manage Groups
-          </button>
-
           <button
             onClick={() => setShowConverter(true)}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -295,24 +152,87 @@ const UOMMaster = () => {
         </div>
       </div>
 
-      {/* Grouped List */}
+      {/* UOM List */}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading UOMs...</div>
+      ) : filteredUOMs.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-gray-400 text-lg mb-2">No UOMs found</div>
+          <p className="text-gray-500 text-sm">
+            {searchTerm ? 'Try a different search term' : 'Click "Add UOM" to create your first UOM'}
+          </p>
+        </div>
       ) : (
-        <GroupedVariantList
-          groupedItems={filteredGroupedUOMs}
-          groups={groups}
-          renderItem={renderUOMItem}
-          emptyMessage="No UOMs found"
-          onAddToGroup={handleOpenAddToGroup}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredUOMs.map((uom) => (
+            <div
+              key={uom.uom_code}
+              className="bg-white rounded-lg border hover:shadow-md transition-shadow p-4"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-gray-900">{uom.uom_name}</span>
+                    <span className="text-sm px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">
+                      {uom.uom_symbol}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 mb-2">
+                    Code: {uom.uom_code}
+                  </div>
+                  {uom.description && (
+                    <div className="text-sm text-gray-600 mb-2 line-clamp-2">
+                      {uom.description}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-xs">
+                    {uom.is_base_uom && (
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                        Base Unit
+                      </span>
+                    )}
+                    {uom.conversion_to_base !== 1 && (
+                      <span className="text-gray-500">
+                        Conv: {uom.conversion_to_base}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={() => handleEdit(uom)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    title="Edit"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(uom)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Summary */}
+      {!loading && filteredUOMs.length > 0 && (
+        <div className="text-sm text-gray-500 text-center">
+          Showing {filteredUOMs.length} of {uoms.length} UOMs
+        </div>
       )}
 
       {/* Form Modal */}
       {showForm && (
         <UOMForm
           uom={editingUOM}
-          groups={groups}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
         />
@@ -321,92 +241,6 @@ const UOMMaster = () => {
       {/* Converter Modal */}
       {showConverter && (
         <UOMConverter uoms={uoms} onClose={() => setShowConverter(false)} />
-      )}
-
-      {/* Group Manager Modal */}
-      {showGroupManager && (
-        <VariantGroupManager
-          variantType="UOM"
-          onClose={() => {
-            setShowGroupManager(false);
-            loadData();
-          }}
-        />
-      )}
-
-      {/* Add to Group Modal */}
-      {showAddToGroupModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Add UOMs to "{groups.find(g => g.code === addToGroupTarget)?.name || addToGroupTarget}"
-              </h3>
-              <button
-                onClick={() => {
-                  setShowAddToGroupModal(false);
-                  setAddToGroupTarget(null);
-                  setSelectedUOMsForGroup([]);
-                }}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="p-4 max-h-96 overflow-y-auto">
-              {getUOMsNotInGroup(addToGroupTarget).length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  All UOMs are already in this group
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {getUOMsNotInGroup(addToGroupTarget).map((uom) => (
-                    <label
-                      key={uom.uom_code}
-                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedUOMsForGroup.includes(uom.uom_code)}
-                        onChange={() => toggleUOMForGroup(uom.uom_code)}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className="font-medium">{uom.uom_code}</span>
-                      <span className="text-gray-600">- {uom.uom_name}</span>
-                      {uom.base_unit && uom.conversion_factor && (
-                        <span className="text-sm text-gray-500">
-                          (1 = {uom.conversion_factor} {uom.base_unit})
-                        </span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center justify-end gap-2 p-4 border-t bg-gray-50">
-              <button
-                onClick={() => {
-                  setShowAddToGroupModal(false);
-                  setAddToGroupTarget(null);
-                  setSelectedUOMsForGroup([]);
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddUOMsToGroup}
-                disabled={selectedUOMsForGroup.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Check className="w-4 h-4" />
-                Add Selected ({selectedUOMsForGroup.length})
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
